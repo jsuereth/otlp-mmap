@@ -37,36 +37,64 @@ impl Meta {
     }
 }
 
-fn main() {
-    let path = Path::new("..\\export.meta");
-    println!("Reading {path:?}");
-    let f = OpenOptions::new()
+struct InputChannel {
+    // We own file to keep its lifetime.
+    f: std::fs::File,
+    data: memmap::MmapMut,
+}
+impl InputChannel {
+    fn new(path: &Path) -> InputChannel {
+        let f = OpenOptions::new()
         .read(true)
         .write(true)
         .create(false)
         .open(path)
         .expect("Unable to open file");
-    let data = unsafe {
-        MmapOptions::new()
-            .map_mut(&f)
-            .expect("Could not access data from memory mapped file")
-    };
-    let state_ref = unsafe { &mut *(data.as_ref().as_ptr() as *mut Meta) };
-    println!("Read\nVersion: {}\nChunk Size: {}\nNum Chunks: {}", state_ref.version, state_ref.chunk_size, state_ref.num_chunks);
-    println!("Reader index: {}", state_ref.read_position.load(Ordering::Relaxed));
-    println!("Writer index: {}", state_ref.write_position.load(Ordering::Relaxed));
+        let data = unsafe {
+            MmapOptions::new()
+                .map_mut(&f)
+                .expect("Could not access data from memory mapped file")
+        };
+        InputChannel { f, data }
+    }
+    fn state_mut(&mut self) -> &mut Meta {
+        unsafe { &mut *(self.data.as_ref().as_ptr() as *mut Meta)}
+    }
+    fn state(&self) -> &Meta {
+        unsafe { &*(self.data.as_ref().as_ptr() as *const Meta)}
+    }
+    fn read_idx(&self) -> i64 {
+        self.state().read_position.load(Ordering::Relaxed) 
+    }
+
+    fn current_buf(&self) -> &[u8] {
+        let read_idx = self.read_idx();
+        let start_byte_idx = (read_idx*self.state().chunk_size) as usize;
+        let stop_byte_idx = ((read_idx+1)*self.state().chunk_size) as usize;
+        &self.data[start_byte_idx..stop_byte_idx]
+    }
+
+    // TODO - helper to move to next buf and read it...
+
+
+}
+
+fn main() {
+    let path = Path::new("..\\export.meta");
+    println!("Reading {path:?}");
+    let mut channel = InputChannel::new(path);
+
+    println!("Read\nVersion: {}\nChunk Size: {}\nNum Chunks: {}", channel.state().version, channel.state().chunk_size, channel.state().num_chunks);
+    println!("Reader index: {}", channel.state().read_position.load(Ordering::Relaxed));
+    println!("Writer index: {}", channel.state().write_position.load(Ordering::Relaxed));
 
     // TOOD - actually read the data.
     let mut idx = 1;
     loop {
-        state_ref.move_next_chunk();
-        let read_idx = state_ref.read_position.load(Ordering::Relaxed);
-        println!("Reading message #: {idx} @ {read_idx}");
-        let start_byte_idx = (read_idx*state_ref.chunk_size) as usize;
-        let stop_byte_idx = ((read_idx+1)*state_ref.chunk_size) as usize;
+        channel.state_mut().move_next_chunk();
+        println!("Reading message #: {idx}");
 
-        let chunk = &data[start_byte_idx..stop_byte_idx];
-        if let Ok(msg) = str::from_utf8(chunk) {
+        if let Ok(msg) = str::from_utf8(channel.current_buf()) {
             println!(" - Read [{msg}]");
         } else {
             println!(" - Failed to read msg!");
