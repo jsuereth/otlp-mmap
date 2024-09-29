@@ -25,7 +25,9 @@ impl Meta {
         let start = self.read_position.load(Ordering::SeqCst);
         let end = self.write_position.load(Ordering::SeqCst);
         let next = (start+1) % (self.num_chunks+1);
-        next != end && self.read_position.compare_exchange(start, next, Ordering::SeqCst, Ordering::Relaxed).is_ok()
+        let too_far = (end+1) % (self.num_chunks+1);
+        // TODO - we should not read index 0?
+        next != too_far && self.read_position.compare_exchange(start, next, Ordering::SeqCst, Ordering::Relaxed).is_ok()
     }
     fn move_next_chunk(&mut self) {
         // TOOD - Exponential backoff and error handling.
