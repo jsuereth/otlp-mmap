@@ -25,9 +25,9 @@ impl Meta {
     fn try_move_next_chunk(&mut self) -> bool {
         let start = self.read_position.load(Ordering::SeqCst);
         let end = self.write_position.load(Ordering::SeqCst);
-        let next = (start+1) % (self.num_chunks+1);
+        let next = (start+1) % self.num_chunks;
         // TODO - we always loose one message if we don't do this, figure out a better algorithm, as this leads to rejected/corrupted data.
-        let too_far = (end+1) % (self.num_chunks+1);
+        let too_far = (end+1) % self.num_chunks;
         // TODO - we should not read index 0?
         next != too_far && self.read_position.compare_exchange(start, next, Ordering::SeqCst, Ordering::Relaxed).is_ok()
     }
@@ -95,7 +95,9 @@ fn main() {
     loop {
         //println!("Reading message #: {idx}");
         if let Ok(msg) = str::from_utf8(channel.current_buf()) {
-            println!(" - Read [{msg}]");
+            println!(" - Read idx[{idx}] w/ [{msg}]");
+            println!("Reader index: {}", channel.state().read_position.load(Ordering::Relaxed));
+            println!("Writer index: {}", channel.state().write_position.load(Ordering::Relaxed));
             ()
         } else {
             println!(" - Failed to read msg {idx}!");
