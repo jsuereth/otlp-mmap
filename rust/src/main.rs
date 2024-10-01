@@ -21,10 +21,12 @@ pub(crate) struct Meta {
 }
 
 impl Meta {
+
     fn try_move_next_chunk(&mut self) -> bool {
         let start = self.read_position.load(Ordering::SeqCst);
         let end = self.write_position.load(Ordering::SeqCst);
         let next = (start+1) % (self.num_chunks+1);
+        // TODO - we always loose one message if we don't do this, figure out a better algorithm, as this leads to rejected/corrupted data.
         let too_far = (end+1) % (self.num_chunks+1);
         // TODO - we should not read index 0?
         next != too_far && self.read_position.compare_exchange(start, next, Ordering::SeqCst, Ordering::Relaxed).is_ok()
@@ -69,8 +71,8 @@ impl InputChannel {
 
     fn current_buf(&self) -> &[u8] {
         let read_idx = self.read_idx();
-        let start_byte_idx = (read_idx*self.state().chunk_size) as usize;
-        let stop_byte_idx = ((read_idx+1)*self.state().chunk_size) as usize;
+        let start_byte_idx = 64 + (read_idx*self.state().chunk_size) as usize;
+        let stop_byte_idx = 64 + ((read_idx+1)*self.state().chunk_size) as usize;
         &self.data[start_byte_idx..stop_byte_idx]
     }
 
@@ -91,15 +93,15 @@ fn main() {
     // TOOD - actually read the data.
     let mut idx = 1;
     loop {
-        channel.state_mut().move_next_chunk();
-        println!("Reading message #: {idx}");
-
+        //println!("Reading message #: {idx}");
         if let Ok(msg) = str::from_utf8(channel.current_buf()) {
             println!(" - Read [{msg}]");
+            ()
         } else {
-            println!(" - Failed to read msg!");
+            println!(" - Failed to read msg {idx}!");
         }
         // sleep(time::Duration::from_secs(1));
+        channel.state_mut().move_next_chunk();
         idx += 1;
     }
 }

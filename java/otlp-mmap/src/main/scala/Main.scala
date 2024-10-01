@@ -56,8 +56,10 @@ class OutputChannel(channel: FileChannel, chunk_length: Long, num_chunks: Long) 
   val metadata = SharedMetadata(channel.map(MapMode.READ_WRITE, 0, 64, arena))
   private var currentIndex = 1
   private var chunks: collection.mutable.ArrayBuffer[MemorySegment] =
-    (1 to (num_chunks+1).toInt).map: i =>
-      channel.map(MapMode.READ_WRITE, chunk_length*i, chunk_length*i+1, arena)
+    (0 until num_chunks.toInt).map: i =>
+      val chunk_start = 64+(chunk_length*i)
+      val chunk_end = chunk_start+chunk_length
+      channel.map(MapMode.READ_WRITE, chunk_start, chunk_end, arena)
     .to(ArrayBuffer)
   writeHeader()
 
@@ -69,7 +71,7 @@ class OutputChannel(channel: FileChannel, chunk_length: Long, num_chunks: Long) 
     def tryMoveNextChunk(): Boolean =
       val end = metadata.readPosition.getVolate()
       val current = metadata.writePosition.get()
-      val next = (current + 1) % (num_chunks+1)
+      val next = (current + 1) % num_chunks
       if (next != end) && metadata.writePosition.compareAndSet(current, next)
       then 
         currentIndex = next.toInt
@@ -117,7 +119,8 @@ class OutputChannel(channel: FileChannel, chunk_length: Long, num_chunks: Long) 
     val channel = use(file.getChannel())
     val my_channel = use(OutputChannel(channel, 64, 100))
 
-    for i <- 1 until 100000 do
+    //for i <- 1 until 100000 do
+    for i <- 1 until 110 do
       System.out.println(s"Writing index: $i")
       try my_channel.writeChunk: buffer =>
         buffer.asCharBuffer().append(f"i:$i%06d")
