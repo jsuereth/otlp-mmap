@@ -54,7 +54,7 @@ class OutputChannel(channel: FileChannel, chunk_length: Long, num_chunks: Long) 
   val version = System.currentTimeMillis()
   val arena = Arena.ofConfined()
   val metadata = SharedMetadata(channel.map(MapMode.READ_WRITE, 0, 64, arena))
-  private var currentIndex = 1
+  private var currentIndex = 0
   private var chunks: collection.mutable.ArrayBuffer[MemorySegment] =
     (0 until num_chunks.toInt).map: i =>
       val chunk_start = 64+(chunk_length*i)
@@ -120,7 +120,7 @@ class OutputChannel(channel: FileChannel, chunk_length: Long, num_chunks: Long) 
     val my_channel = use(OutputChannel(channel, 64, 100))
 
     //for i <- 1 until 100000 do
-    for i <- 1 until 110 do
+    for i <- 0 until 110 do
       System.out.println(s"Writing index: $i")
       try my_channel.writeChunk: buffer =>
         buffer.asCharBuffer().append(f"i:$i%06d")
