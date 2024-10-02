@@ -6,9 +6,9 @@ use oltp_mmap::ringbuffer::RingbufferInputChannel;
 
 
 fn main() {
-    let path = Path::new("..\\export.meta");
+    let path = Path::new("..").join("export.meta");
     println!("Reading {path:?}");
-    let mut channel = RingbufferInputChannel::new(path);
+    let mut channel = RingbufferInputChannel::new(&path);
 
     // TOOD - actually read the data.
     let mut idx = 0;
