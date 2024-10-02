@@ -56,8 +56,8 @@ Files which implement (fixed size) circular buffers contain a 64-byte header as 
 | num_chunks       | 8    | 1     | int64 | number of chunks in the ring buffer               |
 | chunk_size       | 8    | 2     | int64 | size, in bytes, of chunks of ring buffers         |
 | unused           | 24   |       |       | zeroed out bits                                   |
-| writer_position  | 8    | 7     | int64 | position of the current_chunk about to be written |
 | reader_position  | 8    | 6     | int64 | position of the current chunk about to be read    |
+| writer_position  | 8    | 7     | int64 | position of the current_chunk about to be written |
 
 Remaining bytes are the actual fixed-size contents, e.g.
 
