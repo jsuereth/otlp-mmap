@@ -49,9 +49,7 @@ class RingBufferHeader(segment: MemorySegment):
  * 
  * The output channel decides the size of the chunk and the number of chunks in the ring.
  */
-class RingBufferOutputChannel(channel: FileChannel, chunk_length: Long, num_chunks: Long) extends Closeable:
-  // TODO - version should probably be an input.
-  private val version = System.currentTimeMillis()
+class RingBufferOutputChannel(channel: FileChannel, version: Long, chunk_length: Long, num_chunks: Long) extends Closeable:
   // Our memory management for these memory segments.
   // TODO - shoudl we use a shared arena?
   private val arena = Arena.ofConfined()
@@ -111,7 +109,12 @@ class RingBufferOutputChannel(channel: FileChannel, chunk_length: Long, num_chun
 
   // TODO - create next chunk method that will ensure we have a bytebufer at the right piece of memory.
 
+  /** Forces mmap segments to be written to disk. */
+  final def force(): Unit =
+    metadata.force()
+    for chunk <- chunks do chunk.force()
+
   /** Closes the ring buffer file and cleans up all off-heap memory. */
-  def close(): Unit =
+  override def close(): Unit =
     arena.close()
     channel.force(true)

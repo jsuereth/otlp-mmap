@@ -8,5 +8,7 @@ lazy val root = project
 
     scalaVersion := scala3Version,
 
+    libraryDependencies += "io.opentelemetry" % "opentelemetry-sdk-trace" % "1.42.1",
     libraryDependencies += "org.scalameta" %% "munit" % "1.0.0" % Test
+    
   )

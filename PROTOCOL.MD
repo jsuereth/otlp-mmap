@@ -69,7 +69,23 @@ At any time, if `version` has changed, a "reader" of this file needs to reset it
 
 ### Dictionary Files
 
-TODO - How do we write dictionaries, like Resource / instrumentation scope.
+TODO - How do we write dictionaries, like Resource / instrumentation scope. We can think about using
+variable-sized entries to minimize memory usage.
+
+Files which implement a dictionary have the following 64-byte header:
+
+| Field            | Size | Index | Type | Description                                        |
+|------------------|------|-------|------|----------------------------------------------------|
+| version          | 8    | 0     | int64 | version number of the OTLP export                 |
+| num_entries      | 8    | 1     | int64 | the number of entry chunks written                |
+| chunk_size       | 8    | 2     | int64 | The size of each entry (all same size)            |
+| unused           | 40   |       |       | zeroed out bits                                   |
+
+Dictionary entries are fixed size and written sequentially:
+
+```
+| header (64 bytes) | entry 1 | entry 2 | ... | entry N-1 |
+```
 
 ### Timeseries files
 
