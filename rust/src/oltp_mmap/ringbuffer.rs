@@ -13,7 +13,7 @@ pub struct RingbufferInputChannel {
 }
 
 impl RingbufferInputChannel {
-    /// Construct a new Ringbuffer a a file using the given path.
+    /// Construct a new Ringbuffer file input using the given path.
     pub fn new(path: &Path) -> RingbufferInputChannel {
         let f = OpenOptions::new()
         .read(true)
