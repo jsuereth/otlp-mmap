@@ -46,6 +46,7 @@ class DictionaryOutputChannel(channel: FileChannel, version: Long, entry_length:
     private val arena = Arena.ofConfined()
     // The 64-byte header for the ring buffer file.
     private val metadata = DictionaryHeader(channel.map(MapMode.READ_WRITE, 0, 64, arena))
+    writeHeader()
 
     private def writeHeader(): Unit =
         try

@@ -55,6 +55,10 @@ impl RingbufferInputChannel {
     fn state(&self) -> &RingBufferHeader {
         unsafe { &*(self.data.as_ref().as_ptr() as *const RingBufferHeader)}
     }
+    /// Returns the header of this file.
+    pub fn version(&self) -> i64 {
+        self.state().version
+    }
     // TODO - helper to move to next buf and read it...
 }
 
@@ -75,6 +79,19 @@ impl <'a> Deref for RingbufferChunk<'a> {
         let start_byte_idx = 64 + (self.read_idx*self.header.chunk_size) as usize;
         let end_byte_idx = 64 + ((self.read_idx+1)*self.header.chunk_size) as usize;
         &self.data[start_byte_idx..end_byte_idx]
+    }
+}
+impl <'a> prost::bytes::Buf for RingbufferChunk<'a> {
+    fn remaining(&self) -> usize {
+        todo!()
+    }
+
+    fn chunk(&self) -> &[u8] {
+        todo!()
+    }
+
+    fn advance(&mut self, cnt: usize) {
+        todo!()
     }
 }
 

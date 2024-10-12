@@ -29,8 +29,8 @@ impl DictionaryInputChannel {
     }
 
     // TODO _ Add errors.
-    pub fn entry<'a>(&'a self, idx: usize) -> Option<DictionaryEntry<'a>> {
-        if (idx as i64) < self.state().num_entries.load(Ordering::Acquire) {
+    pub fn entry<'a>(&'a self, idx: i64) -> Option<DictionaryEntry<'a>> {
+        if idx >= 0 && idx < self.state().num_entries.load(Ordering::Acquire) {
             Some(DictionaryEntry {
                 data: &self.data,
                 header: self.state(),
@@ -39,6 +39,11 @@ impl DictionaryInputChannel {
         } else {
             None
         }
+    }
+
+    /// Returns the version header of this file.
+    pub fn version(&self) -> i64 {
+        self.state().version
     }
 
     fn state(&self) -> &DictionaryHeader {

@@ -2,6 +2,7 @@ mod oltp_mmap;
 
 use std::path::Path;
 use oltp_mmap::OtlpInputCommon;
+use opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue;
 
 
 fn main() {
@@ -9,12 +10,26 @@ fn main() {
     println!("Reading {path:?}");
     let mut otlp = OtlpInputCommon::new(&path);
 
+    if !otlp.is_sane() {
+        panic!("Version mismatch in OTLP export files!!!");
+    }
+
     // TOOD - actually read the data.
     let mut idx = 0;
     loop {
         println!("Reading message #: {idx}");
-        let _ = otlp.next_span();
+        let span = otlp.next_span().unwrap();
         // sleep(time::Duration::from_secs(1));
+        let resource = otlp.resource(span.resource).unwrap();
+        let scope = otlp.scope(span.scope).unwrap();
+        
+        if let StringValue(service_name) = resource.attributes.first().unwrap().value.as_ref().unwrap().value.as_ref().unwrap() {
+            println!("Read span: {}, from {}, with {}={}", 
+            span.span.name, 
+            scope.name, 
+            resource.attributes.first().unwrap().key,
+            service_name);
+        }
         idx += 1;
     }
 }
