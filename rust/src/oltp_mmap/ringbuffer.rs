@@ -81,21 +81,6 @@ impl <'a> Deref for RingbufferChunk<'a> {
         &self.data[start_byte_idx..end_byte_idx]
     }
 }
-impl <'a> prost::bytes::Buf for RingbufferChunk<'a> {
-    fn remaining(&self) -> usize {
-        todo!()
-    }
-
-    fn chunk(&self) -> &[u8] {
-        todo!()
-    }
-
-    fn advance(&mut self, cnt: usize) {
-        todo!()
-    }
-}
-
-
 
 /// This first 64 bytes of any ringbuffer in OTLP-MMAP has this format.
 /// We use this struct to "reinterpret_cast" and use memory safe primitives for access.

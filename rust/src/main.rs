@@ -14,7 +14,8 @@ fn main() {
         panic!("Version mismatch in OTLP export files!!!");
     }
 
-    // TOOD - actually read the data.
+    // TODO - Try to send the trace data via OTLP.
+    // Create message channels, per-resource or scope perhaps.
     let mut idx = 0;
     loop {
         println!("Reading message #: {idx}");

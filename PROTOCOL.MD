@@ -19,15 +19,40 @@ OTLP-mmap constructs a directory of files for export:
 
 ### resource
 
-TODO
+Resources are written to a Dictionary file as length-encoded protobufs. They use the 
+[Resource](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/resource/v1/resource.proto#L28) protobuf definition in OTLP.
+
+The file name is always `resource.otlp` and is shared between signals.
+
+TODO(jsuereth): These should support `schema_url`.
 
 ### scope
 
-TODO
+InstrumentationScopeInfo are written to a Dictionary file as length-encoded protobufs. They use the
+[InstrumentationScope](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/common/v1/common.proto#L71) protobuf definition in OTLP.
+
+The file name is always `scope.otlp` and is shared between signals.
+
+TODO(jsuereth): These should support `schema_url`.
 
 ### spans
 
-TODO - ring buffer file, with scope/resource referenced by ID.
+Spans are written to a Ringbuffer file as length-encoded protobufs.  They use a custom protobuf definition:
+
+```protobuf
+message SpanRef {
+  // The index reference of the resource in the resource dictionary file.
+  required int64 resource_ref = 1;
+  // The index reference of the resource in the resource dictionary file.
+  required int64 scope_ref = 2;
+  // The actual span of interest.
+  required opentelemetry.proto.trace.v1.Span span = 3;
+}
+```
+
+The file name is always `spans.otlp`.
+
+TODO(jsuereth): These should support `schema_url`.
 
 ### metrics
 
@@ -69,9 +94,6 @@ At any time, if `version` has changed, a "reader" of this file needs to reset it
 
 ### Dictionary Files
 
-TODO - How do we write dictionaries, like Resource / instrumentation scope. We can think about using
-variable-sized entries to minimize memory usage.
-
 Files which implement a dictionary have the following 64-byte header:
 
 | Field            | Size | Index | Type | Description                                        |
@@ -86,6 +108,8 @@ Dictionary entries are fixed size and written sequentially:
 ```
 | header (64 bytes) | entry 1 | entry 2 | ... | entry N-1 |
 ```
+
+TODO(jsuereth) - Think about variable size entries.
 
 ### Timeseries files
 

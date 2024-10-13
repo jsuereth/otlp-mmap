@@ -60,6 +60,7 @@ impl OtlpInputCommon {
 
     // TODO - error handling.
     pub fn next_span(&mut self) -> Option<OtlpSpan> {
+         // TODO - every now and then check sanity before continuing...?
         let buf = self.spans.next();
         match SpanRef::decode_length_delimited(buf.deref()) {
             Ok(span_ref) => {
