@@ -52,15 +52,26 @@ message SpanRef {
 
 The file name is always `spans.otlp`.
 
-TODO(jsuereth): These should support `schema_url`.
-
 ### metrics
 
 TODO
 
 ### logs
 
-TODO - ring buffer file, with scope/resource referenced by ID.
+Logs are written to a Ringbuffer file as length-encoded protobufs.  They use a custom protobuf definition:
+
+```protobuf
+message LogRef {
+  // The index reference of the resource in the resource dictionary file.
+  required int64 resource_ref = 1;
+  // The index reference of the resource in the resource dictionary file.
+  required int64 scope_ref = 2;
+  // The actual span of interest.
+  required opentelemetry.proto.logs.v1.LogRecord log = 3;
+}
+```
+
+The file name is always `logs.otlp`.
 
 ## Low Level Details
 
