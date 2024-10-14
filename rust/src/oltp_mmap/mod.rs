@@ -1,7 +1,6 @@
-use std::{ops::Deref, path::Path};
-
+use std::path::Path;
 use dictionary::DictionaryInputChannel;
-use opentelemetry_proto::tonic::{common::v1::InstrumentationScope, resource::{self, v1::Resource}, trace::v1::Span};
+use opentelemetry_proto::tonic::{common::v1::InstrumentationScope, resource::v1::Resource, trace::v1::Span};
 use prost::Message;
 use ringbuffer::RingbufferInputChannel;
 use span_ref::SpanRef;
@@ -10,6 +9,7 @@ use span_ref::SpanRef;
 pub mod ringbuffer;
 pub mod dictionary;
 pub mod span_ref;
+pub mod r#async;
 
 /// An implementation that reads OTLP data.
 pub struct OtlpInputCommon {
@@ -31,56 +31,56 @@ impl OtlpInputCommon {
         self.resources.version() == self.scopes.version() &&
         self.resources.version() == self.spans.version()
     }
-
+    /// Reads the resource referenced by an index.
     pub fn resource(&self, idx: i64) -> Option<Resource> {
-        self.resources.entry(idx).and_then(|buf| {
-            match Resource::decode_length_delimited(buf.deref()) {
-                Ok(resource) => Some(resource),
-                // TODO - Save errors.
-                Err(e) => {
-                    println!("Failed to read resource @ {idx}, {e:?}");
-                    None
-                },
-            }
-        })
+        self.resources.entry(idx).and_then(|buf| read_resource(&buf))
     }
-
+    /// Reads the instrumentation scope referenced by an index.
     pub fn scope(&self, idx: i64) -> Option<InstrumentationScope> {
-        self.scopes.entry(idx).and_then(|buf| {
-            match InstrumentationScope::decode_length_delimited(buf.deref()) {
-                Ok(resource) => Some(resource),
-                // TODO - Save errors.
-                Err(e) => {
-                    println!("Failed to read scope @ {idx}, {e:?}");
-                    None
-                },
-            }
-        })
+        self.scopes.entry(idx).and_then(|buf| read_scope(&buf))
     }
 
     // TODO - error handling.
+    /// Polls until the next span to read is available.
     pub fn next_span(&mut self) -> Option<OtlpSpan> {
          // TODO - every now and then check sanity before continuing...?
-        let buf = self.spans.next();
-        match SpanRef::decode_length_delimited(buf.deref()) {
-            Ok(span_ref) => {
-                // TODO - load resource.  Use safe mechanism to do it.
-                Some(OtlpSpan {
-                    // span: span_ref.span,
-                    resource: span_ref.resource_ref,
-                    scope: span_ref.scope_ref,
-                    span: span_ref.span,
-                })
-            },
-            // TODO - save errors
-            Err(e) => {
-                println!("Failed to read span, {e:?}");
-                None
-            },
-        }
+         read_span_ref(&self.spans.next())
     }
 }
 
+/// Actually reads the resource from chunks.
+fn read_resource(buf: &[u8]) -> Option<Resource> {
+    match Resource::decode_length_delimited(buf) {
+        Ok(resource) => Some(resource),
+        // TODO - Save errors.
+        Err(_) => None,
+    }
+}
+
+/// Actually reads the scope from chunks.
+fn read_scope(buf: &[u8]) -> Option<InstrumentationScope> {
+    match InstrumentationScope::decode_length_delimited(buf) {
+        Ok(scope) => Some(scope),
+        // TODO - Save errors.
+        Err(_) => None,
+    }
+}
+
+/// Actually reads the span references from chunks.
+fn read_span_ref(buf: &[u8]) -> Option<OtlpSpan> {
+    match SpanRef::decode_length_delimited(buf) {
+        Ok(span_ref) => Some(OtlpSpan {
+            // span: span_ref.span,
+            resource: span_ref.resource_ref,
+            scope: span_ref.scope_ref,
+            span: span_ref.span,
+        }),
+        // TODO - Save errors.
+        Err(_) => None,
+    }
+}
+
+/// A span sent via MMAP OTLP where resource/scope are sent by index.
 pub struct OtlpSpan {
     // pub span: Span,
     pub resource: i64,

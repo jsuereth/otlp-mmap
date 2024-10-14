@@ -28,25 +28,36 @@ impl RingbufferInputChannel {
         };
         RingbufferInputChannel { f, data }
     }
+
+    /// Read the next event in the ringbuffer.
+    /// Returns None if no messages are yet available.
+    pub fn try_next<'a>(&'a mut self) -> Option<RingbufferChunk<'a>> {
+        // TODO - Check sanity of the stream before continuing.
+        // TODO - make sure previous chunk was returned before continuing...
+        if !self.state().has_messages() {
+            None
+        } else {
+            let read_idx = self.read_position();
+            Some(RingbufferChunk {
+                data: &self.data,
+                header: unsafe {
+                    &mut *(self.data.as_ref().as_ptr() as *mut RingBufferHeader)
+                },
+                read_idx,
+            })
+        }
+    }
+
     /// Read the next event in the ringbuffer.
     /// Note: this will block!
     /// 
     /// Additionally, you cannot read the next chunk until this is "dropped".
     pub fn next<'a>(&'a mut self) -> RingbufferChunk<'a> {
-        // TODO - Check sanity of the stream before continuing.
-        // TODO - make sure previous chunk was returned before continuing...
         // TODO - exponential backoff loop.
         while !self.state().has_messages() {
             thread::yield_now();
         }
-        let read_idx = self.read_position();
-        RingbufferChunk {
-            data: &self.data,
-            header: unsafe {
-                &mut *(self.data.as_ref().as_ptr() as *mut RingBufferHeader)
-            },
-            read_idx,
-        }
+        self.try_next().unwrap()
     }
     fn read_position(&self) -> i64 {
         self.state().read_position.load(Ordering::Relaxed)
