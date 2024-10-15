@@ -582,6 +582,7 @@ dependencies = [
  "opentelemetry-proto",
  "prost",
  "serde",
+ "thiserror",
 ]
 
 [[package]]

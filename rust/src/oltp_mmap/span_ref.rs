@@ -2,8 +2,7 @@ use opentelemetry_proto::tonic::trace::v1::Span;
 
 /// SpanRef - The proto message format used for the spans.otlp ringbuffer.
 #[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, PartialEq, ::prost::Message, serde::Serialize, serde::Deserialize)]
 pub struct SpanRef {
     /// Index reference to the resource this span uses.
     #[prost(int64, tag = 1)]

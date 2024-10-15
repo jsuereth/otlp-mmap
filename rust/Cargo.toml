@@ -10,3 +10,4 @@ memmap = "0.7.0"
 opentelemetry-proto = { version="0.26.1", features = ["with-serde", "gen-tonic", "trace"] }
 serde={ version = "1.0.210", features = ["derive"] }
 prost = "0.13.3"
+thiserror="1.0.64"
