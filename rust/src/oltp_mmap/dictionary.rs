@@ -1,12 +1,45 @@
 use super::Error;
 use memmap::{Mmap, MmapOptions};
+use moka::future::{Cache, CacheBuilder};
 use std::fs::{File, OpenOptions};
 use std::ops::Deref;
 use std::path::Path;
 use std::sync::atomic::AtomicI64;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+/// Async, cached access to Dictionary Files.
+pub struct AsyncDictionaryInput<T> {
+    input: Mutex<DictionaryInputChannel>,
+    cache: Cache<i64, Arc<T>>,
+}
+impl<T> AsyncDictionaryInput<T>
+where
+    T: prost::Message + std::default::Default + 'static,
+{
+    /// Open a dictionary file and construct an LRU cache against its values.
+    pub fn new(p: &Path, max_capacity: u64) -> Result<AsyncDictionaryInput<T>, Error> {
+        Ok(AsyncDictionaryInput {
+            input: Mutex::new(DictionaryInputChannel::new(p)?),
+            cache: CacheBuilder::new(max_capacity).build(),
+        })
+    }
+    /// Reads a value from the dictionary. Returns an error on I/O issues.
+    pub async fn get(&self, idx: i64) -> Result<T, Error> {
+        let input = self.input.lock().await;
+        let buf = input.entry(idx)?;
+        T::decode_length_delimited(buf.deref()).map_err(Error::ProtobufDecodeError)
+    }
+    /// Reads the timestamp associated with this dictionary.
+    pub async fn timestamp(&self) -> i64 {
+        self.input.lock().await.version()
+    }
+}
 
 /// An input channel that leverages mmap'd files to communicate dictionary entries.
+///
+/// All access is synchronous.
 pub struct DictionaryInputChannel {
     // We own the file to keep its lifetime
     f: File,

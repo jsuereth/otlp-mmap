@@ -1,20 +1,110 @@
-use dictionary::DictionaryInputChannel;
+use dictionary::{AsyncDictionaryInput, DictionaryInputChannel};
 use error::OltpMmapError;
+use itertools::Itertools;
 use opentelemetry_proto::tonic::{
-    common::v1::InstrumentationScope, resource::v1::Resource, trace::v1::Span,
+    collector::trace::{
+        self,
+        v1::{trace_service_client::TraceServiceClient, ExportTraceServiceRequest},
+    },
+    common::v1::InstrumentationScope,
+    resource::v1::Resource,
+    trace::v1::{ResourceSpans, ScopeSpans, Span},
 };
 use prost::Message;
-use ringbuffer::RingbufferInputChannel;
+use ringbuffer::{AsyncRingBufferInputChannel, RingbufferInputChannel};
 use span_ref::SpanRef;
-use std::path::Path;
-
-type Error = error::OltpMmapError;
+use std::{path::Path, time::Duration};
 
 pub mod dictionary;
 pub mod error;
 pub mod ringbuffer;
 pub mod span_ref;
 // pub mod r#async;
+
+/// Errors used within OTLP-mmap.
+pub type Error = error::OltpMmapError;
+
+/// Asynchronous exeuction of OTLP mmap input channels.
+pub struct OtlpInputAsync {
+    resources: AsyncDictionaryInput<Resource>,
+    scopes: AsyncDictionaryInput<InstrumentationScope>,
+    spans: AsyncRingBufferInputChannel<SpanRef>,
+}
+impl OtlpInputAsync {
+    pub fn new(p: &Path) -> Result<OtlpInputAsync, Error> {
+        Ok(OtlpInputAsync {
+            resources: AsyncDictionaryInput::new(&p.join("resource.otlp"), 10)?,
+            scopes: AsyncDictionaryInput::new(&p.join("scope.otlp"), 100)?,
+            spans: AsyncRingBufferInputChannel::new(&p.join("spans.otlp"))?,
+        })
+    }
+
+    pub async fn send_traces_to(&self, trace_endpoint: &str) -> Result<(), Error> {
+        let client = TraceServiceClient::connect(trace_endpoint.to_owned()).await?;
+        self.send_traces_loop(client).await
+    }
+
+    async fn send_traces_loop(
+        &self,
+        mut endpoint: TraceServiceClient<tonic::transport::Channel>,
+    ) -> Result<(), Error> {
+        loop {
+            let next_batch = self.create_otlp_trace_write_request().await?;
+            endpoint.export(next_batch).await?;
+        }
+    }
+
+    async fn create_otlp_trace_write_request(
+        &self,
+    ) -> Result<trace::v1::ExportTraceServiceRequest, Error> {
+        // TODO - configure buffer spans.
+        let spans = self.buffer_spans(100).await?;
+        let mut result = ExportTraceServiceRequest {
+            resource_spans: Default::default(),
+        };
+        for (rid, spans) in spans.into_iter().chunk_by(|s| s.resource_ref).into_iter() {
+            let resource = self.resources.get(rid).await?;
+            let mut resource_spans = ResourceSpans {
+                resource: Some(resource),
+                scope_spans: Default::default(),
+                schema_url: "".to_owned(),
+            };
+            for (sid, spans) in &spans.chunk_by(|s| s.scope_ref) {
+                let scope = self.scopes.get(sid).await?;
+                resource_spans.scope_spans.push(ScopeSpans {
+                    scope: Some(scope),
+                    spans: spans.into_iter().map(|s| s.span).collect(),
+                    schema_url: "".to_owned(),
+                });
+            }
+            result.resource_spans.push(resource_spans);
+        }
+        Ok(result)
+    }
+
+    /// Groups spans (with timeout) and sends the group for downstream publishing.
+    async fn buffer_spans(&self, max_spans: usize) -> Result<Vec<SpanRef>, Error> {
+        // TODO - Allow configurable timeout.
+        let mut buf = Vec::new();
+        let send_by_time =
+            tokio::time::sleep_until(tokio::time::Instant::now() + Duration::from_secs(1));
+        tokio::pin!(send_by_time);
+
+        loop {
+            tokio::select! {
+                span = self.spans.next() => {
+                    buf.push(span?);
+                    if buf.len() >= max_spans {
+                        return Ok(buf);
+                    }
+                },
+                () = &mut send_by_time => {
+                    return Ok(buf);
+                },
+            }
+        }
+    }
+}
 
 /// An implementation that reads OTLP data.
 pub struct OtlpInputCommon {
@@ -51,7 +141,15 @@ impl OtlpInputCommon {
         read_scope(&buf)
     }
 
-    // TODO - error handling.
+    /// Attempts to read the next span.  Returns Ok(None) if none are available.
+    pub fn try_next_span(&mut self) -> Result<Option<OtlpSpan>, Error> {
+        if let Some(buf) = self.spans.try_next() {
+            Ok(Some(read_span_ref(&buf)?))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Polls until the next span to read is available.
     pub fn next_span(&mut self) -> Result<OtlpSpan, Error> {
         // TODO - every now and then check sanity before continuing...?

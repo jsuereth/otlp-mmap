@@ -1,11 +1,69 @@
 use super::Error;
 use memmap::MmapOptions;
+use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::atomic::Ordering;
 use std::thread;
+use std::time::Duration;
 use std::{fs::OpenOptions, path::Path, sync::atomic::AtomicI64};
+use tokio::sync::Mutex;
+
+/// Async access to RingBuffer input files.
+pub struct AsyncRingBufferInputChannel<T> {
+    input: Mutex<RingbufferInputChannel>,
+    phantom: PhantomData<T>,
+}
+
+impl<T> AsyncRingBufferInputChannel<T>
+where
+    T: prost::Message + std::default::Default + 'static,
+{
+    /// Construct a new Ringbuffer file input using the given path.
+    pub fn new(path: &Path) -> Result<AsyncRingBufferInputChannel<T>, Error> {
+        Ok(AsyncRingBufferInputChannel {
+            input: Mutex::new(RingbufferInputChannel::new(path)?),
+            phantom: PhantomData,
+        })
+    }
+
+    /// Reads the next input on this ringbuffer.
+    /// Note: This will lock the ringbuffer from access for the duration.
+    pub async fn next(&self) -> Result<T, Error> {
+        // We want to ensure "chunk" falls out of scope (is Drop-ed) before this
+        // lock is dropped.
+        let mut input = self.input.lock().await;
+        // Exponential Backoff attempt to read next span.
+        // TODO -  FastSpin ~ 10 times?
+        // Yield-Spin ~ 10 times
+        for _ in 0..10 {
+            if let Some(buf) = input.try_next() {
+                return Ok(T::decode_length_delimited(buf.deref())?);
+            } else {
+                tokio::task::yield_now().await;
+            }
+        }
+        // Sleep spin, exponentially slower.
+        let mut d = Duration::from_millis(1);
+        loop {
+            if let Some(buf) = input.try_next() {
+                return Ok(T::decode_length_delimited(buf.deref())?);
+            } else {
+                tokio::time::sleep(d).await;
+            }
+            // TODO - Cap max wait time.
+            d = d * 2;
+        }
+    }
+
+    /// Returns the timestamp of this ringbuffer.
+    pub async fn timestamp(&self) -> i64 {
+        self.input.lock().await.version()
+    }
+}
 
 /// An input channel that leverages mmap'd files to communicate events via ringbuffer.
+///
+/// All interactions are synchronous.
 pub struct RingbufferInputChannel {
     // We own file to keep its lifetime.
     #[allow(dead_code)]

@@ -21,11 +21,17 @@ A few principles:
 
 To run the current example, do the following:
 
-1. In one terminal, go to the `java/otlp-mmap` directory.  Type `sbt run`
-2. In another terminal go to the `rust` directory, Type `cargo run`.
+1. In one terminal, start a debug opentelemetry collector.
+
+```
+docker run   -p 127.0.0.1:4317:4317   -p 127.0.0.1:55679:55679   otel/opentelemetry-collector-contrib:0.111.0
+```
+
+2. In one terminal, go to the `java/otlp-mmap` directory.  Type `sbt run`
+3. In another terminal go to the `rust` directory, Type `cargo run`.
 
 You should see a Java (scala) program generating Spans and firing them into the `export` directory.  The Rust
-program will be reading these spans and printing information about them.
+program will be reading these spans and sending them via regular OTLP to the collector.
    
 
 ## Details

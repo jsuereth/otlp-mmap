@@ -11,3 +11,7 @@ opentelemetry-proto = { version="0.26.1", features = ["with-serde", "gen-tonic",
 serde={ version = "1.0.210", features = ["derive"] }
 prost = "0.13.3"
 thiserror="1.0.64"
+tokio = { version = "1.40.0", features = ["full"] }
+moka = { version = "0.12.8", features = ["future"] }
+tonic = "0.12.3"
+itertools="0.13.0"

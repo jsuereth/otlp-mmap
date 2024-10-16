@@ -10,4 +10,10 @@ pub enum OltpMmapError {
 
     #[error("Index {1} not found in dictionary {0}")]
     NotFoundInDictoinary(String, i64),
+
+    #[error("{0}")]
+    TonicStatus(#[from] tonic::Status),
+
+    #[error("{0}")]
+    TonicTransportError(#[from] tonic::transport::Error),
 }
