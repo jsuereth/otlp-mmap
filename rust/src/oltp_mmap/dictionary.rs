@@ -9,30 +9,32 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-/// Async, cached access to Dictionary Files.
-pub struct AsyncDictionaryInput<T> {
-    input: Mutex<DictionaryInputChannel>,
+/// Async, cached access to OTLP mmap Dictionary Files.
+pub struct DictionaryReader<T> {
+    input: Mutex<RawDictionaryReader>,
     cache: Cache<i64, Arc<T>>,
 }
-impl<T> AsyncDictionaryInput<T>
+impl<T> DictionaryReader<T>
 where
     T: prost::Message + std::default::Default + 'static,
 {
     /// Open a dictionary file and construct an LRU cache against its values.
-    pub fn new(p: &Path, max_capacity: u64) -> Result<AsyncDictionaryInput<T>, Error> {
-        Ok(AsyncDictionaryInput {
-            input: Mutex::new(DictionaryInputChannel::new(p)?),
+    pub fn new(p: &Path, max_capacity: u64) -> Result<DictionaryReader<T>, Error> {
+        Ok(DictionaryReader {
+            input: Mutex::new(RawDictionaryReader::new(p)?),
             cache: CacheBuilder::new(max_capacity).build(),
         })
     }
     /// Reads a value from the dictionary. Returns an error on I/O issues.
-    pub async fn get(&self, idx: i64) -> Result<T, Error> {
-        let input = self.input.lock().await;
-        let buf = input.entry(idx)?;
-        T::decode_length_delimited(buf.deref()).map_err(Error::ProtobufDecodeError)
+    pub async fn get(&self, idx: i64) -> Result<Arc<T>, Arc<Error>> {
+        self.cache.try_get_with(idx, async move {
+            let input = self.input.lock().await;
+            let buf = input.entry(idx)?;
+            T::decode_length_delimited(buf.deref()).map_err(Error::ProtobufDecodeError).map(Arc::new)
+        }).await
     }
     /// Reads the timestamp associated with this dictionary.
-    pub async fn timestamp(&self) -> i64 {
+    pub async fn version(&self) -> i64 {
         self.input.lock().await.version()
     }
 }
@@ -40,15 +42,15 @@ where
 /// An input channel that leverages mmap'd files to communicate dictionary entries.
 ///
 /// All access is synchronous.
-pub struct DictionaryInputChannel {
+struct RawDictionaryReader {
     // We own the file to keep its lifetime
     f: File,
     data: Mmap,
     name: String,
 }
-impl DictionaryInputChannel {
+impl RawDictionaryReader {
     /// Construct a new Dictionary file input using the given path.
-    pub fn new(path: &Path) -> Result<DictionaryInputChannel, Error> {
+    pub fn new(path: &Path) -> Result<RawDictionaryReader, Error> {
         let f = OpenOptions::new()
             .read(true)
             .write(false)
@@ -59,7 +61,7 @@ impl DictionaryInputChannel {
                 .map(&f)
                 .expect("Could not access data from memory mapped file")
         };
-        Ok(DictionaryInputChannel {
+        Ok(RawDictionaryReader {
             f,
             data,
             name: path.display().to_string(),
@@ -67,9 +69,9 @@ impl DictionaryInputChannel {
     }
 
     // TODO _ Add errors.
-    pub fn entry<'a>(&'a self, idx: i64) -> Result<DictionaryEntry<'a>, Error> {
+    fn entry<'a>(&'a self, idx: i64) -> Result<RawDictionaryEntry<'a>, Error> {
         if idx >= 0 && idx < self.state().num_entries.load(Ordering::Acquire) {
-            Ok(DictionaryEntry {
+            Ok(RawDictionaryEntry {
                 data: &self.data,
                 header: self.state(),
                 read_idx: idx as i64,
@@ -83,21 +85,21 @@ impl DictionaryInputChannel {
     }
 
     /// Returns the version header of this file.
-    pub fn version(&self) -> i64 {
+    fn version(&self) -> i64 {
         self.state().version
     }
 
-    fn state(&self) -> &DictionaryHeader {
-        unsafe { &*(self.data.as_ref().as_ptr() as *const DictionaryHeader) }
+    fn state(&self) -> &RawDictionaryHeader {
+        unsafe { &*(self.data.as_ref().as_ptr() as *const RawDictionaryHeader) }
     }
 }
 
-pub struct DictionaryEntry<'a> {
+struct RawDictionaryEntry<'a> {
     data: &'a Mmap,
-    header: &'a DictionaryHeader,
+    header: &'a RawDictionaryHeader,
     read_idx: i64,
 }
-impl<'a> Deref for DictionaryEntry<'a> {
+impl<'a> Deref for RawDictionaryEntry<'a> {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
         let start_byte_index = (64 + (self.header.entry_size * self.read_idx)) as usize;
@@ -109,7 +111,7 @@ impl<'a> Deref for DictionaryEntry<'a> {
 /// This first 64 bytes of any ringbuffer in OTLP-MMAP has this format.
 /// We use this struct to "reinterpret_cast" and use memory safe primitives for access.
 #[repr(C)]
-pub(crate) struct DictionaryHeader {
+struct RawDictionaryHeader {
     /// Current data instance version
     version: i64,
     num_entries: AtomicI64,

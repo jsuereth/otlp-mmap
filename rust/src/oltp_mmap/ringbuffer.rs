@@ -3,25 +3,24 @@ use memmap::MmapOptions;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::atomic::Ordering;
-use std::thread;
 use std::time::Duration;
 use std::{fs::OpenOptions, path::Path, sync::atomic::AtomicI64};
 use tokio::sync::Mutex;
 
 /// Async access to RingBuffer input files.
-pub struct AsyncRingBufferInputChannel<T> {
-    input: Mutex<RingbufferInputChannel>,
+pub struct RingBufferReader<T> {
+    input: Mutex<RawRingbufferReader>,
     phantom: PhantomData<T>,
 }
 
-impl<T> AsyncRingBufferInputChannel<T>
+impl<T> RingBufferReader<T>
 where
     T: prost::Message + std::default::Default + 'static,
 {
     /// Construct a new Ringbuffer file input using the given path.
-    pub fn new(path: &Path) -> Result<AsyncRingBufferInputChannel<T>, Error> {
-        Ok(AsyncRingBufferInputChannel {
-            input: Mutex::new(RingbufferInputChannel::new(path)?),
+    pub fn new(path: &Path) -> Result<RingBufferReader<T>, Error> {
+        Ok(RingBufferReader {
+            input: Mutex::new(RawRingbufferReader::new(path)?),
             phantom: PhantomData,
         })
     }
@@ -51,8 +50,10 @@ where
                 println!("Waiting {d:?} for input...");
                 tokio::time::sleep(d).await;
             }
-            // TODO - Cap max wait time.
-            d = d * 2;
+            // TODO - Cap max wait time configuration.
+            if d.as_secs() < 1 {
+                d = d * 2;
+            }
         }
     }
 
@@ -65,16 +66,16 @@ where
 /// An input channel that leverages mmap'd files to communicate events via ringbuffer.
 ///
 /// All interactions are synchronous.
-pub struct RingbufferInputChannel {
+pub struct RawRingbufferReader {
     // We own file to keep its lifetime.
     #[allow(dead_code)]
     f: std::fs::File,
     data: memmap::MmapMut,
 }
 
-impl RingbufferInputChannel {
+impl RawRingbufferReader {
     /// Construct a new Ringbuffer file input using the given path.
-    pub fn new(path: &Path) -> Result<RingbufferInputChannel, Error> {
+    fn new(path: &Path) -> Result<RawRingbufferReader, Error> {
         let f = OpenOptions::new()
             .read(true)
             .write(true)
@@ -85,43 +86,31 @@ impl RingbufferInputChannel {
                 .map_mut(&f)
                 .expect("Could not access data from memory mapped file")
         };
-        Ok(RingbufferInputChannel { f, data })
+        Ok(RawRingbufferReader { f, data })
     }
 
     /// Read the next event in the ringbuffer.
     /// Returns None if no messages are yet available.
-    pub fn try_next<'a>(&'a mut self) -> Option<RingbufferChunk<'a>> {
+    fn try_next<'a>(&'a mut self) -> Option<RawRingbufferEntry<'a>> {
         // TODO - Check sanity of the stream before continuing.
         // TODO - make sure previous chunk was returned before continuing...
         if !self.state().has_messages() {
             None
         } else {
             let read_idx = self.read_position();
-            Some(RingbufferChunk {
+            Some(RawRingbufferEntry {
                 data: &self.data,
-                header: unsafe { &mut *(self.data.as_ref().as_ptr() as *mut RingBufferHeader) },
+                header: unsafe { &mut *(self.data.as_ref().as_ptr() as *mut RawRingBufferHeader) },
                 read_idx,
             })
         }
-    }
-
-    /// Read the next event in the ringbuffer.
-    /// Note: this will block!
-    ///
-    /// Additionally, you cannot read the next chunk until this is "dropped".
-    pub fn next<'a>(&'a mut self) -> RingbufferChunk<'a> {
-        // TODO - exponential backoff loop.
-        while !self.state().has_messages() {
-            thread::yield_now();
-        }
-        self.try_next().unwrap()
     }
     fn read_position(&self) -> i64 {
         self.state().read_position.load(Ordering::Relaxed)
     }
     /// Grants readable access to the ring buffer header.
-    fn state(&self) -> &RingBufferHeader {
-        unsafe { &*(self.data.as_ref().as_ptr() as *const RingBufferHeader) }
+    fn state(&self) -> &RawRingBufferHeader {
+        unsafe { &*(self.data.as_ref().as_ptr() as *const RawRingBufferHeader) }
     }
     /// Returns the header of this file.
     pub fn version(&self) -> i64 {
@@ -131,17 +120,17 @@ impl RingbufferInputChannel {
 }
 
 /// Grants access to memory chunk in a ringbuffer.
-pub struct RingbufferChunk<'a> {
+struct RawRingbufferEntry<'a> {
     data: &'a memmap::MmapMut,
-    header: &'a mut RingBufferHeader,
+    header: &'a mut RawRingBufferHeader,
     read_idx: i64,
 }
-impl<'a> Drop for RingbufferChunk<'a> {
+impl<'a> Drop for RawRingbufferEntry<'a> {
     fn drop(&mut self) {
         self.header.move_next_chunk(self.read_idx);
     }
 }
-impl<'a> Deref for RingbufferChunk<'a> {
+impl<'a> Deref for RawRingbufferEntry<'a> {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
         let start_byte_idx = 64 + (self.read_idx * self.header.chunk_size) as usize;
@@ -153,7 +142,7 @@ impl<'a> Deref for RingbufferChunk<'a> {
 /// This first 64 bytes of any ringbuffer in OTLP-MMAP has this format.
 /// We use this struct to "reinterpret_cast" and use memory safe primitives for access.
 #[repr(C)]
-pub(crate) struct RingBufferHeader {
+pub(crate) struct RawRingBufferHeader {
     /// Current data instance version
     version: i64,
     num_chunks: i64,
@@ -165,7 +154,7 @@ pub(crate) struct RingBufferHeader {
     write_position: AtomicI64,
 }
 
-impl RingBufferHeader {
+impl RawRingBufferHeader {
     fn move_next_chunk(&mut self, expected: i64) {
         let next = (expected + 1) % self.num_chunks;
         match self.read_position.compare_exchange(

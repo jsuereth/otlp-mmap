@@ -1,4 +1,3 @@
-use dictionary::AsyncDictionaryInput;
 use itertools::Itertools;
 use opentelemetry_proto::tonic::{
     collector::trace::{
@@ -9,7 +8,6 @@ use opentelemetry_proto::tonic::{
     resource::v1::Resource,
     trace::v1::{ResourceSpans, ScopeSpans},
 };
-use ringbuffer::AsyncRingBufferInputChannel;
 use span_ref::SpanRef;
 use std::{path::Path, time::Duration};
 
@@ -20,19 +18,21 @@ pub mod span_ref;
 
 /// Errors used within OTLP-mmap.
 pub type Error = error::OltpMmapError;
+type RingBufferReader<T> = ringbuffer::RingBufferReader<T>;
+type DictionaryReader<T> = dictionary::DictionaryReader<T>;
 
 /// Asynchronous exeuction of OTLP mmap input channels.
-pub struct OtlpInputAsync {
-    resources: AsyncDictionaryInput<Resource>,
-    scopes: AsyncDictionaryInput<InstrumentationScope>,
-    spans: AsyncRingBufferInputChannel<SpanRef>,
+pub struct OtlpMmapReader {
+    resources: DictionaryReader<Resource>,
+    scopes: DictionaryReader<InstrumentationScope>,
+    spans: RingBufferReader<SpanRef>,
 }
-impl OtlpInputAsync {
-    pub fn new(p: &Path) -> Result<OtlpInputAsync, Error> {
-        Ok(OtlpInputAsync {
-            resources: AsyncDictionaryInput::new(&p.join("resource.otlp"), 10)?,
-            scopes: AsyncDictionaryInput::new(&p.join("scope.otlp"), 100)?,
-            spans: AsyncRingBufferInputChannel::new(&p.join("spans.otlp"))?,
+impl OtlpMmapReader {
+    pub fn new(p: &Path) -> Result<OtlpMmapReader, Error> {
+        Ok(OtlpMmapReader {
+            resources: DictionaryReader::new(&p.join("resource.otlp"), 10)?,
+            scopes: DictionaryReader::new(&p.join("scope.otlp"), 100)?,
+            spans: RingBufferReader::new(&p.join("spans.otlp"))?,
         })
     }
 
@@ -67,14 +67,14 @@ impl OtlpInputAsync {
         for (rid, spans) in spans.into_iter().chunk_by(|s| s.resource_ref).into_iter() {
             let resource = self.resources.get(rid).await?;
             let mut resource_spans = ResourceSpans {
-                resource: Some(resource),
+                resource: Some(resource.as_ref().clone()),
                 scope_spans: Default::default(),
                 schema_url: "".to_owned(),
             };
             for (sid, spans) in &spans.chunk_by(|s| s.scope_ref) {
                 let scope = self.scopes.get(sid).await?;
                 resource_spans.scope_spans.push(ScopeSpans {
-                    scope: Some(scope),
+                    scope: Some(scope.as_ref().clone()),
                     spans: spans.into_iter().map(|s| s.span).collect(),
                     schema_url: "".to_owned(),
                 });
