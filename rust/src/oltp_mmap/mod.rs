@@ -28,7 +28,9 @@ pub struct OtlpMmapReader {
     spans: RingBufferReader<SpanRef>,
 }
 impl OtlpMmapReader {
+    /// Construct a new reader of OTLP mmap protocol.
     pub fn new(p: &Path) -> Result<OtlpMmapReader, Error> {
+        // TODO - configurable cache capacity.
         Ok(OtlpMmapReader {
             resources: DictionaryReader::new(&p.join("resource.otlp"), 10)?,
             scopes: DictionaryReader::new(&p.join("scope.otlp"), 100)?,
@@ -36,17 +38,21 @@ impl OtlpMmapReader {
         })
     }
 
+    // Opens an OTLP connection and fires traces read from OTLP mmap into it.
     pub async fn send_traces_to(&self, trace_endpoint: &str) -> Result<(), Error> {
         let client = TraceServiceClient::connect(trace_endpoint.to_owned()).await?;
         self.send_traces_loop(client).await
     }
 
+    /// This will loop and attempt to send traces at an OTLP endpoint.
+    /// Continuing infinitely.
     async fn send_traces_loop(
         &self,
         mut endpoint: TraceServiceClient<tonic::transport::Channel>,
     ) -> Result<(), Error> {
         let mut batch_idx = 1;
         loop {
+            self.check_sanity().await?;
             let next_batch = self.create_otlp_trace_write_request().await?;
             if !next_batch.resource_spans.is_empty() {
                 println!("Sending batch #{batch_idx}");
@@ -56,6 +62,24 @@ impl OtlpMmapReader {
         }
     }
 
+    /// Returns OK(()) if OTLP MMAP versions match, error otherwise.
+    async fn check_sanity(&self) -> Result<(), Error> {
+        // TODO - check sanity should check if our local version read is still the same,
+        // vs.just comparing version against each other.
+        let r_version = self.resources.version().await;
+        let s_version = self.scopes.version().await;
+        if r_version != s_version {
+            return Err(error::OltpMmapError::VersionMismatch(r_version, s_version))
+        }
+        let version = self.spans.version().await;
+        if r_version != version {
+            return Err(error::OltpMmapError::VersionMismatch(r_version, version));
+        }
+        Ok(())        
+    }
+
+    /// Constructs an OTLP (not mmap) TraceServiceRequest.
+    /// This will first atempt to buffer 100 spans (or elapsed time) before returning.
     async fn create_otlp_trace_write_request(
         &self,
     ) -> Result<trace::v1::ExportTraceServiceRequest, Error> {

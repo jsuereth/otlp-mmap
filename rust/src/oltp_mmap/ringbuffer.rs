@@ -58,7 +58,7 @@ where
     }
 
     /// Returns the timestamp of this ringbuffer.
-    pub async fn timestamp(&self) -> i64 {
+    pub async fn version(&self) -> i64 {
         self.input.lock().await.version()
     }
 }

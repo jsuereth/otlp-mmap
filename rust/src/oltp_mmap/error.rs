@@ -3,6 +3,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum OltpMmapError {
+    #[error("OTLP mmap version mismatch. {0} != {1}")]
+    VersionMismatch(i64, i64),
+
     #[error(transparent)]
     IoError(#[from] std::io::Error),
 
