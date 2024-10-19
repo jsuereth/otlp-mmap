@@ -12,7 +12,7 @@ Using memory mapped files for export has drawbacks, but a few important upsides:
 
 A few principles:
 
-- *Limited Persistence:* We do not (truly) care about persistence. This could leverage shared memory.  However, persistence
+- *Limited Persistence:* We do not (truly) care about persistence. This could leverage shared memory. However, persistence can be a benefit in the event the collection process dies and need to restart.
 - *Concurrent Access:* We must assume at least 1 producer and at most 1 consumer of o11y data. All access to files should leverage memory safety primitves, and encourage direct page sharing between processes.
 - *Fixed sized entries:* We start with fixed-size assumptions and can adapt/scale based on performance benchmarks.
 
@@ -56,9 +56,24 @@ docker run   -p 127.0.0.1:4317:4317   -p 127.0.0.1:55679:55679   otel/openteleme
 
 You should see a Java (scala) program generating Spans and firing them into the `export` directory.  The Rust
 program will be reading these spans and sending them via regular OTLP to the collector.
-   
-
 
 ## Details
 
 See [Protocol](PROTOCOL.MD) for details on the file contents and layout.
+
+## Prototyping TODOs
+
+- [ ] Throughput tests
+- [ ] Benchmarks
+    - Memory usage of traditonal otlp exporter vs. MMap-Writer + MMap-collector combined
+    - Memory overhead of primary process
+- File format experiements
+  - [ ] Metric file format
+  - [ ] Evaluate Parquet
+  - [ ] variable sized entry dictionary
+- More Language Writers
+  - [ ] Go
+- Deeper SDK hooks
+  - [ ] Directly keeping metric aggregations in mmap
+  - [ ] Directly writing span start/stop/event to ringbuffer
+- Comparison w/ eBPF techniques
