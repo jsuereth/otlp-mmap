@@ -91,9 +91,10 @@ impl RawRingbufferReader {
 
     /// Read the next event in the ringbuffer.
     /// Returns None if no messages are yet available.
+    /// The previous RingbufferEntry returned MUST be dropped before calling again.
     fn try_next<'a>(&'a mut self) -> Option<RawRingbufferEntry<'a>> {
         // TODO - Check sanity of the stream before continuing.
-        // TODO - make sure previous chunk was returned before continuing...
+        // We need to record the version we first read in a different mem location to do that.
         if !self.state().has_messages() {
             None
         } else {

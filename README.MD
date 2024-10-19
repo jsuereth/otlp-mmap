@@ -34,6 +34,29 @@ You should see a Java (scala) program generating Spans and firing them into the 
 program will be reading these spans and sending them via regular OTLP to the collector.
    
 
+## Building
+
+1. Build otlp-mmap-collector image
+
+```
+cd rust
+docker build . -t otel/otlp-mmap-collector:latest
+```
+
+2. Build java-demo-app image
+
+```
+cd java
+cd otlp-mmap
+docker build . -t otel/mmap-demo:latest
+```
+
+3. Run the demo
+
+```
+docker compose up
+```
+
 ## Details
 
 See [Protocol](PROTOCOL.MD) for details on the file contents and layout.

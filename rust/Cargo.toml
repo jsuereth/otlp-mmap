@@ -1,5 +1,5 @@
 [package]
-name = "otlp-mmap"
+name = "otlp-mmap-collector"
 version = "0.1.0"
 edition = "2021"
 

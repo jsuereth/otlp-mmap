@@ -21,20 +21,45 @@ pub type Error = error::OltpMmapError;
 type RingBufferReader<T> = ringbuffer::RingBufferReader<T>;
 type DictionaryReader<T> = dictionary::DictionaryReader<T>;
 
+/// Configuration for reading OTLP.
+pub struct OtlpMmapReaderConfig {
+    /// Capacity of LRU cache for reading resource from dictionary.
+    pub resource_cache_capacity: u64,
+    /// Capacity of LRU cache for reading instrumentation scope from dictionary.
+    pub scope_cache_capactiy: u64,
+    /// Maximum number of spans to buffer in one batch.
+    pub max_spans_batch: usize,
+    /// Maximum time to wait for spans before sending a batch.
+    pub span_batch_timeout: Duration,
+}
+
+impl Default for OtlpMmapReaderConfig {
+    fn default() -> Self {
+        Self { 
+            resource_cache_capacity: 10, 
+            scope_cache_capactiy: 100,
+            max_spans_batch: 100,
+            span_batch_timeout: Duration::from_secs(60),
+        }
+    }
+}
+
 /// Asynchronous exeuction of OTLP mmap input channels.
 pub struct OtlpMmapReader {
     resources: DictionaryReader<Resource>,
     scopes: DictionaryReader<InstrumentationScope>,
     spans: RingBufferReader<SpanRef>,
+    config: OtlpMmapReaderConfig,
 }
 impl OtlpMmapReader {
     /// Construct a new reader of OTLP mmap protocol.
-    pub fn new(p: &Path) -> Result<OtlpMmapReader, Error> {
+    pub fn new(p: &Path, config: OtlpMmapReaderConfig) -> Result<OtlpMmapReader, Error> {
         // TODO - configurable cache capacity.
         Ok(OtlpMmapReader {
-            resources: DictionaryReader::new(&p.join("resource.otlp"), 10)?,
-            scopes: DictionaryReader::new(&p.join("scope.otlp"), 100)?,
+            resources: DictionaryReader::new(&p.join("resource.otlp"), config.resource_cache_capacity)?,
+            scopes: DictionaryReader::new(&p.join("scope.otlp"), config.scope_cache_capactiy)?,
             spans: RingBufferReader::new(&p.join("spans.otlp"))?,
+            config,
         })
     }
 
@@ -84,7 +109,7 @@ impl OtlpMmapReader {
         &self,
     ) -> Result<trace::v1::ExportTraceServiceRequest, Error> {
         // TODO - configure buffer spans.
-        let spans = self.buffer_spans(100).await?;
+        let spans = self.buffer_spans(self.config.max_spans_batch).await?;
         let mut result = ExportTraceServiceRequest {
             resource_spans: Default::default(),
         };
@@ -113,9 +138,8 @@ impl OtlpMmapReader {
         // TODO - Allow configurable timeout.
         let mut buf = Vec::new();
         let send_by_time =
-            tokio::time::sleep_until(tokio::time::Instant::now() + Duration::from_secs(60));
+            tokio::time::sleep_until(tokio::time::Instant::now() + self.config.span_batch_timeout);
         tokio::pin!(send_by_time);
-
         loop {
             tokio::select! {
                 span = self.spans.next() => {

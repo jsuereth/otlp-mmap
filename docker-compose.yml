@@ -1,0 +1,40 @@
+x-otlp-mmap-volume:
+  &otlp-mmap-volume
+  type: bind
+  source: ./export
+  target: /otlp/export
+services:
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.72.0
+    volumes:
+      - ./otel-config.yaml:/otel-config.yaml
+    command: ["--config=/otel-config.yaml"]
+    ports:
+      - "4317:4317"
+  # Regular OTLP Demo
+  # normal_otlp_demo:
+  #   image: otel/mmap-demo:latest
+  #   depends_on:
+  #     - collector
+  #   environment:
+  #     OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4317
+  #     OTEL_RESOURCE_ATTRIBUTES: "service.name=normal_otlp"
+  # Mmap OTLP Demo
+  mmap_otlp_demo:
+    image: otel/mmap-demo:latest
+    environment:
+      OTLP_MMAP_EXPORTER_DIRECTORY: /otlp/export
+    # TODO - share definiton w/ mmap collector
+    volumes: 
+      - ./export:/otlp/export
+  mmap_collector:
+    image: otel/otlp-mmap-collector:latest
+    depends_on:
+      - collector
+      - mmap_otlp_demo
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4317
+      OTLP_MMAP_EXPORTER_DIRECTORY: /otlp/export
+    # TODO - share definiton w/ demo
+    volumes: 
+      - ./export:/otlp/export
