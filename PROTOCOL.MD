@@ -14,7 +14,9 @@ OTLP-mmap constructs a directory of files for export:
   - `resource.otlp`: A Dictionary containing resource definitions
   - `scope.otlp`: A Dictionary containing scope definitions
   - `spans.otlp`: A Circular Buffer containing exported spans
-  - `metrics.otlp`: A Timeseries file containing exported metric data points
+  - `metrics.otlp`: A dictionary containing metric names.
+  - `metrics_series.otlp`: A Dictionary containing attributes for timeseries that are recorded.
+  - `metrics_points.otlp`: A circular Buffer containing data points
   - `logs.otlp`: A Circular Buffer containing exported logs
 
 ### resource
@@ -52,9 +54,42 @@ message SpanRef {
 
 The file name is always `spans.otlp`.
 
-### metrics
+## metrics
 
-TODO
+A dictionary of metric definitions.
+
+```protobuf
+message Metric {
+  required string name = 1;
+  required string description = 2;
+  required string unit = 3;
+  required InstrumentType instrument = 4;
+}
+```
+
+### metrics time series
+
+Time series are written as a dictionary of metric name and attribute.
+
+```protobuf
+message TimeSeries {
+  required int64 metric_ref = 1;
+  repeated KeyValue attributes = 2;
+}
+```
+
+### metrics data points
+
+A ringbuffer of points.
+
+```protobuf
+message DataPoint {
+  required int64 timeseries_ref = 1;
+  oneof point {
+    ...
+  }
+}
+```
 
 ### logs
 
@@ -103,7 +138,7 @@ Remaining bytes are the actual fixed-size contents, e.g.
 
 At any time, if `version` has changed, a "reader" of this file needs to reset its state and start fresh.
 
-### Dictionary Files
+### Fixed Size Dictionary Files
 
 Files which implement a dictionary have the following 64-byte header:
 
@@ -120,7 +155,28 @@ Dictionary entries are fixed size and written sequentially:
 | header (64 bytes) | entry 1 | entry 2 | ... | entry N-1 |
 ```
 
-TODO(jsuereth) - Think about variable size entries.
+
+### Variable Sized Dictionary Files
+
+Files which implement a variable sized dictionary have the following 64-byte header:
+
+| Field            | Size | Index | Type | Description                                        |
+|------------------|------|-------|------|----------------------------------------------------|
+| version          | 8    | 0     | int64 | version number of the OTLP export                 |
+| unused           | 48   |       |       | zeroed out bits                                   |
+| writer_position  | 8    | 7     | int64 | byte offset of the next unused entry chunk.       |
+
+  
+Dictionary entries are fixed size and written sequentially:
+
+```
+| header (64 bytes) | entry 1 | entry 2 | ... | entry N-1 |
+```
+
+TODO(jsuereth) - Think about a sparse index.
+
+Note: When referencing a Variable-Sized dictionary, the offset (in bytes) from the start of the file
+is used as the index into the dictionary.
 
 ### Timeseries files
 
