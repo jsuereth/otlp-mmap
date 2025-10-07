@@ -16,12 +16,12 @@ object DictionaryHeader:
 class DictionaryHeader(segment: MemorySegment):
       // Helper class to simplify doing direct memory access using concurrency primitives.
   class MetadataLongField(index: Int):
-    inline def get(): Long = RingBufferHeader.metaHandle.get(segment, index)
-    inline def getVolate(): Long = RingBufferHeader.metaHandle.getVolatile(segment, index)
-    inline def set(value: Long) = RingBufferHeader.metaHandle.set(segment, index, value)
-    inline def setVolatile(value: Long) = RingBufferHeader.metaHandle.setVolatile(segment, index, value)
-    inline def setRelease(value: Long) = RingBufferHeader.metaHandle.setRelease(segment, index, value)
-    inline def compareAndSet(expected: Long, value: Long): Boolean = RingBufferHeader.metaHandle.compareAndSet(segment, index, expected, value)
+    inline def get(): Long = RingBufferHeader.metaHandle.get(segment, 0L, index)
+    inline def getVolate(): Long = RingBufferHeader.metaHandle.getVolatile(segment, 0L,index)
+    inline def set(value: Long) = RingBufferHeader.metaHandle.set(segment, 0L,index, value)
+    inline def setVolatile(value: Long) = RingBufferHeader.metaHandle.setVolatile(segment, 0L,index, value)
+    inline def setRelease(value: Long) = RingBufferHeader.metaHandle.setRelease(segment, 0L,index, value)
+    inline def compareAndSet(expected: Long, value: Long): Boolean = RingBufferHeader.metaHandle.compareAndSet(segment, 0L, index, expected, value)
 
   val version = MetadataLongField(DictionaryHeader.VERSION_INDEX)
   val length = MetadataLongField(DictionaryHeader.LENGTH_INDEX)
