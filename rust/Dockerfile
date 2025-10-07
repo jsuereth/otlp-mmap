@@ -1,6 +1,6 @@
 
 # The build image
-FROM rust:1.78.0-alpine3.18 AS build
+FROM rust:1.88.0-alpine3.22 AS build
 RUN apk add musl-dev
 WORKDIR /build
 
@@ -13,7 +13,7 @@ COPY src /build/src
 RUN cargo build --release
 
 # The runtime image
-FROM alpine:3.20.3
+FROM alpine:3.22
 LABEL maintainer="The OpenTelemetry Authors"
 # TODO - Don't run as root...
 # RUN addgroup otel \
