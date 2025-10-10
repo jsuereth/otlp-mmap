@@ -8,7 +8,7 @@ lazy val root = project
 
     scalaVersion := scala3Version,
 
-    libraryDependencies += "io.opentelemetry" % "opentelemetry-sdk-trace" % "1.54.1",
+    libraryDependencies += "io.opentelemetry" % "opentelemetry-sdk" % "1.54.1",
     // libraryDependencies += "io.opentelemetry" % "opentelemetry-exporter-otlp-common" % "1.42.1",
     libraryDependencies += "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % "1.54.1",
     libraryDependencies += "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.54.1",

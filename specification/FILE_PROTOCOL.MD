@@ -43,7 +43,8 @@ The header will consist of the following 64-byte block.
 | events           | 8    | 1     | int64 | offset to event ringbuffer.                       |
 | spans            | 8    | 2     | int64 | offest to span ringbufer.                         |
 | measurements     | 8    | 2     | int64 | offset to measurement ringbuffer.                 |
-| unused           | 24   |       |       | zeroed out bits                                   |
+| measurements     | 8    | 3     | int64 | offset to dictionary.                             |
+| unused           | 16   |       |       | zeroed out bits                                   |
 
 
 ### Ringbuffers
