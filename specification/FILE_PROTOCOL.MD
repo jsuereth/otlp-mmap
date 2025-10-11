@@ -56,15 +56,56 @@ order:
 - **Spans**: events representing span lifecycle.
 - **Measurements**: events represnting a measurement (metric).
 
-Ringbuffers are an array of fixed-size buffers that begin with the following 64-byte header:
+Ringbuffers are an array of fixed-size buffers that begin with the following 32-byte header:
 
-| Field            | Size | Index | Type | Description                                        |
-|------------------|------|-------|------|----------------------------------------------------|
-| num_chunks       | 8    | 0     | int64 | number of chunks in the ring buffer               |
-| chunk_size       | 8    | 1     | int64 | size, in bytes, of chunks of ring buffers         |
-| unused           | 32   |       |       | zeroed out bits                                   |
-| reader_position  | 8    | 6     | int64 | position of the current chunk about to be read    |
-| writer_position  | 8    | 7     | int64 | position of the current_chunk about to be written |
+| Field             | Size | Index | Type | Description                                        |
+|-------------------|------|-------|------|----------------------------------------------------|
+| num_buffers       | 8    | 0     | int64 | number of buffers in the ring buffer              |
+| buffer_size       | 8    | 1     | int64 | size, in bytes, of a buffer in the ring buffers   |
+| reader_position   | 8    | 2     | int64 | position of the current chunk about to be read    |
+| writer_position   | 8    | 3     | int64 | TODO                                              |
+
+The header is immediately followed by a int32 array representing buffer availability.
+
+The size of the availability mask
+
+Ringbuffers are designed to be lock-less multi-producer single-consumer (MPSC) queues. To support
+multiple writers concurrently, we have mechanism that allows producers to claim unique slots atomically
+and then publish those slots out of order.
+
+Note: `writer_position` refers to the largest sequence claimed by *any* producer.
+
+The current available capacity for writing in a ring buffer can be computed as:
+
+```java
+long capacity =
+  (reader_position < writer_position) ? 
+  reader_position + num_buffers - writer_position :
+  reader_position - writer_position;
+```
+
+## Producer algorithm
+
+Producers use an atomic "get and add" operation on `writer_position` to atomically claim the next n
+available buffers. This sequence number serves as the guaranteed unique index for that specific message
+or batch of messages.
+
+This producer now owns this section of the ring-buffer.
+
+Once a producer has finished writing data to its claimed slot, it atomically updates the availability
+buffer entry at the corresponding index using a release store operation. This releases the buffer
+from the producer.
+
+## Consumer algorithm
+
+The single consumer checks consecutive availability starting from its current reader_position. A buffer
+is considered available only if the flag stored in the availability buffer matches the expected availability
+ for that sequence number. The consumer increments its reader_position only when it finds the next sequence
+ is available, ensuring strict ordering even if producers published out of sequence.
+
+
+
+
 
 ### Dictionary
 

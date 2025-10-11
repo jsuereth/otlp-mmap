@@ -11,21 +11,6 @@ import java.io.RandomAccessFile
 
 class SdkMmap
 
-
-object Header:
-    val metaHandle = ValueLayout.JAVA_LONG.arrayElementVarHandle()
-
-trait Header:
-  def segment: MemorySegment
-  def force(): Unit = segment.force()
-  class MetadataLongField(index: Int):
-    inline def get(): Long = Header.metaHandle.get(segment, 0L, index)
-    inline def getVolate(): Long = Header.metaHandle.getVolatile(segment, 0L,index)
-    inline def set(value: Long) = Header.metaHandle.set(segment, 0L,index, value)
-    inline def setVolatile(value: Long) = Header.metaHandle.setVolatile(segment, 0L,index, value)
-    inline def setRelease(value: Long) = Header.metaHandle.setRelease(segment, 0L,index, value)
-    inline def compareAndSet(expected: Long, value: Long): Boolean = Header.metaHandle.compareAndSet(segment, 0L, index, expected, value)
-
 /** 
  * A header for the dictionary in the file.
  * 
@@ -33,7 +18,7 @@ trait Header:
  */
 final class DictionaryHeader(val segment: MemorySegment) extends Header:
     val end = MetadataLongField(0)
-    val num_entries = MetadataLongField(1)
+    val num_entries = MetadataLongField(8)
 
 final class Dictionary(header: DictionaryHeader, channel: FileChannel):
     def writeEntry(size: Long)(writer: ByteBuffer => Unit): Long =
@@ -58,86 +43,18 @@ object Dictionary:
         header.end.set(offset+64)
         new Dictionary(header, channel)
 
-/** 
- * A header for a ringbuffer in the file.
- * 
- * This provides read/write access and memory synchronization primitives.
- */
-final class RingBufferHeader(val segment: MemorySegment) extends Header:
-    val num_chunks = MetadataLongField(0)
-    val chunk_size = MetadataLongField(1)
-    val read_position = MetadataLongField(6)
-    val write_position = MetadataLongField(7)
-
-/**
-  * An in-memory ring-buffer that will use primitives against the header
-  * to write to each ring buffer chunk.
-  *
-  * @param header A wrapper around the memory segment representing the header.
-  * @param chunks The memory segments we use for each chunk in the ringbuffer.
-  */
-final class RingBuffer(header: RingBufferHeader, chunks: Array[MemorySegment]):
-  /** Write a chunk to the ring buffer. */
-  def writeChunk[A](writer: ByteBuffer => A): A =
-    try writer(currentChunk.asByteBuffer().order(ByteOrder.nativeOrder()))
-    finally moveNextChunk()
-  def force(): Unit =
-    header.force()
-    chunks.foreach(_.force())
-  private var currentIndex = 0
-  // Returns a the current chunk for writing.
-  private def currentChunk: MemorySegment =
-    chunks(currentIndex)
-  // Advanced the write position, when able.  THIS WILL BLOCK.
-  private def moveNextChunk(): Unit =
-    // Note this will block until we can write.
-    def tryMoveNextChunk(): Boolean =
-      val end = header.read_position.getVolate()
-      val current = header.write_position.get()
-      val next = (current + 1) % header.num_chunks.get()
-      if (next != end) && header.write_position.compareAndSet(current, next)
-      then 
-        currentIndex = next.toInt
-        true
-      else false
-    // TODO - exponential backoff
-    while !tryMoveNextChunk()
-    do Thread.`yield`()
-
-object RingBuffer:
-    def apply(channel: FileChannel, offset: Long, opt: RingBufferOptions): RingBuffer =
-        val arena = Arena.ofConfined()
-        println(s"Creating ring buffer header from ${offset} to ${offset+64}")
-        val header = RingBufferHeader(channel.map(MapMode.READ_WRITE, offset, 64, arena))
-        header.chunk_size.set(opt.chunk_length)
-        header.num_chunks.set(opt.num_chunks)
-        header.read_position.set(0)
-        header.write_position.set(0)
-        val chunks = 
-            (0 until opt.num_chunks.toInt).map: i =>
-                val chunk_start = offset+64+(opt.chunk_length*i)
-                val chunk_end = chunk_start+opt.chunk_length
-                println(s"Creating ring buffer chunk from ${chunk_start} to ${chunk_end}")
-                channel.map(MapMode.READ_WRITE, chunk_start, opt.chunk_length, arena)
-            .toArray
-        chunks.foreach(println)
-        new RingBuffer(header, chunks)
 
 class FileHeader(val segment: MemorySegment) extends Header:
     val version = MetadataLongField(0)
-    val events = MetadataLongField(1)
-    val spans = MetadataLongField(2)
-    val measurements = MetadataLongField(3)
-    val dictionary = MetadataLongField(4)
+    val events = MetadataLongField(1*8)
+    val spans = MetadataLongField(2*8)
+    val measurements = MetadataLongField(3*8)
+    val dictionary = MetadataLongField(4*8)
 object FileHeader:
     def apply(channel: FileChannel): FileHeader =
         val arena = Arena.ofConfined()
         new FileHeader(channel.map(MapMode.READ_WRITE, 0, 64, arena))
 
-case class RingBufferOptions(
-    chunk_length: Long,
-    num_chunks: Long,
-)
 case class SdkMmapOptions(
     events: RingBufferOptions,
     spans: RingBufferOptions,
@@ -190,16 +107,16 @@ object SdkMmapRaw:
         println(s"Creating event channel @ ${offset}")
         val events = RingBuffer(file.getChannel(), offset, opt.events)
         header.events.set(offset)
-        offset += 64+opt.events.chunk_length*opt.events.num_chunks
+        offset += 64+opt.events.buffer_size*opt.events.num_buffers
         // We need to align this on a 8-byte boundary.
         println(s"Creating span channel @ ${offset}")
         val spans = RingBuffer(file.getChannel(), offset, opt.spans)
         header.spans.set(offset)
-        offset += 64+opt.spans.chunk_length*opt.spans.num_chunks
+        offset += 64+opt.spans.buffer_size*opt.spans.num_buffers
         println(s"Creating measurement channel @ ${offset}")
         val measurements = RingBuffer(file.getChannel(), offset, opt.measurements)
         header.measurements.set(offset)
-        offset += 64+opt.measurements.chunk_length*opt.measurements.num_chunks
+        offset += 64+opt.measurements.buffer_size*opt.measurements.num_buffers
         println(s"Creating dictionary @ ${offset}")
         val dictionary = Dictionary(file.getChannel(), offset)
         header.dictionary.set(offset)
