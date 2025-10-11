@@ -80,13 +80,13 @@ class SdkMmapRaw(
         dictionary.writeEntry(entry.size)(entry.write)
 
     def write_event[T: Writable](entry: T): Unit =
-        events.writeChunk(entry.write)
+        events.writeToNextBuffer(entry.write)
 
     def write_span[T: Writable](entry: T): Unit =
-        spans.writeChunk(entry.write)
+        spans.writeToNextBuffer(entry.write)
 
     def write_measurement[T: Writable](entry: T): Unit =
-        measurements.writeChunk(entry.write)
+        measurements.writeToNextBuffer(entry.write)
 
     def force(): Unit =
         events.force()
@@ -107,16 +107,16 @@ object SdkMmapRaw:
         println(s"Creating event channel @ ${offset}")
         val events = RingBuffer(file.getChannel(), offset, opt.events)
         header.events.set(offset)
-        offset += 64+opt.events.buffer_size*opt.events.num_buffers
+        offset += events.byteSize()
         // We need to align this on a 8-byte boundary.
         println(s"Creating span channel @ ${offset}")
         val spans = RingBuffer(file.getChannel(), offset, opt.spans)
         header.spans.set(offset)
-        offset += 64+opt.spans.buffer_size*opt.spans.num_buffers
+        offset += spans.byteSize()
         println(s"Creating measurement channel @ ${offset}")
         val measurements = RingBuffer(file.getChannel(), offset, opt.measurements)
         header.measurements.set(offset)
-        offset += 64+opt.measurements.buffer_size*opt.measurements.num_buffers
+        offset += measurements.byteSize()
         println(s"Creating dictionary @ ${offset}")
         val dictionary = Dictionary(file.getChannel(), offset)
         header.dictionary.set(offset)

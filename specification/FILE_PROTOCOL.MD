@@ -56,39 +56,62 @@ order:
 - **Spans**: events representing span lifecycle.
 - **Measurements**: events represnting a measurement (metric).
 
-Ringbuffers are an array of fixed-size buffers that begin with the following 32-byte header:
+Ringbuffers are an array laid out as follows:
+
+```
+| header | availability array | buffer 1 | buffer 2 | ... |
+```
+
+The header is 32-bytes and consists of the following:
 
 | Field             | Size | Index | Type | Description                                        |
 |-------------------|------|-------|------|----------------------------------------------------|
 | num_buffers       | 8    | 0     | int64 | number of buffers in the ring buffer              |
 | buffer_size       | 8    | 1     | int64 | size, in bytes, of a buffer in the ring buffers   |
-| reader_position   | 8    | 2     | int64 | position of the current chunk about to be read    |
-| writer_position   | 8    | 3     | int64 | TODO                                              |
+| reader_index      | 8    | 2     | int64 | index of the number of events the reader has read |
+| writer_index      | 8    | 3     | int64 | index of the number of events claimed by writers  |
 
-The header is immediately followed by a int32 array representing buffer availability.
+The header is immediately followed by a int32 array representing buffer availability. The length of
+the availability array is equal to number of buffers in the ring buffer.
 
-The size of the availability mask
+The availibility array is then followed by the actual buffers themselves.
 
 Ringbuffers are designed to be lock-less multi-producer single-consumer (MPSC) queues. To support
 multiple writers concurrently, we have mechanism that allows producers to claim unique slots atomically
 and then publish those slots out of order.
 
-Note: `writer_position` refers to the largest sequence claimed by *any* producer.
+This means that we follow a "claim-then-commit" approach to any particular buffer in the ring.
 
-The current available capacity for writing in a ring buffer can be computed as:
+All index values are monotonically increasing sequences (vs. current index in the ringbuffer). We
+use this property to understand, via the availability array, whether any particular buffer is ready
+to be read.
 
-```java
-long capacity =
-  (reader_position < writer_position) ? 
-  reader_position + num_buffers - writer_position :
-  reader_position - writer_position;
+Note: Ringbuffers *must* be have size equal to a power-of-two, to optimise latency-sensitive math used in hot-paths.
+
+#### Producer Algorithm
+
+First a producer attempts to claim the next `writer_position` (atomically). 
+This sequence number serves as the guaranteed unique index for the buffer.
+This should have a capacity check.  An example algorithm:
+
+```rust
+fn tryObtainNextWrite() -> Option<i64> {
+  let current = header.write_position.load(Ordering::Relaxed)
+  let next = current + 1
+  let reader = header.read_position.load(Ordering::Acquire)
+  let hasCapacity = {
+    let previousIndexWithConflict = current + 1 - header.num_buffers
+    previousIndexWithConflict < reader
+  }
+  if hasCapacity && header.write_position.compare_exchange(
+    current, next, Ordering::SeqCst, Ordering::Relaxed
+  ) {
+    Some(next)
+  } else {
+    None
+  }
+}
 ```
-
-## Producer algorithm
-
-Producers use an atomic "get and add" operation on `writer_position` to atomically claim the next n
-available buffers. This sequence number serves as the guaranteed unique index for that specific message
-or batch of messages.
 
 This producer now owns this section of the ring-buffer.
 
@@ -96,16 +119,55 @@ Once a producer has finished writing data to its claimed slot, it atomically upd
 buffer entry at the corresponding index using a release store operation. This releases the buffer
 from the producer.
 
-## Consumer algorithm
+This can be done as follows:
+
+```rust
+// Assume we have an `indexMask` of `num_buffers-1`
+// Assume we have a `shift` of `log2(num_buffers)`
+fn ringIndex(idx: i64) -> usize {
+  // Note this is the equivalent of
+  // (idx % num_buffers) as usize
+  (idx & indexMask) as usize
+}
+fn availabilityFlagForIndex(idx: i64) -> i32 {
+  (idx >>> shift) as i32
+}
+fn setAvailable(idx: i64) {
+  availability_array[ringIndex(idx)] = availabilityFlagForIndex(idx)
+}
+```
+
+#### Consumer algorithm
 
 The single consumer checks consecutive availability starting from its current reader_position. A buffer
 is considered available only if the flag stored in the availability buffer matches the expected availability
- for that sequence number. The consumer increments its reader_position only when it finds the next sequence
- is available, ensuring strict ordering even if producers published out of sequence.
+ for that sequence number. 
+ 
+ The consumer increments its reader_position only after it reads the next sequence, ensuring producers do not overwrite data it is reading.
 
+An example check for availability:
 
+```rust
+fn tryObtainNextRead() -> Option<i64> {
+  let reader = header.read_position.load(Ordering::Acquire)
+  let writer = header.write_position.load(Ordering::Acquire)
+  let next = reader + 1
+  if isReadable(next) {
+    Some(next)
+  } else {
+    None
+  }
+}
 
+fn isReadable(idx: i64) -> bool {
+  let ridx = ringIndex(idx)
+  let flag = availabilityFlagForIndex(idx)
+  availability_array[idx] == flag
+}
+```
 
+Note: When done reading, make sure to increment the current read index
+to match the value returned from `tryObtainNextRead`.
 
 ### Dictionary
 
