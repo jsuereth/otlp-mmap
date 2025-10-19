@@ -8,40 +8,13 @@ import java.nio.channels.FileChannel
 import java.nio.channels.FileChannel.MapMode
 import java.lang.foreign.Arena
 import java.io.RandomAccessFile
+import io.opentelemetry.api.common.Attributes
 
-class SdkMmap
+class SdkMmap(raw: SdkMmapRaw):
+    // Wrapper methods around SDK mmap file.
 
-/** 
- * A header for the dictionary in the file.
- * 
- * This provides read/write access and memory synchronization primitives.
- */
-final class DictionaryHeader(val segment: MemorySegment) extends Header:
-    val end = MetadataLongField(0)
-    val num_entries = MetadataLongField(8)
-
-final class Dictionary(header: DictionaryHeader, channel: FileChannel):
-    def writeEntry(size: Long)(writer: ByteBuffer => Unit): Long =
-        val id = header.end.get()
-        val next_end = size + id
-        // TODO - make this thread safe?
-        try writer(channel.map(MapMode.READ_WRITE, id, size))
-        finally header.end.setRelease(next_end)
-        header.num_entries.setRelease(header.num_entries.get()+1)
-        id
-    def force(): Unit =
-        header.force()
-
-object Dictionary:
-    def apply(channel: FileChannel, offset: Long): Dictionary =
-        println(s"Creating dictionary header from ${offset} to ${offset+64}")
-        val arena = Arena.ofConfined()
-        val header = DictionaryHeader(channel.map(MapMode.READ_WRITE, offset, 64, arena))
-        // TODO - reload on crash?
-        header.num_entries.set(0)
-        // Make sure we start after the dictionary header...
-        header.end.set(offset+64)
-        new Dictionary(header, channel)
+    /** Obtains the attribute index in the dictionary for a set of attributes. */
+    def lookupAttributeRef(attributes: Attributes): Long = ???
 
 
 class FileHeader(val segment: MemorySegment) extends Header:

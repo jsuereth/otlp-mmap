@@ -85,7 +85,7 @@ final class RingBuffer(
     // Ring buffer
     (header.buffer_size.get() * header.num_buffers.get())
 
-  def hasWriteCapacity(currentIdx: Long): Boolean =
+  private def hasWriteCapacity(currentIdx: Long): Boolean =
     // We calculate as far "back" in the ring buffer index
     // we can go before we'd overwrite something waiting to be read.
     val previousIndexWithConflict = currentIdx + 1 - header.num_buffers.get()
@@ -148,10 +148,12 @@ object RingBuffer:
         // TODO - validation on options.
         val arena = Arena.ofShared()
         val header = RingBufferHeader(channel.map(MapMode.READ_WRITE, offset, HEADER_SIZE, arena))
-        header.buffer_size.set(opt.buffer_size)
-        header.num_buffers.set(opt.num_buffers)
-        header.read_position.set(-1)
-        header.write_position.set(-1)
+        // Check if we're "fresh" here, and initialize the buffer.
+        if header.buffer_size.get() != opt.buffer_size then
+          header.buffer_size.set(opt.buffer_size)
+          header.num_buffers.set(opt.num_buffers)
+          header.read_position.set(-1)
+          header.write_position.set(-1)
         // next create availability array.
         val availability_bytes = 4*opt.num_buffers
         val availability_offset = offset+HEADER_SIZE

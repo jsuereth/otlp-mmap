@@ -10,15 +10,6 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-
-given Writable[Long] with
-    extension (data: Long) def write(buffer: ByteBuffer): Unit =
-        buffer.putLong(data)
-    extension (data: Long) def size: Long = 8
-given Readable[Long] with
-    def read(buffer: ByteBuffer): Long =
-        buffer.getLong()
-
 class TestRingBuffer extends FunSuite:
     test("basic ringbuffer writes and reads") {
         val file = java.io.File.createTempFile("ringbuffer", "otlp");

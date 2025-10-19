@@ -186,7 +186,7 @@ The dictionary begins with a 64-byte header:
 
 When interacting with the dictionary, all references are *offsets from the start of the file*.
 
-Dictionary entries are serialized protocol buffer messages (so they MUST begin with serialized size)
+Dictionary entries are serialized protocol buffer messages (so they MUST begin with serialized size, as a varint).
 
 ## Specific Types
 
@@ -247,7 +247,7 @@ The core instrumentation scope entry contains the following:
 
 TODO
 
-### Dictionary - Attribute Set
+### Payload - Attribute Set
 
 The attribute set entry contains a set of key-value attributes.
 
@@ -255,3 +255,10 @@ An attribute set is a repeated field of containing one of the following:
 
 - A KeyValue pair
 - A dictionary offset to another attribute set.
+
+### Payload - KeyValue pair
+
+A key value pair is the following:
+
+- A dictionary offset to the key (a string).
+- The value (serialized in proto)

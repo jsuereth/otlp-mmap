@@ -6,22 +6,6 @@ import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Path
 
-// An object with known byte layout we use to test file writing.
-object TestBytes
-given Writable[TestBytes.type] with
-    /** Writes the data to a byte buffer. */
-    extension (data: TestBytes.type) def write(buffer: ByteBuffer): Unit =
-        buffer.put(1.toByte)
-        buffer.put(2.toByte)
-        buffer.put(3.toByte)
-        buffer.put(4.toByte)
-        buffer.put(5.toByte)
-        buffer.put(6.toByte)
-        buffer.put(7.toByte)
-        buffer.put(0.toByte)
-    /** The size of the value in bytes when serialized. */
-    extension (data: TestBytes.type) def size: Long = 8
-
 class TestSdkMmap extends FunSuite:
     test("basic mmap sdk file") {
         val opts = SdkMmapOptions(
