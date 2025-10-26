@@ -21,8 +21,8 @@ class TestResourceDictionary extends FunSuite:
         val r2 = Resource.getDefault()
         val idx2 = rd.intern(r2)
         assertEquals(rd.intern(r1), idx, "Failed to return same index for same resource.")
-        // TODO - we need to check actual bytes.
-        val bytes = Files.readAllBytes(Paths.get(file.getAbsolutePath()))
-        val hex = HexFormat.of().formatHex(bytes)
-        println(hex)
+        // TODO - we need to check actual bytes or reads.
+        // val bytes = Files.readAllBytes(Paths.get(file.getAbsolutePath()))
+        // val hex = HexFormat.of().formatHex(bytes)
+        // println(hex)
     }

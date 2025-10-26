@@ -17,6 +17,7 @@ given Writable[MarshalerWithSize] with
     data.getBinarySerializedSize()
 
 
+
 /** Stores opentelemetry Resource in the OTLP mmap dictionary. */
 class ResourceDictionary(d: Dictionary, strings: StringDictionary):
     // TODO - We'll want some kind of limit to avoid OOM-ing.

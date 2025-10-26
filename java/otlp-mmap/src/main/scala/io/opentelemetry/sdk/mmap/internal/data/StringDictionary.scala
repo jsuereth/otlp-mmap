@@ -3,6 +3,7 @@ package data
 
 import java.nio.ByteBuffer
 import io.opentelemetry.otlp.mmap.internal.ByteBufferOutputStream
+import java.nio.charset.StandardCharsets
 
 
 // Writer for String, in protobuf format.
@@ -28,6 +29,13 @@ given Writable[String] with
             out.write(bytes)
         }
 
+// TODO - speed this up.
+given SizedReadable[String]:
+  override def read(size: Long, buffer: ByteBuffer): String =
+     val cbuf = new Array[Byte](size.toInt)
+     buffer.get(cbuf)
+     new String(cbuf, StandardCharsets.UTF_8)
+
 /** A Dictionary that can remember strings by an index. */
 final class StringDictionary(d: Dictionary):
     // TODO - We'll want some kind of limit to avoid OOM-ing.
@@ -35,3 +43,5 @@ final class StringDictionary(d: Dictionary):
     private val memos = java.util.concurrent.ConcurrentHashMap[String,Long]()
     /** Adds (or returns previously added) index of a string in the dictionary. */
     def intern(value: String): Long = memos.computeIfAbsent(value, d.write)
+    /** Reads the serialized value. */
+    def read(location: Long): String = d.read(location)

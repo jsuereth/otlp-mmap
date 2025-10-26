@@ -45,10 +45,6 @@ class TestDictionary extends FunSuite:
         assertEquals(idx2, 70L, "second index should be 'hello' away from first")
 
         // Now try reading.
-        val read2 = d.readEntry(idx2, (size, buf) => {
-            val cbuf = new Array[Byte](size.toInt)
-            buf.get(cbuf)
-            new String(cbuf, StandardCharsets.UTF_8)
-        })
-        assertEquals(read2, "second", "Failed to read second interned string")
+        assertEquals(sd.read(idx), "Hello", "Failed to read first interned string")
+        assertEquals(sd.read(idx2), "second", "Failed to read second interned string")
     }

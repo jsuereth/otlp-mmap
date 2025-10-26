@@ -27,6 +27,8 @@ final class Dictionary(header: DictionaryHeader, channel: FileChannel):
     def force(): Unit =
         header.force()
 
+    def read[A: SizedReadable](location: Long): A =
+        readEntry(location, summon[SizedReadable[A]].read)
     // For testing - Reads length-delimited entry
     // Reader takes a "size" and the bytebuffer containing the entry.
     def readEntry[T](location: Long, reader: (Long, ByteBuffer) => T): T =
