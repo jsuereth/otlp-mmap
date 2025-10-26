@@ -12,6 +12,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import io.opentelemetry.sdk.mmap.internal.data.StringDictionary
+import java.nio.charset.StandardCharsets
 
 class TestDictionary extends FunSuite:
     test("basic dictonary writes") {
@@ -42,4 +43,12 @@ class TestDictionary extends FunSuite:
         // Next index should be 64+6 bytes away (5 for hello, 1 for size varint)
         val idx2 = sd.intern("second")
         assertEquals(idx2, 70L, "second index should be 'hello' away from first")
+
+        // Now try reading.
+        val read2 = d.readEntry(idx2, (size, buf) => {
+            val cbuf = new Array[Byte](size.toInt)
+            buf.get(cbuf)
+            new String(cbuf, StandardCharsets.UTF_8)
+        })
+        assertEquals(read2, "second", "Failed to read second interned string")
     }

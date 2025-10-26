@@ -15,13 +15,23 @@ given Writable[String] with
         VarInt.writeVarInt64(bytes.length, out)
         out.write(bytes)
     extension (data: String) def size: Long = 
-        // TODO - avoid calculating utf-8 multiple times.
         val bytes = data.getBytes(java.nio.charset.StandardCharsets.UTF_8)
         // Our varIntLength function returns the number of ADDITIONAL bytes needed.
-        1+VarInt.varIntLength(bytes.length) + bytes.length
+        VarInt.sizeVarInt64(bytes.length) + bytes.length
+    // Note - This will avoid calculating UTF-8 bytes multiple times, which can be expensive in Java.
+    extension (data: String) override def intern(dict: Dictionary): Long =
+        val bytes = data.getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        val size = VarInt.sizeVarInt64(bytes.length) + bytes.length
+        dict.writeEntry(size) { buffer =>
+            val out = ByteBufferOutputStream(buffer)
+            VarInt.writeVarInt64(bytes.length, out)
+            out.write(bytes)
+        }
 
 /** A Dictionary that can remember strings by an index. */
 final class StringDictionary(d: Dictionary):
+    // TODO - We'll want some kind of limit to avoid OOM-ing.
+    // We also need to benchmark memory overhead of this *specific* region if possible.
     private val memos = java.util.concurrent.ConcurrentHashMap[String,Long]()
     /** Adds (or returns previously added) index of a string in the dictionary. */
     def intern(value: String): Long = memos.computeIfAbsent(value, d.write)

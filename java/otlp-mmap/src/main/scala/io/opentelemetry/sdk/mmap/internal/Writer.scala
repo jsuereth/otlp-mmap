@@ -8,3 +8,6 @@ trait Writable[T]:
     extension (data: T) def write(buffer: ByteBuffer): Unit
     /** The size of the value in bytes when serialized. */
     extension (data: T) def size: Long
+    /** An optimised version of writing that can avoid any intermediate allocation used to calculate byte size. */
+    extension (data: T) def intern(dict: Dictionary): Long =
+        dict.writeEntry(data.size)(data.write)
