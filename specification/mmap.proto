@@ -1,0 +1,629 @@
+// Copyright 2020, OpenTelemetry Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package opentelemetry.proto.mmap.v1;
+
+message SpanEvent {
+     // A unique identifier for a trace. All spans from the same trace share
+  // the same `trace_id`. The ID is a 16-byte array. An ID with all zeroes OR
+  // of length other than 16 bytes is considered invalid (empty string in OTLP/JSON
+  // is zero-length and thus is also invalid).
+  //
+  // This field is required.
+  bytes trace_id = 1;
+
+  // A unique identifier for a span within a trace, assigned when the span
+  // is created. The ID is an 8-byte array. An ID with all zeroes OR of length
+  // other than 8 bytes is considered invalid (empty string in OTLP/JSON
+  // is zero-length and thus is also invalid).
+  //
+  // This field is required.
+  bytes span_id = 2;
+
+  message StartSpan {
+    // The `span_id` of this span's parent span. If this is a root span, then this
+    // field must be empty. The ID is an 8-byte array.
+    bytes parent_span_id = 4;
+     // Flags, a bit field.
+    //
+    // Bits 0-7 (8 least significant bits) are the trace flags as defined in W3C Trace
+    // Context specification. To read the 8-bit W3C trace flag, use
+    // `flags & SPAN_FLAGS_TRACE_FLAGS_MASK`.
+    //
+    // See https://www.w3.org/TR/trace-context-2/#trace-flags for the flag definitions.
+    //
+    // Bits 8 and 9 represent the 3 states of whether a span's parent
+    // is remote. The states are (unknown, is not remote, is remote).
+    // To read whether the value is known, use `(flags & SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK) != 0`.
+    // To read whether the span is remote, use `(flags & SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK) != 0`.
+    //
+    // When creating span messages, if the message is logically forwarded from another source
+    // with an equivalent flags fields (i.e., usually another OTLP span message), the field SHOULD
+    // be copied as-is. If creating from a source that does not have an equivalent flags field
+    // (such as a runtime representation of an OpenTelemetry span), the high 22 bits MUST
+    // be set to zero.
+    // Readers MUST NOT assume that bits 10-31 (22 most significant bits) will be zero.
+    //
+    // [Optional].
+    fixed32 flags = 16;
+    // A description of the span's operation.
+    //
+    // For example, the name can be a qualified method name or a file name
+    // and a line number where the operation is called. A best practice is to use
+    // the same display name at the same call point in an application.
+    // This makes it easier to correlate spans in different traces.
+    //
+    // This field is semantically required to be set to non-empty string.
+    // Empty value is equivalent to an unknown span name.
+    //
+    // This field is required.
+    string name = 5;
+
+    // SpanKind is the type of span. Can be used to specify additional relationships between spans
+    // in addition to a parent/child relationship.
+    enum SpanKind {
+        // Unspecified. Do NOT use as default.
+        // Implementations MAY assume SpanKind to be INTERNAL when receiving UNSPECIFIED.
+        SPAN_KIND_UNSPECIFIED = 0;
+
+        // Indicates that the span represents an internal operation within an application,
+        // as opposed to an operation happening at the boundaries. Default value.
+        SPAN_KIND_INTERNAL = 1;
+
+        // Indicates that the span covers server-side handling of an RPC or other
+        // remote network request.
+        SPAN_KIND_SERVER = 2;
+
+        // Indicates that the span describes a request to some remote service.
+        SPAN_KIND_CLIENT = 3;
+
+        // Indicates that the span describes a producer sending a message to a broker.
+        // Unlike CLIENT and SERVER, there is often no direct critical path latency relationship
+        // between producer and consumer spans. A PRODUCER span ends when the message was accepted
+        // by the broker while the logical processing of the message might span a much longer time.
+        SPAN_KIND_PRODUCER = 4;
+
+        // Indicates that the span describes consumer receiving a message from a broker.
+        // Like the PRODUCER kind, there is often no direct critical path latency relationship
+        // between producer and consumer spans.
+        SPAN_KIND_CONSUMER = 5;
+    }
+
+    // Distinguishes between spans generated in a particular context. For example,
+    // two spans with the same name may be distinguished using `CLIENT` (caller)
+    // and `SERVER` (callee) to identify queueing latency associated with the span.
+    SpanKind kind = 6;
+    // The start time of the span. On the client side, this is the time
+    // kept by the local machine where the span execution starts. On the server side, this
+    // is the time when the server's application handler starts running.
+    // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January 1970.
+    //
+    // This field is semantically required and it is expected that end_time >= start_time.
+    fixed64 start_time_unix_nano = 7;
+    // A collection of key/value pairs. Note, global attributes
+    // like server name can be set using the resource API. Examples of attributes:
+    //
+    //     "/http/user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"
+    //     "/http/server_latency": 300
+    //     "example.com/myattribute": true
+    //     "example.com/score": 10.239
+    //
+    // Attribute keys MUST be unique (it is not allowed to have more than one
+    // attribute with the same key).
+    //
+    // The attribute values SHOULD NOT contain empty values.
+    // The attribute values SHOULD NOT contain bytes values.
+    // The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
+    // double values.
+    // The attribute values SHOULD NOT contain kvlist values.
+    // The behavior of software that receives attributes containing such values can be unpredictable.
+    // These restrictions can change in a minor release.
+    // The restrictions take origin from the OpenTelemetry specification:
+    // https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+    repeated KeyValueRef attributes = 9;
+  }
+  message EndSpan {
+    // The end time of the span. On the client side, this is the time
+    // kept by the local machine where the span execution ends. On the server side, this
+    // is the time when the server application handler stops running.
+    // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January 1970.
+    //
+    // This field is semantically required and it is expected that end_time >= start_time.
+    fixed64 end_time_unix_nano = 8;
+    // An optional final status for this span. Semantically when Status isn't set, it means
+    // span's status code is unset, i.e. assume STATUS_CODE_UNSET (code = 0).
+    Status status = 15;
+  }
+  message ChangeSpanName {
+    // A description of the span's operation.
+    //
+    // For example, the name can be a qualified method name or a file name
+    // and a line number where the operation is called. A best practice is to use
+    // the same display name at the same call point in an application.
+    // This makes it easier to correlate spans in different traces.
+    //
+    // This field is semantically required to be set to non-empty string.
+    // Empty value is equivalent to an unknown span name.
+    //
+    // This field is required.
+    string name = 5;
+  }
+  message UpdateAttributes {
+    // A collection of key/value pairs. Note, global attributes
+    // like server name can be set using the resource API. Examples of attributes:
+    //
+    //     "/http/user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"
+    //     "/http/server_latency": 300
+    //     "example.com/myattribute": true
+    //     "example.com/score": 10.239
+    //
+    // Attribute keys MUST be unique (it is not allowed to have more than one
+    // attribute with the same key).
+    //
+    // The attribute values SHOULD NOT contain empty values.
+    // The attribute values SHOULD NOT contain bytes values.
+    // The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
+    // double values.
+    // The attribute values SHOULD NOT contain kvlist values.
+    // The behavior of software that receives attributes containing such values can be unpredictable.
+    // These restrictions can change in a minor release.
+    // The restrictions take origin from the OpenTelemetry specification:
+    // https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+    repeated KeyValueRef attributes = 9;
+  }
+  message AddLink {
+    // A pointer from the current span to another span in the same trace or in a
+    // different trace. For example, this can be used in batching operations,
+    // where a single batch handler processes multiple requests from different
+    // traces or when the handler receives a request from a different project.
+    message Link {
+        // A unique identifier of a trace that this linked span is part of. The ID is a
+        // 16-byte array.
+        bytes trace_id = 1;
+
+        // A unique identifier for the linked span. The ID is an 8-byte array.
+        bytes span_id = 2;
+
+        // The trace_state associated with the link.
+        string trace_state = 3;
+
+        // A collection of attribute key/value pairs on the link.
+        // Attribute keys MUST be unique (it is not allowed to have more than one
+        // attribute with the same key).
+        //
+        // The attribute values SHOULD NOT contain empty values.
+        // The attribute values SHOULD NOT contain bytes values.
+        // The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
+        // double values.
+        // The attribute values SHOULD NOT contain kvlist values.
+        // The behavior of software that receives attributes containing such values can be unpredictable.
+        // These restrictions can change in a minor release.
+        // The restrictions take origin from the OpenTelemetry specification:
+        // https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+        repeated KeyValueRef attributes = 4;
+
+        // The number of dropped attributes. If the value is 0,
+        // then no attributes were dropped.
+        uint32 dropped_attributes_count = 5;
+
+        // Flags, a bit field.
+        //
+        // Bits 0-7 (8 least significant bits) are the trace flags as defined in W3C Trace
+        // Context specification. To read the 8-bit W3C trace flag, use
+        // `flags & SPAN_FLAGS_TRACE_FLAGS_MASK`.
+        //
+        // See https://www.w3.org/TR/trace-context-2/#trace-flags for the flag definitions.
+        //
+        // Bits 8 and 9 represent the 3 states of whether the link is remote.
+        // The states are (unknown, is not remote, is remote).
+        // To read whether the value is known, use `(flags & SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK) != 0`.
+        // To read whether the link is remote, use `(flags & SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK) != 0`.
+        //
+        // Readers MUST NOT assume that bits 10-31 (22 most significant bits) will be zero.
+        // When creating new spans, bits 10-31 (most-significant 22-bits) MUST be zero.
+        //
+        // [Optional].
+        fixed32 flags = 6;
+    }
+    // A collection of Links, which are references from this span to a span
+    // in the same or different trace.
+    repeated Link links = 13;
+
+  }
+  // The actual event data.
+  oneof event {
+    StartSpan start = 11;
+    EndSpan end = 12;
+    ChangeSpanName name = 13;
+    UpdateAttributes attributes = 14;
+    AddLink link = 15;
+  }
+}
+
+// The Status type defines a logical error model that is suitable for different
+// programming environments, including REST APIs and RPC APIs.
+message Status {
+  reserved 1;
+
+  // A developer-facing human readable error message.
+  string message = 2;
+
+  // For the semantics of status codes see
+  // https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/api.md#set-status
+  enum StatusCode {
+    // The default status.
+    STATUS_CODE_UNSET               = 0;
+    // The Span has been validated by an Application developer or Operator to 
+    // have completed successfully.
+    STATUS_CODE_OK                  = 1;
+    // The Span contains an error.
+    STATUS_CODE_ERROR               = 2;
+  };
+
+  // The status code.
+  StatusCode code = 3;
+}
+
+// Passes a single metric measurement from the source to the
+// collector.  This MUST use the metric_ref to determine
+// how to aggregate the measurement into a real OTLP metric.
+message Measurement {
+    // Reference to the definitiion of this metric.
+    int64 metric_ref = 1;
+    // TODO- use a ref for this?
+    // A collection of attribute key/value pairs on the link.
+    // Attribute keys MUST be unique (it is not allowed to have more than one
+    // attribute with the same key).
+    //
+    // The attribute values SHOULD NOT contain empty values.
+    // The attribute values SHOULD NOT contain bytes values.
+    // The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
+    // double values.
+    // The attribute values SHOULD NOT contain kvlist values.
+    // The behavior of software that receives attributes containing such values can be unpredictable.
+    // These restrictions can change in a minor release.
+    // The restrictions take origin from the OpenTelemetry specification:
+    // https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+    repeated KeyValueRef attributes = 2;
+    // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
+    // 1970.
+    fixed64 time_unix_nano = 3;
+    // The value itself.  A point is considered invalid when one of the recognized
+    // value fields is not present inside this oneof.
+    oneof value {
+        int64 as_long = 4;
+        double as_double = 5;
+    }
+    // (optional) Span context information if this measurement was
+    // recorded within a span.
+    SpanContext span_context = 6;
+}
+
+message MetricRef {
+  // The name of the metric.
+  string name = 1;
+
+  // A description of the metric, which can be used in documentation.
+  string description = 2;
+
+  // The unit in which the metric value is reported. Follows the format
+  // described by https://unitsofmeasure.org/ucum.html.
+  string unit = 3;
+
+  // Reference to the instrumentation scope where this metric is defined.
+  int64 instrumentation_scope_ref = 4;
+
+  message Gauge {}
+  message Sum {
+    // aggregation_temporality describes if the aggregator reports delta changes
+    // since last report time, or cumulative changes since a fixed start time.
+    AggregationTemporality aggregation_temporality = 2;
+
+    // Represents whether the sum is monotonic.
+    bool is_monotonic = 3;
+  }
+  message Histogram {
+    // aggregation_temporality describes if the aggregator reports delta changes
+    // since last report time, or cumulative changes since a fixed start time.
+    AggregationTemporality aggregation_temporality = 1;
+    // Bucket boundaries to use for this histogram.
+    repeated double bucket_boundares = 2;
+  }
+  message ExponentialHistogram {
+    // aggregation_temporality describes if the aggregator reports delta changes
+    // since last report time, or cumulative changes since a fixed start time.
+    AggregationTemporality aggregation_temporality = 1;
+    // The number of buckets to configure for the exponential histogram.
+    int64 max_buckets = 2;
+    // The maximum scale to allow for this histogram.
+    int64 max_scale = 3;
+  }
+  // Defines the aggregation to perform on measurements recorded.
+  oneof aggregation {
+    Gauge gauge = 5;
+    Sum sum = 6;
+    Histogram histogram = 7;
+    ExponentialHistogram exp_hist = 8;
+  }
+}
+
+message Event {
+  // InsturmentationScope from which this was recorded.
+  int64 scope_ref = 1; 
+
+  // time_unix_nano is the time when the event occurred.
+  // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January 1970.
+  // Value of 0 indicates unknown or missing timestamp.
+  fixed64 time_unix_nano = 2;
+  // Numerical value of the severity, normalized to values described in Log Data Model.
+  // [Optional].
+  SeverityNumber severity_number = 3;
+  // The severity text (also known as log level). The original string representation as
+  // it is known at the source. [Optional].
+  string severity_text = 4;
+  // A value containing the body of the log record. Can be for example a human-readable
+  // string message (including multi-line) describing the event in a free form or it can
+  // be a structured data composed of arrays and maps of other values. [Optional].
+  AnyValue body = 5;
+  // A unique identifier of event category/type.
+  // All events with the same event_name are expected to conform to the same
+  // schema for both their attributes and their body.
+  //
+  // Recommended to be fully qualified and short (no longer than 256 characters).
+  //
+  // Presence of event_name on the log record identifies this record
+  // as an event.
+  //
+  // [Optional].
+  int64 event_name_ref = 6;
+  // Span information in which this event was recorded.
+  // [Optional].
+  SpanContext span_context = 7;
+}
+
+// Resource information.
+message Resource {
+  // Set of attributes that describe the resource.
+  // Attribute keys MUST be unique (it is not allowed to have more than one
+  // attribute with the same key).
+  //
+  // The attribute values SHOULD NOT contain empty values.
+  // The attribute values SHOULD NOT contain bytes values.
+  // The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
+  // double values.
+  // The attribute values SHOULD NOT contain kvlist values.
+  // The behavior of software that receives attributes containing such values can be unpredictable.
+  // These restrictions can change in a minor release.
+  // The restrictions take origin from the OpenTelemetry specification:
+  // https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+  repeated KeyValueRef attributes = 1;
+
+  // The number of dropped attributes. If the value is 0, then
+  // no attributes were dropped.
+  uint32 dropped_attributes_count = 2;
+}
+
+// InstrumentationScope is a message representing the instrumentation scope information
+// such as the fully qualified name and version. 
+message InstrumentationScope {
+
+  // A name denoting the Instrumentation scope.
+  // An empty instrumentation scope name means the name is unknown.
+  int64 name_ref = 1;
+
+  // Defines the version of the instrumentation scope.
+  // An empty instrumentation scope version means the version is unknown.
+  int64 version_ref = 2;
+
+  // Additional attributes that describe the scope. [Optional].
+  // Attribute keys MUST be unique (it is not allowed to have more than one
+  // attribute with the same key).
+  repeated KeyValueRef attributes = 3;
+
+  // The number of attributes that were discarded. Attributes
+  // can be discarded because their keys are too long or because there are too many
+  // attributes. If this value is 0, then no attributes were dropped.
+  uint32 dropped_attributes_count = 4;
+  // Resource in which this instrumentation scope was created.
+  int64 resource_ref = 5;
+}
+
+// KeyValue Ref represents a Key-Value pair.
+message KeyValueRef {
+    // Reference to a key in the dictionary.
+    int64 key_ref = 1;
+    // The value of this key-value.
+    AnyValue value = 2;
+}
+
+// Represents any type of attribute value. AnyValue may contain a
+// primitive value such as a string or integer or it may contain an arbitrary nested
+// object containing arrays, key-value lists and primitives.
+message AnyValue {
+  // The value is one of the listed fields. It is valid for all values to be unspecified
+  // in which case this AnyValue is considered to be "empty".
+  oneof value {
+    string string_value = 1;
+    bool bool_value = 2;
+    int64 int_value = 3;
+    double double_value = 4;
+    ArrayValue array_value = 5;
+    // TODO - should we force keys to be in dictionaries here?
+    KeyValueList kvlist_value = 6;
+    bytes bytes_value = 7;
+    // Reference to a value in the dictionary.
+    int64 value_ref = 8;
+  }
+}
+
+
+// ArrayValue is a list of AnyValue messages. We need ArrayValue as a message
+// since oneof in AnyValue does not allow repeated fields.
+message ArrayValue {
+  // Array of values. The array may be empty (contain 0 elements).
+  repeated AnyValue values = 1;
+}
+
+// KeyValueList is a list of KeyValue messages. We need KeyValueList as a message
+// since `oneof` in AnyValue does not allow repeated fields. Everywhere else where we need
+// a list of KeyValue messages (e.g. in Span) we use `repeated KeyValue` directly to
+// avoid unnecessary extra wrapping (which slows down the protocol). The 2 approaches
+// are semantically equivalent.
+message KeyValueList {
+  // A collection of key/value pairs of key-value pairs. The list may be empty (may
+  // contain 0 elements).
+  // The keys MUST be unique (it is not allowed to have more than one
+  // value with the same key).
+  repeated KeyValueRef values = 1;
+}
+
+
+// AggregationTemporality defines how a metric aggregator reports aggregated
+// values. It describes how those values relate to the time interval over
+// which they are aggregated.
+enum AggregationTemporality {
+  // UNSPECIFIED is the default AggregationTemporality, it MUST not be used.
+  AGGREGATION_TEMPORALITY_UNSPECIFIED = 0;
+
+  // DELTA is an AggregationTemporality for a metric aggregator which reports
+  // changes since last report time. Successive metrics contain aggregation of
+  // values from continuous and non-overlapping intervals.
+  //
+  // The values for a DELTA metric are based only on the time interval
+  // associated with one measurement cycle. There is no dependency on
+  // previous measurements like is the case for CUMULATIVE metrics.
+  //
+  // For example, consider a system measuring the number of requests that
+  // it receives and reports the sum of these requests every second as a
+  // DELTA metric:
+  //
+  //   1. The system starts receiving at time=t_0.
+  //   2. A request is received, the system measures 1 request.
+  //   3. A request is received, the system measures 1 request.
+  //   4. A request is received, the system measures 1 request.
+  //   5. The 1 second collection cycle ends. A metric is exported for the
+  //      number of requests received over the interval of time t_0 to
+  //      t_0+1 with a value of 3.
+  //   6. A request is received, the system measures 1 request.
+  //   7. A request is received, the system measures 1 request.
+  //   8. The 1 second collection cycle ends. A metric is exported for the
+  //      number of requests received over the interval of time t_0+1 to
+  //      t_0+2 with a value of 2.
+  AGGREGATION_TEMPORALITY_DELTA = 1;
+
+  // CUMULATIVE is an AggregationTemporality for a metric aggregator which
+  // reports changes since a fixed start time. This means that current values
+  // of a CUMULATIVE metric depend on all previous measurements since the
+  // start time. Because of this, the sender is required to retain this state
+  // in some form. If this state is lost or invalidated, the CUMULATIVE metric
+  // values MUST be reset and a new fixed start time following the last
+  // reported measurement time sent MUST be used.
+  //
+  // For example, consider a system measuring the number of requests that
+  // it receives and reports the sum of these requests every second as a
+  // CUMULATIVE metric:
+  //
+  //   1. The system starts receiving at time=t_0.
+  //   2. A request is received, the system measures 1 request.
+  //   3. A request is received, the system measures 1 request.
+  //   4. A request is received, the system measures 1 request.
+  //   5. The 1 second collection cycle ends. A metric is exported for the
+  //      number of requests received over the interval of time t_0 to
+  //      t_0+1 with a value of 3.
+  //   6. A request is received, the system measures 1 request.
+  //   7. A request is received, the system measures 1 request.
+  //   8. The 1 second collection cycle ends. A metric is exported for the
+  //      number of requests received over the interval of time t_0 to
+  //      t_0+2 with a value of 5.
+  //   9. The system experiences a fault and loses state.
+  //   10. The system recovers and resumes receiving at time=t_1.
+  //   11. A request is received, the system measures 1 request.
+  //   12. The 1 second collection cycle ends. A metric is exported for the
+  //      number of requests received over the interval of time t_1 to
+  //      t_0+1 with a value of 1.
+  //
+  // Note: Even though, when reporting changes since last report time, using
+  // CUMULATIVE is valid, it is not recommended. This may cause problems for
+  // systems that do not use start_time to determine when the aggregation
+  // value was reset (e.g. Prometheus).
+  AGGREGATION_TEMPORALITY_CUMULATIVE = 2;
+}
+
+// Shared span-context to use between measurements/events
+message SpanContext {
+// (Optional) Span ID of the exemplar trace.
+    // span_id may be missing if the measurement is not recorded inside a trace
+    // or if the trace is not sampled.
+    bytes span_id = 1;
+
+    // (Optional) Trace ID of the exemplar trace.
+    // trace_id may be missing if the measurement is not recorded inside a trace
+    // or if the trace is not sampled.
+    bytes trace_id = 2;
+    // Span Flags, a bit field.
+    //
+    // Bits 0-7 (8 least significant bits) are the trace flags as defined in W3C Trace
+    // Context specification. To read the 8-bit W3C trace flag, use
+    // `flags & SPAN_FLAGS_TRACE_FLAGS_MASK`.
+    //
+    // See https://www.w3.org/TR/trace-context-2/#trace-flags for the flag definitions.
+    //
+    // Bits 8 and 9 represent the 3 states of whether a span's parent
+    // is remote. The states are (unknown, is not remote, is remote).
+    // To read whether the value is known, use `(flags & SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK) != 0`.
+    // To read whether the span is remote, use `(flags & SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK) != 0`.
+    //
+    // When creating span messages, if the message is logically forwarded from another source
+    // with an equivalent flags fields (i.e., usually another OTLP span message), the field SHOULD
+    // be copied as-is. If creating from a source that does not have an equivalent flags field
+    // (such as a runtime representation of an OpenTelemetry span), the high 22 bits MUST
+    // be set to zero.
+    // Readers MUST NOT assume that bits 10-31 (22 most significant bits) will be zero.
+    //
+    // [Optional].
+    fixed32 flags = 3;
+}
+
+
+// Possible values for LogRecord.SeverityNumber.
+enum SeverityNumber {
+  // UNSPECIFIED is the default SeverityNumber, it MUST NOT be used.
+  SEVERITY_NUMBER_UNSPECIFIED = 0;
+  SEVERITY_NUMBER_TRACE  = 1;
+  SEVERITY_NUMBER_TRACE2 = 2;
+  SEVERITY_NUMBER_TRACE3 = 3;
+  SEVERITY_NUMBER_TRACE4 = 4;
+  SEVERITY_NUMBER_DEBUG  = 5;
+  SEVERITY_NUMBER_DEBUG2 = 6;
+  SEVERITY_NUMBER_DEBUG3 = 7;
+  SEVERITY_NUMBER_DEBUG4 = 8;
+  SEVERITY_NUMBER_INFO   = 9;
+  SEVERITY_NUMBER_INFO2  = 10;
+  SEVERITY_NUMBER_INFO3  = 11;
+  SEVERITY_NUMBER_INFO4  = 12;
+  SEVERITY_NUMBER_WARN   = 13;
+  SEVERITY_NUMBER_WARN2  = 14;
+  SEVERITY_NUMBER_WARN3  = 15;
+  SEVERITY_NUMBER_WARN4  = 16;
+  SEVERITY_NUMBER_ERROR  = 17;
+  SEVERITY_NUMBER_ERROR2 = 18;
+  SEVERITY_NUMBER_ERROR3 = 19;
+  SEVERITY_NUMBER_ERROR4 = 20;
+  SEVERITY_NUMBER_FATAL  = 21;
+  SEVERITY_NUMBER_FATAL2 = 22;
+  SEVERITY_NUMBER_FATAL3 = 23;
+  SEVERITY_NUMBER_FATAL4 = 24;
+}
