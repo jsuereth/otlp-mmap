@@ -14,6 +14,8 @@ lazy val root = project
     libraryDependencies += "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.54.1",
     libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % "2.18.0",
     libraryDependencies += "org.scalameta" %% "munit" % "1.0.0" % Test,
+    // Is this temporary or not?
+    libraryDependencies += "com.google.protobuf" % "protobuf-java" % "4.33.0",
     assembly / assemblyJarName := "demo.jar",
     assembly / assemblyMergeStrategy := {
        case PathList("META-INF", "versions", _*)           => MergeStrategy.preferProject

@@ -13,6 +13,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import io.opentelemetry.sdk.mmap.internal.data.StringDictionary
 import java.nio.charset.StandardCharsets
+import io.opentelemetry.sdk.mmap.internal.data.ProtoReader
 
 class TestDictionary extends FunSuite:
     test("basic dictonary writes") {
@@ -47,4 +48,27 @@ class TestDictionary extends FunSuite:
         // Now try reading.
         assertEquals(sd.read(idx), "Hello", "Failed to read first interned string")
         assertEquals(sd.read(idx2), "second", "Failed to read second interned string")
+    }
+
+    test("Proto intern") {
+        val file = java.io.File.createTempFile("string-dictionary", "otlp");
+        file.deleteOnExit()
+        val raf = new RandomAccessFile(file, "rw")
+        val d = Dictionary(raf.getChannel(), 0)
+        given SizedReadable[opentelemetry.proto.mmap.v1.Mmap.Resource] =
+            ProtoReader(opentelemetry.proto.mmap.v1.Mmap.Resource.getDefaultInstance())
+        val proto = 
+            opentelemetry.proto.mmap.v1.Mmap.Resource.newBuilder()
+            .addAttributes(
+            opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.newBuilder()
+            .setKeyRef(10L)
+            .setValue(
+                opentelemetry.proto.mmap.v1.Mmap.AnyValue.newBuilder()
+                .setBoolValue(true)
+            ))
+            .build()
+        import data.given
+        val idx = d.write(proto)
+        val read_proto: opentelemetry.proto.mmap.v1.Mmap.Resource = d.read(idx)
+        assertEquals(read_proto, proto)
     }

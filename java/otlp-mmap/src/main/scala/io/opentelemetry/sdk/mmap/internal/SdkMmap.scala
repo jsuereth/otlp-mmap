@@ -9,6 +9,10 @@ import java.nio.channels.FileChannel.MapMode
 import java.lang.foreign.Arena
 import java.io.RandomAccessFile
 import io.opentelemetry.api.common.Attributes
+import io.opentelemetry.sdk.mmap.internal.data.StringDictionary
+import io.opentelemetry.sdk.mmap.internal.data.ResourceDictionary
+import io.opentelemetry.sdk.mmap.internal.data.ScopeDictionary
+import io.opentelemetry.sdk.mmap.internal.data.MetricDictionary
 
 class SdkMmap(raw: SdkMmapRaw):
     // Wrapper methods around SDK mmap file.
@@ -44,10 +48,15 @@ case class SdkMmapOptions(
   * @param dictionary
   */
 class SdkMmapRaw(
-    events: RingBuffer,
-    spans: RingBuffer,
-    measurements: RingBuffer,
+    val events: RingBuffer,
+    val spans: RingBuffer,
+    val measurements: RingBuffer,
     dictionary: Dictionary):
+
+    val strings = StringDictionary(dictionary)
+    val resources = ResourceDictionary(dictionary, strings)
+    val scopes = ScopeDictionary(dictionary, strings)
+    val metrics = MetricDictionary(dictionary, strings)
     /** Adds a new entry to the dictionary, returning its offset. */
     def write_entry[T: Writable](entry: T): Long =
         dictionary.writeEntry(entry.size)(entry.write)

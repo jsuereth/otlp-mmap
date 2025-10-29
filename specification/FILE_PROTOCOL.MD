@@ -215,6 +215,7 @@ The span metric ringbuffer contains "span" events.  These events contain:
     - attribute_ref: Dictionary offset to additional attributes.
   - End Span Event
     - timestamp
+    - status
   - Add Span Link Event
     - other trace id
     - other span id
@@ -245,9 +246,14 @@ The core instrumentation scope entry contains the following:
 
 ### Dictionary - Resource
 
-TODO
+```proto
+message Resource {
+  repeated KeyValueRef attributes = 1;
+  // TODO - entities?
+}
+```
 
-### Payload - Attribute Set
+### Payload - Attribute Set (TODO)
 
 The attribute set entry contains a set of key-value attributes.
 
@@ -262,3 +268,12 @@ A key value pair is the following:
 
 - A dictionary offset to the key (a string).
 - The value (serialized in proto)
+
+```proto
+message KeyValueRef {
+  // Offset to the key in the dictionary.
+  long key_ref = 1;
+  // OTLP anyvalue.
+  AnyValue value = 2;
+}
+```
