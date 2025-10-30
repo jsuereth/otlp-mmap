@@ -26,22 +26,35 @@ pub struct MmapReader {
 
 impl MmapReader {
     pub fn new(path: &Path) -> Result<MmapReader, Error> {
+        println!("Reading file [{}]", path.display());
         let f = OpenOptions::new()
             .read(true)
             .write(true)
             .create(false)
             .open(path)?;
-        let header = unsafe {
-            let raw_header = MmapOptions::new().len(64).map_mut(&f)?;
-            &*(raw_header.as_ptr() as *const &MmapHeader)
+        let raw_header = unsafe {
+            MmapOptions::new()
+            .offset(0)
+            .len(64)
+            .map_mut(&f)?
         };
+        println!("Opened header {:?}", raw_header);
+        let header = unsafe {
+            &*(raw_header.as_ref().as_ptr() as *const MmapHeader)
+        };
+        println!("Reading header, expected size {} ", std::mem::size_of::<MmapHeader>());
         // This is the order of blocks in the file.
         // We use this to load separate MMap instances for the various sections.
-        let event_start = header.events.load(Ordering::Acquire);
-        let span_start = header.spans.load(Ordering::Acquire);
-        let measurement_start = header.spans.load(Ordering::Acquire);
-        let dictionary_start = header.dictionary.load(Ordering::Acquire);
-
+        println!("version: {}", header.version);
+        let event_start = header.events.load(Ordering::Relaxed);
+        let span_start = header.spans.load(Ordering::Relaxed);
+        let measurement_start = header.measurements.load(Ordering::Relaxed);
+        let dictionary_start = header.dictionary.load(Ordering::Relaxed);
+        eprintln!("Found header: ");
+        eprintln!("events: {event_start}");
+        eprintln!("spans: {span_start}");
+        eprintln!("measurements: {measurement_start}");
+        eprintln!("dictionary: {dictionary_start}");
         let events: RingBufferReader<Event> = unsafe {
             let event_area = MmapOptions::new()
                 .len((span_start - event_start) as usize)
@@ -49,6 +62,7 @@ impl MmapReader {
                 .map_mut(&f)?;
             RingBufferReader::new(event_area, 0)
         };
+        println!("Loaded events");
         let spans: RingBufferReader<SpanEvent> = unsafe {
             let event_area = MmapOptions::new()
                 .len((measurement_start - span_start) as usize)
@@ -56,6 +70,7 @@ impl MmapReader {
                 .map_mut(&f)?;
             RingBufferReader::new(event_area, 0)
         };
+        println!("Loaded spans");
         let metrics: RingBufferReader<Measurement> = unsafe {
             let event_area = MmapOptions::new()
                 .len((dictionary_start - measurement_start) as usize)
@@ -63,12 +78,14 @@ impl MmapReader {
                 .map_mut(&f)?;
             RingBufferReader::new(event_area, 0)
         };
+        println!("Loaded metrics");
         let dictionary = unsafe {
             let dictionary_area = MmapOptions::new()
             .offset(dictionary_start as u64)
             .map_mut(&f)?;
             Dictionary::new(dictionary_area, 0)
         };
+        println!("Loaded dictionary");
         Ok(MmapReader {
             events,
             spans,
@@ -81,7 +98,7 @@ impl MmapReader {
 #[repr(C)]
 struct MmapHeader {
     /// Version of the file.
-    version: AtomicI64,
+    version: i64,
     /// Location of logs event buffer.
     events: AtomicI64,
     /// Location of spans event buffer.

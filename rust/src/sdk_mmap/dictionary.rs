@@ -60,7 +60,7 @@ impl RawDictionary {
     }
 
     fn header(&self) -> &RawDictionaryHeader {
-        unsafe { &*(self.data.as_ptr().add(self.offset) as *const &RawDictionaryHeader) }
+        unsafe { &*(self.data.as_ref().as_ptr().add(self.offset) as *const RawDictionaryHeader) }
     }
 }
 

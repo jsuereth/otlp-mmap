@@ -81,7 +81,7 @@ struct RawRingBuffer {
 impl RawRingBuffer {
     /// Constructs a new ring buffer on an mmap at the offset.
     fn new(data: MmapMut, offset: usize) -> RawRingBuffer {
-        let hdr = unsafe { &*(data.as_ptr().add(offset) as *const &RawRingBufferHeader) };
+        let hdr = unsafe { &*(data.as_ref().as_ptr().add(offset) as *const RawRingBufferHeader) };
         RawRingBuffer {
             data,
             offset,
@@ -91,7 +91,10 @@ impl RawRingBuffer {
 
     fn try_read<T: prost::Message + std::default::Default>(&self) -> Result<Option<T>, Error> {
         if let Some(idx) = self.try_obtain_read_idx() {
-            Ok(Some(T::decode_length_delimited(self.entry(idx).deref())?))
+            let result = Ok(Some(T::decode_length_delimited(self.entry(idx).deref())?));
+            // Bump reader position to mark we've read this value.
+            self.header().reader_index.store(idx, Ordering::Release);
+            result
         } else {
             Ok(None)
         }
@@ -112,12 +115,12 @@ impl RawRingBuffer {
 
     /// The ring buffer header (with atomic access).
     fn header(&self) -> &RawRingBufferHeader {
-        unsafe { &*(self.data.as_ptr().add(self.offset) as *const &RawRingBufferHeader) }
+        unsafe { &*(self.data.as_ref().as_ptr().add(self.offset) as *const RawRingBufferHeader) }
     }
     /// The availability array for ring buffer entries.
     fn availability_array(&self) -> &[AtomicI32] {
         unsafe {
-            let start_ptr = self.data.as_ptr().add(self.offset + 32).cast::<AtomicI32>();
+            let start_ptr = self.data.as_ref().as_ptr().add(self.offset + 32).cast::<AtomicI32>();
             std::slice::from_raw_parts(start_ptr, self.header().num_buffers as usize)
         }
     }
@@ -139,6 +142,7 @@ impl RawRingBuffer {
     /// Checks whether a given ring buffer is avialable to read.
     /// Note: This uses an atomic operation.
     fn is_read_available(&self, idx: i64) -> bool {
+        println!("Checking if we can read: {idx}");
         let flag = ((idx as u32) >> self.shift) as i32;
         let ring_index = self.ring_buffer_index(idx);
         self.availability_array()[ring_index].load(Ordering::Acquire) == flag
@@ -154,8 +158,10 @@ impl RawRingBuffer {
 
     /// Returns a ring buffer entry that we can use as a byte slice.
     fn entry<'a>(&'a self, idx: i64) -> RingBufferEntry<'a> {
-        let start_byte_idx = 64 + (idx * self.header().buffer_size) as usize;
-        let end_byte_idx = 64 + ((idx + 1) * self.header().buffer_size) as usize;
+        let ring_index = self.ring_buffer_index(idx);
+        println!("Reading: {idx} - real idx {ring_index}");
+        let start_byte_idx = 64 + ring_index * (self.header().buffer_size as usize);
+        let end_byte_idx = 64 + ((ring_index + 1) * (self.header().buffer_size as usize));
         RingBufferEntry {
             data: &self.data,
             start_offset: start_byte_idx,
