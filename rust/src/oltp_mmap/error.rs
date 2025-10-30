@@ -22,5 +22,5 @@ pub enum OltpMmapError {
     TonicTransportError(#[from] tonic::transport::Error),
 
     #[error(transparent)]
-    AsyncOltpMmapError(#[from] Arc<OltpMmapError>)
+    AsyncOltpMmapError(#[from] Arc<OltpMmapError>),
 }

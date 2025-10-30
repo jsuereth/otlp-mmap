@@ -68,12 +68,14 @@ See [Protocol](PROTOCOL.MD) for details on the file contents and layout.
     - Memory usage of traditonal otlp exporter vs. MMap-Writer + MMap-collector combined
     - Memory overhead of primary process
 - File format experiements
-  - [ ] Metric file format
+  - [X] variable sized entry dictionary
+  - [X] Metric file format
   - [ ] Evaluate Parquet
-  - [ ] variable sized entry dictionary
+  - [ ] Evaluate STEF
 - More Language Writers
   - [ ] Go
+  - [ ] Python
 - Deeper SDK hooks
-  - [ ] Directly keeping metric aggregations in mmap
-  - [ ] Directly writing span start/stop/event to ringbuffer
+  - [X] Directly keeping metric aggregations in mmap
+  - [X] Directly writing span start/stop/event to ringbuffer
 - Comparison w/ eBPF techniques

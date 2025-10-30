@@ -35,8 +35,8 @@ pub struct OtlpMmapReaderConfig {
 
 impl Default for OtlpMmapReaderConfig {
     fn default() -> Self {
-        Self { 
-            resource_cache_capacity: 10, 
+        Self {
+            resource_cache_capacity: 10,
             scope_cache_capactiy: 100,
             max_spans_batch: 100,
             span_batch_timeout: Duration::from_secs(60),
@@ -56,7 +56,10 @@ impl OtlpMmapReader {
     pub fn new(p: &Path, config: OtlpMmapReaderConfig) -> Result<OtlpMmapReader, Error> {
         // TODO - configurable cache capacity.
         Ok(OtlpMmapReader {
-            resources: DictionaryReader::new(&p.join("resource.otlp"), config.resource_cache_capacity)?,
+            resources: DictionaryReader::new(
+                &p.join("resource.otlp"),
+                config.resource_cache_capacity,
+            )?,
             scopes: DictionaryReader::new(&p.join("scope.otlp"), config.scope_cache_capactiy)?,
             spans: RingBufferReader::new(&p.join("spans.otlp"))?,
             config,
@@ -94,13 +97,13 @@ impl OtlpMmapReader {
         let r_version = self.resources.version().await;
         let s_version = self.scopes.version().await;
         if r_version != s_version {
-            return Err(error::OltpMmapError::VersionMismatch(r_version, s_version))
+            return Err(error::OltpMmapError::VersionMismatch(r_version, s_version));
         }
         let version = self.spans.version().await;
         if r_version != version {
             return Err(error::OltpMmapError::VersionMismatch(r_version, version));
         }
-        Ok(())        
+        Ok(())
     }
 
     /// Constructs an OTLP (not mmap) TraceServiceRequest.

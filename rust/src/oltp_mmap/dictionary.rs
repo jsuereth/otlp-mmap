@@ -27,11 +27,15 @@ where
     }
     /// Reads a value from the dictionary. Returns an error on I/O issues.
     pub async fn get(&self, idx: i64) -> Result<Arc<T>, Arc<Error>> {
-        self.cache.try_get_with(idx, async move {
-            let input = self.input.lock().await;
-            let buf = input.entry(idx)?;
-            T::decode_length_delimited(buf.deref()).map_err(Error::ProtobufDecodeError).map(Arc::new)
-        }).await
+        self.cache
+            .try_get_with(idx, async move {
+                let input = self.input.lock().await;
+                let buf = input.entry(idx)?;
+                T::decode_length_delimited(buf.deref())
+                    .map_err(Error::ProtobufDecodeError)
+                    .map(Arc::new)
+            })
+            .await
     }
     /// Reads the timestamp associated with this dictionary.
     pub async fn version(&self) -> i64 {
