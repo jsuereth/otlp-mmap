@@ -22,5 +22,14 @@ class ProtoReader[Msg <: MessageLite](base: Msg)
 
   override def read(buffer: ByteBuffer): Msg =
     // TODO - byte buffer read
-    // base.newBuilderForType().mergeDelimitedFrom()
-    ???
+    val result = base.newBuilderForType()
+    result.mergeDelimitedFrom(new ByteBufferInputStream(buffer))
+    result.build().asInstanceOf[Msg]
+
+private class ByteBufferInputStream(in: ByteBuffer) extends java.io.InputStream:
+
+  override def read(): Int = in.get()
+  override def read(b: Array[Byte], off: Int, len: Int): Int =
+    val l = Math.min(len, in.remaining())
+    in.get(b, off, l)
+    l
