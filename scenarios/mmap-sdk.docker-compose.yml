@@ -1,0 +1,40 @@
+# Mmap SDK OTLP Demo
+# 
+# This demo replaces the entire SDK in java with something that pushes
+# data into an MMAP file as quickly as possible.
+#
+# A machine-local (but separate container) collector reads the file
+# and processes data into actual OTLP which is sent to an
+# OpenTelemetry collector
+x-otlp-mmap-volume:
+  &otlp-mmap-volume
+  type: bind
+  source: ./export
+  target: /otlp/export
+services:
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.72.0
+    volumes:
+      - ./otel-config.yaml:/otel-config.yaml
+    command: ["--config=/otel-config.yaml"]
+    ports:
+      - "4317:4317"
+  # Mmap OTLP Demo
+  mmap_otlp_demo:
+    image: otel/mmap-demo:latest
+    environment:
+      SDK_MMAP_EXPORTER_FILE: /otlp/export/mmap-demo.otlp
+    # TODO - share definiton w/ mmap collector
+    volumes: 
+      - ./export:/otlp/export
+  mmap_collector:
+    image: otel/otlp-mmap-collector:latest
+    depends_on:
+      - collector
+      - mmap_otlp_demo
+    environment:
+      SDK_MMAP_EXPORTER_FILE: /otlp/export/mmap-demo.otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4317      
+    # TODO - share definiton w/ demo
+    volumes: 
+      - ./export:/otlp/export

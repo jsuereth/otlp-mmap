@@ -133,6 +133,9 @@ class SpanBuilder(event: MmapProto.SpanEvent.Builder, shared: TracerSharedState)
       import internal.data.given
       event.setTraceId(ByteString.copyFrom(context.getTraceIdBytes()))
       event.setSpanId(ByteString.copyFrom(context.getSpanIdBytes()))
+      // Check if we have a start time and create one.
+      if event.getStart().getStartTimeUnixNano() == 0
+      then setStartTimestamp(Instant.now())
       shared.mmap.spans.write(event.build())
       Span(context, shared)
 

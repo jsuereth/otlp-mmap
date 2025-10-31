@@ -33,10 +33,10 @@ cd otlp-mmap
 docker build . -t otel/mmap-demo:latest
 ```
 
-3. Run the demo
+3. Run the desired demo
 
 ```
-docker compose up
+docker compose -f scenarios/{scenario}.yml up
 ```
 
 The demo will send two batches of 100 spans from a java process through the otlp-mmap-collector to a normal collector.

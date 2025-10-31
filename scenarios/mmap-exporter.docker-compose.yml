@@ -1,3 +1,11 @@
+# Mmap Exporter OTLP Demo
+# 
+# This demo replaces SDK exportes with a fast, ring-buffer mmap-file
+# approach.
+#
+# A machine-local (but separate container) collector reads the file
+# and processes data into actual OTLP which is sent to an
+# OpenTelemetry collector
 x-otlp-mmap-volume:
   &otlp-mmap-volume
   type: bind
