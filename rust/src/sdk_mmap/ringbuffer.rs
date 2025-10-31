@@ -120,17 +120,25 @@ impl RawRingBuffer {
     /// The availability array for ring buffer entries.
     fn availability_array(&self) -> &[AtomicI32] {
         unsafe {
-            let start_ptr = self.data.as_ref().as_ptr().add(self.offset + 32).cast::<AtomicI32>();
+            let start_ptr = self.data.as_ref().as_ptr().add(self.availability_array_offset()).cast::<AtomicI32>();
             std::slice::from_raw_parts(start_ptr, self.header().num_buffers as usize)
         }
     }
     /// The number of bytes this ring buffer will take.
     pub fn byte_size(&self) -> usize {
         // Header + Availability Array + Ring Buffer
-        let size = 32
-            + (4 * self.header().num_buffers)
-            + (self.header().num_buffers * self.header().buffer_size);
-        size as usize
+        let size = 
+            self.first_buffer_offset()
+            + (self.header().num_buffers * self.header().buffer_size) as usize;
+        size
+    }
+
+    pub fn availability_array_offset(&self) -> usize {
+        self.offset + 32
+    }
+
+    pub fn first_buffer_offset(&self) -> usize {
+        self.offset + 32 + (4 * self.header().num_buffers) as usize
     }
 
     fn ring_buffer_index(&self, idx: i64) -> usize {
@@ -158,10 +166,11 @@ impl RawRingBuffer {
 
     /// Returns a ring buffer entry that we can use as a byte slice.
     fn entry<'a>(&'a self, idx: i64) -> RingBufferEntry<'a> {
+        let offset_to_ring = self.first_buffer_offset();
         let ring_index = self.ring_buffer_index(idx);
-        println!("Reading: {idx} - real idx {ring_index}");
-        let start_byte_idx = 64 + ring_index * (self.header().buffer_size as usize);
-        let end_byte_idx = 64 + ((ring_index + 1) * (self.header().buffer_size as usize));
+        let start_byte_idx = offset_to_ring + (ring_index * (self.header().buffer_size as usize));
+        let end_byte_idx = start_byte_idx + (self.header().buffer_size as usize);
+        println!("Reading: {idx} - real idx {ring_index} @ {start_byte_idx}");
         RingBufferEntry {
             data: &self.data,
             start_offset: start_byte_idx,
