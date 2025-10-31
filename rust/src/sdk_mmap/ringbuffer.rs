@@ -150,7 +150,6 @@ impl RawRingBuffer {
     /// Checks whether a given ring buffer is avialable to read.
     /// Note: This uses an atomic operation.
     fn is_read_available(&self, idx: i64) -> bool {
-        println!("Checking if we can read: {idx}");
         let flag = ((idx as u32) >> self.shift) as i32;
         let ring_index = self.ring_buffer_index(idx);
         self.availability_array()[ring_index].load(Ordering::Acquire) == flag
@@ -170,7 +169,6 @@ impl RawRingBuffer {
         let ring_index = self.ring_buffer_index(idx);
         let start_byte_idx = offset_to_ring + (ring_index * (self.header().buffer_size as usize));
         let end_byte_idx = start_byte_idx + (self.header().buffer_size as usize);
-        println!("Reading: {idx} - real idx {ring_index} @ {start_byte_idx}");
         RingBufferEntry {
             data: &self.data,
             start_offset: start_byte_idx,
