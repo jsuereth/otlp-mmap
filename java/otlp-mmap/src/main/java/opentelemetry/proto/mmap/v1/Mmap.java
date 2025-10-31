@@ -638,6 +638,16 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
 
     /**
      * <pre>
+     * InsturmentationScope from which this was recorded.
+     * </pre>
+     *
+     * <code>int64 scope_ref = 20;</code>
+     * @return The scopeRef.
+     */
+    long getScopeRef();
+
+    /**
+     * <pre>
      * A unique identifier for a trace. All spans from the same trace share
      * the same `trace_id`. The ID is a 16-byte array. An ID with all zeroes OR
      * of length other than 16 bytes is considered invalid (empty string in OTLP/JSON
@@ -8784,6 +8794,21 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
           eventCase_);
     }
 
+    public static final int SCOPE_REF_FIELD_NUMBER = 20;
+    private long scopeRef_ = 0L;
+    /**
+     * <pre>
+     * InsturmentationScope from which this was recorded.
+     * </pre>
+     *
+     * <code>int64 scope_ref = 20;</code>
+     * @return The scopeRef.
+     */
+    @java.lang.Override
+    public long getScopeRef() {
+      return scopeRef_;
+    }
+
     public static final int TRACE_ID_FIELD_NUMBER = 1;
     private com.google.protobuf.ByteString traceId_ = com.google.protobuf.ByteString.EMPTY;
     /**
@@ -9014,6 +9039,9 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       if (eventCase_ == 15) {
         output.writeMessage(15, (opentelemetry.proto.mmap.v1.Mmap.SpanEvent.AddLink) event_);
       }
+      if (scopeRef_ != 0L) {
+        output.writeInt64(20, scopeRef_);
+      }
       getUnknownFields().writeTo(output);
     }
 
@@ -9051,6 +9079,10 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
         size += com.google.protobuf.CodedOutputStream
           .computeMessageSize(15, (opentelemetry.proto.mmap.v1.Mmap.SpanEvent.AddLink) event_);
       }
+      if (scopeRef_ != 0L) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt64Size(20, scopeRef_);
+      }
       size += getUnknownFields().getSerializedSize();
       memoizedSize = size;
       return size;
@@ -9066,6 +9098,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       opentelemetry.proto.mmap.v1.Mmap.SpanEvent other = (opentelemetry.proto.mmap.v1.Mmap.SpanEvent) obj;
 
+      if (getScopeRef()
+          != other.getScopeRef()) return false;
       if (!getTraceId()
           .equals(other.getTraceId())) return false;
       if (!getSpanId()
@@ -9106,6 +9140,9 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       int hash = 41;
       hash = (19 * hash) + getDescriptor().hashCode();
+      hash = (37 * hash) + SCOPE_REF_FIELD_NUMBER;
+      hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
+          getScopeRef());
       hash = (37 * hash) + TRACE_ID_FIELD_NUMBER;
       hash = (53 * hash) + getTraceId().hashCode();
       hash = (37 * hash) + SPAN_ID_FIELD_NUMBER;
@@ -9265,6 +9302,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       public Builder clear() {
         super.clear();
         bitField0_ = 0;
+        scopeRef_ = 0L;
         traceId_ = com.google.protobuf.ByteString.EMPTY;
         spanId_ = com.google.protobuf.ByteString.EMPTY;
         if (startBuilder_ != null) {
@@ -9319,9 +9357,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       private void buildPartial0(opentelemetry.proto.mmap.v1.Mmap.SpanEvent result) {
         int from_bitField0_ = bitField0_;
         if (((from_bitField0_ & 0x00000001) != 0)) {
-          result.traceId_ = traceId_;
+          result.scopeRef_ = scopeRef_;
         }
         if (((from_bitField0_ & 0x00000002) != 0)) {
+          result.traceId_ = traceId_;
+        }
+        if (((from_bitField0_ & 0x00000004) != 0)) {
           result.spanId_ = spanId_;
         }
       }
@@ -9363,6 +9404,9 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
 
       public Builder mergeFrom(opentelemetry.proto.mmap.v1.Mmap.SpanEvent other) {
         if (other == opentelemetry.proto.mmap.v1.Mmap.SpanEvent.getDefaultInstance()) return this;
+        if (other.getScopeRef() != 0L) {
+          setScopeRef(other.getScopeRef());
+        }
         if (!other.getTraceId().isEmpty()) {
           setTraceId(other.getTraceId());
         }
@@ -9422,12 +9466,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
                 break;
               case 10: {
                 traceId_ = input.readBytes();
-                bitField0_ |= 0x00000001;
+                bitField0_ |= 0x00000002;
                 break;
               } // case 10
               case 18: {
                 spanId_ = input.readBytes();
-                bitField0_ |= 0x00000002;
+                bitField0_ |= 0x00000004;
                 break;
               } // case 18
               case 90: {
@@ -9465,6 +9509,11 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
                 eventCase_ = 15;
                 break;
               } // case 122
+              case 160: {
+                scopeRef_ = input.readInt64();
+                bitField0_ |= 0x00000001;
+                break;
+              } // case 160
               default: {
                 if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                   done = true; // was an endgroup tag
@@ -9496,6 +9545,50 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
 
       private int bitField0_;
+
+      private long scopeRef_ ;
+      /**
+       * <pre>
+       * InsturmentationScope from which this was recorded.
+       * </pre>
+       *
+       * <code>int64 scope_ref = 20;</code>
+       * @return The scopeRef.
+       */
+      @java.lang.Override
+      public long getScopeRef() {
+        return scopeRef_;
+      }
+      /**
+       * <pre>
+       * InsturmentationScope from which this was recorded.
+       * </pre>
+       *
+       * <code>int64 scope_ref = 20;</code>
+       * @param value The scopeRef to set.
+       * @return This builder for chaining.
+       */
+      public Builder setScopeRef(long value) {
+
+        scopeRef_ = value;
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * InsturmentationScope from which this was recorded.
+       * </pre>
+       *
+       * <code>int64 scope_ref = 20;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearScopeRef() {
+        bitField0_ = (bitField0_ & ~0x00000001);
+        scopeRef_ = 0L;
+        onChanged();
+        return this;
+      }
 
       private com.google.protobuf.ByteString traceId_ = com.google.protobuf.ByteString.EMPTY;
       /**
@@ -9532,7 +9625,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       public Builder setTraceId(com.google.protobuf.ByteString value) {
         if (value == null) { throw new NullPointerException(); }
         traceId_ = value;
-        bitField0_ |= 0x00000001;
+        bitField0_ |= 0x00000002;
         onChanged();
         return this;
       }
@@ -9550,7 +9643,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * @return This builder for chaining.
        */
       public Builder clearTraceId() {
-        bitField0_ = (bitField0_ & ~0x00000001);
+        bitField0_ = (bitField0_ & ~0x00000002);
         traceId_ = getDefaultInstance().getTraceId();
         onChanged();
         return this;
@@ -9591,7 +9684,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       public Builder setSpanId(com.google.protobuf.ByteString value) {
         if (value == null) { throw new NullPointerException(); }
         spanId_ = value;
-        bitField0_ |= 0x00000002;
+        bitField0_ |= 0x00000004;
         onChanged();
         return this;
       }
@@ -9609,7 +9702,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * @return This builder for chaining.
        */
       public Builder clearSpanId() {
-        bitField0_ = (bitField0_ & ~0x00000002);
+        bitField0_ = (bitField0_ & ~0x00000004);
         spanId_ = getDefaultInstance().getSpanId();
         onChanged();
         return this;
@@ -26951,118 +27044,119 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
   static {
     java.lang.String[] descriptorData = {
       "\n\nmmap.proto\022\033opentelemetry.proto.mmap.v" +
-      "1\"\341\t\n\tSpanEvent\022\020\n\010trace_id\030\001 \001(\014\022\017\n\007spa" +
-      "n_id\030\002 \001(\014\022A\n\005start\030\013 \001(\01320.opentelemetr" +
-      "y.proto.mmap.v1.SpanEvent.StartSpanH\000\022=\n" +
-      "\003end\030\014 \001(\0132..opentelemetry.proto.mmap.v1" +
-      ".SpanEvent.EndSpanH\000\022E\n\004name\030\r \001(\01325.ope" +
-      "ntelemetry.proto.mmap.v1.SpanEvent.Chang" +
-      "eSpanNameH\000\022M\n\nattributes\030\016 \001(\01327.opente" +
-      "lemetry.proto.mmap.v1.SpanEvent.UpdateAt" +
-      "tributesH\000\022>\n\004link\030\017 \001(\0132..opentelemetry" +
-      ".proto.mmap.v1.SpanEvent.AddLinkH\000\032\201\003\n\tS" +
-      "tartSpan\022\026\n\016parent_span_id\030\004 \001(\014\022\r\n\005flag" +
-      "s\030\020 \001(\007\022\014\n\004name\030\005 \001(\t\022G\n\004kind\030\006 \001(\01629.op" +
-      "entelemetry.proto.mmap.v1.SpanEvent.Star" +
-      "tSpan.SpanKind\022\034\n\024start_time_unix_nano\030\007" +
-      " \001(\006\022<\n\nattributes\030\t \003(\0132(.opentelemetry" +
-      ".proto.mmap.v1.KeyValueRef\"\231\001\n\010SpanKind\022" +
-      "\031\n\025SPAN_KIND_UNSPECIFIED\020\000\022\026\n\022SPAN_KIND_" +
-      "INTERNAL\020\001\022\024\n\020SPAN_KIND_SERVER\020\002\022\024\n\020SPAN" +
-      "_KIND_CLIENT\020\003\022\026\n\022SPAN_KIND_PRODUCER\020\004\022\026" +
-      "\n\022SPAN_KIND_CONSUMER\020\005\032Z\n\007EndSpan\022\032\n\022end" +
-      "_time_unix_nano\030\010 \001(\006\0223\n\006status\030\017 \001(\0132#." +
-      "opentelemetry.proto.mmap.v1.Status\032\036\n\016Ch" +
-      "angeSpanName\022\014\n\004name\030\005 \001(\t\032P\n\020UpdateAttr" +
-      "ibutes\022<\n\nattributes\030\t \003(\0132(.opentelemet" +
-      "ry.proto.mmap.v1.KeyValueRef\032\375\001\n\007AddLink" +
-      "\022B\n\005links\030\r \003(\01323.opentelemetry.proto.mm" +
-      "ap.v1.SpanEvent.AddLink.Link\032\255\001\n\004Link\022\020\n" +
-      "\010trace_id\030\001 \001(\014\022\017\n\007span_id\030\002 \001(\014\022\023\n\013trac" +
-      "e_state\030\003 \001(\t\022<\n\nattributes\030\004 \003(\0132(.open" +
-      "telemetry.proto.mmap.v1.KeyValueRef\022 \n\030d" +
-      "ropped_attributes_count\030\005 \001(\r\022\r\n\005flags\030\006" +
-      " \001(\007B\007\n\005event\"\255\001\n\006Status\022\017\n\007message\030\002 \001(" +
-      "\t\022<\n\004code\030\003 \001(\0162..opentelemetry.proto.mm" +
-      "ap.v1.Status.StatusCode\"N\n\nStatusCode\022\025\n" +
-      "\021STATUS_CODE_UNSET\020\000\022\022\n\016STATUS_CODE_OK\020\001" +
-      "\022\025\n\021STATUS_CODE_ERROR\020\002J\004\010\001\020\002\"\350\001\n\013Measur" +
-      "ement\022\022\n\nmetric_ref\030\001 \001(\003\022<\n\nattributes\030" +
-      "\002 \003(\0132(.opentelemetry.proto.mmap.v1.KeyV" +
-      "alueRef\022\026\n\016time_unix_nano\030\003 \001(\006\022\021\n\007as_lo" +
-      "ng\030\004 \001(\003H\000\022\023\n\tas_double\030\005 \001(\001H\000\022>\n\014span_" +
-      "context\030\006 \001(\0132(.opentelemetry.proto.mmap" +
-      ".v1.SpanContextB\007\n\005value\"\220\006\n\tMetricRef\022\014" +
-      "\n\004name\030\001 \001(\t\022\023\n\013description\030\002 \001(\t\022\014\n\004uni" +
-      "t\030\003 \001(\t\022!\n\031instrumentation_scope_ref\030\004 \001" +
-      "(\003\022=\n\005gauge\030\005 \001(\0132,.opentelemetry.proto." +
-      "mmap.v1.MetricRef.GaugeH\000\0229\n\003sum\030\006 \001(\0132*" +
-      ".opentelemetry.proto.mmap.v1.MetricRef.S" +
-      "umH\000\022E\n\thistogram\030\007 \001(\01320.opentelemetry." +
-      "proto.mmap.v1.MetricRef.HistogramH\000\022O\n\010e" +
-      "xp_hist\030\010 \001(\0132;.opentelemetry.proto.mmap" +
-      ".v1.MetricRef.ExponentialHistogramH\000\032\007\n\005" +
-      "Gauge\032q\n\003Sum\022T\n\027aggregation_temporality\030" +
-      "\002 \001(\01623.opentelemetry.proto.mmap.v1.Aggr" +
-      "egationTemporality\022\024\n\014is_monotonic\030\003 \001(\010" +
-      "\032{\n\tHistogram\022T\n\027aggregation_temporality" +
-      "\030\001 \001(\01623.opentelemetry.proto.mmap.v1.Agg" +
-      "regationTemporality\022\030\n\020bucket_boundares\030" +
-      "\002 \003(\001\032\224\001\n\024ExponentialHistogram\022T\n\027aggreg" +
-      "ation_temporality\030\001 \001(\01623.opentelemetry." +
-      "proto.mmap.v1.AggregationTemporality\022\023\n\013" +
-      "max_buckets\030\002 \001(\003\022\021\n\tmax_scale\030\003 \001(\003B\r\n\013" +
-      "aggregation\"\234\002\n\005Event\022\021\n\tscope_ref\030\001 \001(\003" +
-      "\022\026\n\016time_unix_nano\030\002 \001(\006\022D\n\017severity_num" +
-      "ber\030\003 \001(\0162+.opentelemetry.proto.mmap.v1." +
-      "SeverityNumber\022\025\n\rseverity_text\030\004 \001(\t\0223\n" +
-      "\004body\030\005 \001(\0132%.opentelemetry.proto.mmap.v" +
-      "1.AnyValue\022\026\n\016event_name_ref\030\006 \001(\003\022>\n\014sp" +
-      "an_context\030\007 \001(\0132(.opentelemetry.proto.m" +
-      "map.v1.SpanContext\"j\n\010Resource\022<\n\nattrib" +
-      "utes\030\001 \003(\0132(.opentelemetry.proto.mmap.v1" +
-      ".KeyValueRef\022 \n\030dropped_attributes_count" +
-      "\030\002 \001(\r\"\263\001\n\024InstrumentationScope\022\020\n\010name_" +
-      "ref\030\001 \001(\003\022\023\n\013version_ref\030\002 \001(\003\022<\n\nattrib" +
-      "utes\030\003 \003(\0132(.opentelemetry.proto.mmap.v1" +
-      ".KeyValueRef\022 \n\030dropped_attributes_count" +
-      "\030\004 \001(\r\022\024\n\014resource_ref\030\005 \001(\003\"T\n\013KeyValue" +
-      "Ref\022\017\n\007key_ref\030\001 \001(\003\0224\n\005value\030\002 \001(\0132%.op" +
-      "entelemetry.proto.mmap.v1.AnyValue\"\235\002\n\010A" +
-      "nyValue\022\026\n\014string_value\030\001 \001(\tH\000\022\024\n\nbool_" +
-      "value\030\002 \001(\010H\000\022\023\n\tint_value\030\003 \001(\003H\000\022\026\n\014do" +
-      "uble_value\030\004 \001(\001H\000\022>\n\013array_value\030\005 \001(\0132" +
-      "\'.opentelemetry.proto.mmap.v1.ArrayValue" +
-      "H\000\022A\n\014kvlist_value\030\006 \001(\0132).opentelemetry" +
-      ".proto.mmap.v1.KeyValueListH\000\022\025\n\013bytes_v" +
-      "alue\030\007 \001(\014H\000\022\023\n\tvalue_ref\030\010 \001(\003H\000B\007\n\005val" +
-      "ue\"C\n\nArrayValue\0225\n\006values\030\001 \003(\0132%.opent" +
-      "elemetry.proto.mmap.v1.AnyValue\"H\n\014KeyVa" +
-      "lueList\0228\n\006values\030\001 \003(\0132(.opentelemetry." +
-      "proto.mmap.v1.KeyValueRef\"?\n\013SpanContext" +
-      "\022\017\n\007span_id\030\001 \001(\014\022\020\n\010trace_id\030\002 \001(\014\022\r\n\005f" +
-      "lags\030\003 \001(\007*\214\001\n\026AggregationTemporality\022\'\n" +
-      "#AGGREGATION_TEMPORALITY_UNSPECIFIED\020\000\022!" +
-      "\n\035AGGREGATION_TEMPORALITY_DELTA\020\001\022&\n\"AGG" +
-      "REGATION_TEMPORALITY_CUMULATIVE\020\002*\303\005\n\016Se" +
-      "verityNumber\022\037\n\033SEVERITY_NUMBER_UNSPECIF" +
-      "IED\020\000\022\031\n\025SEVERITY_NUMBER_TRACE\020\001\022\032\n\026SEVE" +
-      "RITY_NUMBER_TRACE2\020\002\022\032\n\026SEVERITY_NUMBER_" +
-      "TRACE3\020\003\022\032\n\026SEVERITY_NUMBER_TRACE4\020\004\022\031\n\025" +
-      "SEVERITY_NUMBER_DEBUG\020\005\022\032\n\026SEVERITY_NUMB" +
-      "ER_DEBUG2\020\006\022\032\n\026SEVERITY_NUMBER_DEBUG3\020\007\022" +
-      "\032\n\026SEVERITY_NUMBER_DEBUG4\020\010\022\030\n\024SEVERITY_" +
-      "NUMBER_INFO\020\t\022\031\n\025SEVERITY_NUMBER_INFO2\020\n" +
-      "\022\031\n\025SEVERITY_NUMBER_INFO3\020\013\022\031\n\025SEVERITY_" +
-      "NUMBER_INFO4\020\014\022\030\n\024SEVERITY_NUMBER_WARN\020\r" +
-      "\022\031\n\025SEVERITY_NUMBER_WARN2\020\016\022\031\n\025SEVERITY_" +
-      "NUMBER_WARN3\020\017\022\031\n\025SEVERITY_NUMBER_WARN4\020" +
-      "\020\022\031\n\025SEVERITY_NUMBER_ERROR\020\021\022\032\n\026SEVERITY" +
-      "_NUMBER_ERROR2\020\022\022\032\n\026SEVERITY_NUMBER_ERRO" +
-      "R3\020\023\022\032\n\026SEVERITY_NUMBER_ERROR4\020\024\022\031\n\025SEVE" +
-      "RITY_NUMBER_FATAL\020\025\022\032\n\026SEVERITY_NUMBER_F" +
-      "ATAL2\020\026\022\032\n\026SEVERITY_NUMBER_FATAL3\020\027\022\032\n\026S" +
-      "EVERITY_NUMBER_FATAL4\020\030b\006proto3"
+      "1\"\364\t\n\tSpanEvent\022\021\n\tscope_ref\030\024 \001(\003\022\020\n\010tr" +
+      "ace_id\030\001 \001(\014\022\017\n\007span_id\030\002 \001(\014\022A\n\005start\030\013" +
+      " \001(\01320.opentelemetry.proto.mmap.v1.SpanE" +
+      "vent.StartSpanH\000\022=\n\003end\030\014 \001(\0132..opentele" +
+      "metry.proto.mmap.v1.SpanEvent.EndSpanH\000\022" +
+      "E\n\004name\030\r \001(\01325.opentelemetry.proto.mmap" +
+      ".v1.SpanEvent.ChangeSpanNameH\000\022M\n\nattrib" +
+      "utes\030\016 \001(\01327.opentelemetry.proto.mmap.v1" +
+      ".SpanEvent.UpdateAttributesH\000\022>\n\004link\030\017 " +
+      "\001(\0132..opentelemetry.proto.mmap.v1.SpanEv" +
+      "ent.AddLinkH\000\032\201\003\n\tStartSpan\022\026\n\016parent_sp" +
+      "an_id\030\004 \001(\014\022\r\n\005flags\030\020 \001(\007\022\014\n\004name\030\005 \001(\t" +
+      "\022G\n\004kind\030\006 \001(\01629.opentelemetry.proto.mma" +
+      "p.v1.SpanEvent.StartSpan.SpanKind\022\034\n\024sta" +
+      "rt_time_unix_nano\030\007 \001(\006\022<\n\nattributes\030\t " +
+      "\003(\0132(.opentelemetry.proto.mmap.v1.KeyVal" +
+      "ueRef\"\231\001\n\010SpanKind\022\031\n\025SPAN_KIND_UNSPECIF" +
+      "IED\020\000\022\026\n\022SPAN_KIND_INTERNAL\020\001\022\024\n\020SPAN_KI" +
+      "ND_SERVER\020\002\022\024\n\020SPAN_KIND_CLIENT\020\003\022\026\n\022SPA" +
+      "N_KIND_PRODUCER\020\004\022\026\n\022SPAN_KIND_CONSUMER\020" +
+      "\005\032Z\n\007EndSpan\022\032\n\022end_time_unix_nano\030\010 \001(\006" +
+      "\0223\n\006status\030\017 \001(\0132#.opentelemetry.proto.m" +
+      "map.v1.Status\032\036\n\016ChangeSpanName\022\014\n\004name\030" +
+      "\005 \001(\t\032P\n\020UpdateAttributes\022<\n\nattributes\030" +
+      "\t \003(\0132(.opentelemetry.proto.mmap.v1.KeyV" +
+      "alueRef\032\375\001\n\007AddLink\022B\n\005links\030\r \003(\01323.ope" +
+      "ntelemetry.proto.mmap.v1.SpanEvent.AddLi" +
+      "nk.Link\032\255\001\n\004Link\022\020\n\010trace_id\030\001 \001(\014\022\017\n\007sp" +
+      "an_id\030\002 \001(\014\022\023\n\013trace_state\030\003 \001(\t\022<\n\nattr" +
+      "ibutes\030\004 \003(\0132(.opentelemetry.proto.mmap." +
+      "v1.KeyValueRef\022 \n\030dropped_attributes_cou" +
+      "nt\030\005 \001(\r\022\r\n\005flags\030\006 \001(\007B\007\n\005event\"\255\001\n\006Sta" +
+      "tus\022\017\n\007message\030\002 \001(\t\022<\n\004code\030\003 \001(\0162..ope" +
+      "ntelemetry.proto.mmap.v1.Status.StatusCo" +
+      "de\"N\n\nStatusCode\022\025\n\021STATUS_CODE_UNSET\020\000\022" +
+      "\022\n\016STATUS_CODE_OK\020\001\022\025\n\021STATUS_CODE_ERROR" +
+      "\020\002J\004\010\001\020\002\"\350\001\n\013Measurement\022\022\n\nmetric_ref\030\001" +
+      " \001(\003\022<\n\nattributes\030\002 \003(\0132(.opentelemetry" +
+      ".proto.mmap.v1.KeyValueRef\022\026\n\016time_unix_" +
+      "nano\030\003 \001(\006\022\021\n\007as_long\030\004 \001(\003H\000\022\023\n\tas_doub" +
+      "le\030\005 \001(\001H\000\022>\n\014span_context\030\006 \001(\0132(.opent" +
+      "elemetry.proto.mmap.v1.SpanContextB\007\n\005va" +
+      "lue\"\220\006\n\tMetricRef\022\014\n\004name\030\001 \001(\t\022\023\n\013descr" +
+      "iption\030\002 \001(\t\022\014\n\004unit\030\003 \001(\t\022!\n\031instrument" +
+      "ation_scope_ref\030\004 \001(\003\022=\n\005gauge\030\005 \001(\0132,.o" +
+      "pentelemetry.proto.mmap.v1.MetricRef.Gau" +
+      "geH\000\0229\n\003sum\030\006 \001(\0132*.opentelemetry.proto." +
+      "mmap.v1.MetricRef.SumH\000\022E\n\thistogram\030\007 \001" +
+      "(\01320.opentelemetry.proto.mmap.v1.MetricR" +
+      "ef.HistogramH\000\022O\n\010exp_hist\030\010 \001(\0132;.opent" +
+      "elemetry.proto.mmap.v1.MetricRef.Exponen" +
+      "tialHistogramH\000\032\007\n\005Gauge\032q\n\003Sum\022T\n\027aggre" +
+      "gation_temporality\030\002 \001(\01623.opentelemetry" +
+      ".proto.mmap.v1.AggregationTemporality\022\024\n" +
+      "\014is_monotonic\030\003 \001(\010\032{\n\tHistogram\022T\n\027aggr" +
+      "egation_temporality\030\001 \001(\01623.opentelemetr" +
+      "y.proto.mmap.v1.AggregationTemporality\022\030" +
+      "\n\020bucket_boundares\030\002 \003(\001\032\224\001\n\024Exponential" +
+      "Histogram\022T\n\027aggregation_temporality\030\001 \001" +
+      "(\01623.opentelemetry.proto.mmap.v1.Aggrega" +
+      "tionTemporality\022\023\n\013max_buckets\030\002 \001(\003\022\021\n\t" +
+      "max_scale\030\003 \001(\003B\r\n\013aggregation\"\234\002\n\005Event" +
+      "\022\021\n\tscope_ref\030\001 \001(\003\022\026\n\016time_unix_nano\030\002 " +
+      "\001(\006\022D\n\017severity_number\030\003 \001(\0162+.opentelem" +
+      "etry.proto.mmap.v1.SeverityNumber\022\025\n\rsev" +
+      "erity_text\030\004 \001(\t\0223\n\004body\030\005 \001(\0132%.opentel" +
+      "emetry.proto.mmap.v1.AnyValue\022\026\n\016event_n" +
+      "ame_ref\030\006 \001(\003\022>\n\014span_context\030\007 \001(\0132(.op" +
+      "entelemetry.proto.mmap.v1.SpanContext\"j\n" +
+      "\010Resource\022<\n\nattributes\030\001 \003(\0132(.opentele" +
+      "metry.proto.mmap.v1.KeyValueRef\022 \n\030dropp" +
+      "ed_attributes_count\030\002 \001(\r\"\263\001\n\024Instrument" +
+      "ationScope\022\020\n\010name_ref\030\001 \001(\003\022\023\n\013version_" +
+      "ref\030\002 \001(\003\022<\n\nattributes\030\003 \003(\0132(.opentele" +
+      "metry.proto.mmap.v1.KeyValueRef\022 \n\030dropp" +
+      "ed_attributes_count\030\004 \001(\r\022\024\n\014resource_re" +
+      "f\030\005 \001(\003\"T\n\013KeyValueRef\022\017\n\007key_ref\030\001 \001(\003\022" +
+      "4\n\005value\030\002 \001(\0132%.opentelemetry.proto.mma" +
+      "p.v1.AnyValue\"\235\002\n\010AnyValue\022\026\n\014string_val" +
+      "ue\030\001 \001(\tH\000\022\024\n\nbool_value\030\002 \001(\010H\000\022\023\n\tint_" +
+      "value\030\003 \001(\003H\000\022\026\n\014double_value\030\004 \001(\001H\000\022>\n" +
+      "\013array_value\030\005 \001(\0132\'.opentelemetry.proto" +
+      ".mmap.v1.ArrayValueH\000\022A\n\014kvlist_value\030\006 " +
+      "\001(\0132).opentelemetry.proto.mmap.v1.KeyVal" +
+      "ueListH\000\022\025\n\013bytes_value\030\007 \001(\014H\000\022\023\n\tvalue" +
+      "_ref\030\010 \001(\003H\000B\007\n\005value\"C\n\nArrayValue\0225\n\006v" +
+      "alues\030\001 \003(\0132%.opentelemetry.proto.mmap.v" +
+      "1.AnyValue\"H\n\014KeyValueList\0228\n\006values\030\001 \003" +
+      "(\0132(.opentelemetry.proto.mmap.v1.KeyValu" +
+      "eRef\"?\n\013SpanContext\022\017\n\007span_id\030\001 \001(\014\022\020\n\010" +
+      "trace_id\030\002 \001(\014\022\r\n\005flags\030\003 \001(\007*\214\001\n\026Aggreg" +
+      "ationTemporality\022\'\n#AGGREGATION_TEMPORAL" +
+      "ITY_UNSPECIFIED\020\000\022!\n\035AGGREGATION_TEMPORA" +
+      "LITY_DELTA\020\001\022&\n\"AGGREGATION_TEMPORALITY_" +
+      "CUMULATIVE\020\002*\303\005\n\016SeverityNumber\022\037\n\033SEVER" +
+      "ITY_NUMBER_UNSPECIFIED\020\000\022\031\n\025SEVERITY_NUM" +
+      "BER_TRACE\020\001\022\032\n\026SEVERITY_NUMBER_TRACE2\020\002\022" +
+      "\032\n\026SEVERITY_NUMBER_TRACE3\020\003\022\032\n\026SEVERITY_" +
+      "NUMBER_TRACE4\020\004\022\031\n\025SEVERITY_NUMBER_DEBUG" +
+      "\020\005\022\032\n\026SEVERITY_NUMBER_DEBUG2\020\006\022\032\n\026SEVERI" +
+      "TY_NUMBER_DEBUG3\020\007\022\032\n\026SEVERITY_NUMBER_DE" +
+      "BUG4\020\010\022\030\n\024SEVERITY_NUMBER_INFO\020\t\022\031\n\025SEVE" +
+      "RITY_NUMBER_INFO2\020\n\022\031\n\025SEVERITY_NUMBER_I" +
+      "NFO3\020\013\022\031\n\025SEVERITY_NUMBER_INFO4\020\014\022\030\n\024SEV" +
+      "ERITY_NUMBER_WARN\020\r\022\031\n\025SEVERITY_NUMBER_W" +
+      "ARN2\020\016\022\031\n\025SEVERITY_NUMBER_WARN3\020\017\022\031\n\025SEV" +
+      "ERITY_NUMBER_WARN4\020\020\022\031\n\025SEVERITY_NUMBER_" +
+      "ERROR\020\021\022\032\n\026SEVERITY_NUMBER_ERROR2\020\022\022\032\n\026S" +
+      "EVERITY_NUMBER_ERROR3\020\023\022\032\n\026SEVERITY_NUMB" +
+      "ER_ERROR4\020\024\022\031\n\025SEVERITY_NUMBER_FATAL\020\025\022\032" +
+      "\n\026SEVERITY_NUMBER_FATAL2\020\026\022\032\n\026SEVERITY_N" +
+      "UMBER_FATAL3\020\027\022\032\n\026SEVERITY_NUMBER_FATAL4" +
+      "\020\030b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -27073,7 +27167,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     internal_static_opentelemetry_proto_mmap_v1_SpanEvent_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_opentelemetry_proto_mmap_v1_SpanEvent_descriptor,
-        new java.lang.String[] { "TraceId", "SpanId", "Start", "End", "Name", "Attributes", "Link", "Event", });
+        new java.lang.String[] { "ScopeRef", "TraceId", "SpanId", "Start", "End", "Name", "Attributes", "Link", "Event", });
     internal_static_opentelemetry_proto_mmap_v1_SpanEvent_StartSpan_descriptor =
       internal_static_opentelemetry_proto_mmap_v1_SpanEvent_descriptor.getNestedType(0);
     internal_static_opentelemetry_proto_mmap_v1_SpanEvent_StartSpan_fieldAccessorTable = new

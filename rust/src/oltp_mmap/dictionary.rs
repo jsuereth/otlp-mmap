@@ -81,7 +81,7 @@ impl RawDictionaryReader {
                 read_idx: idx as i64,
             })
         } else {
-            Err(super::error::OltpMmapError::NotFoundInDictoinary(
+            Err(super::error::OltpMmapError::NotFoundInDictionary(
                 self.name.to_owned(),
                 idx,
             ))

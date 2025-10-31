@@ -15,7 +15,8 @@ docker build . -t mmap_proto_build
 ## Output the files
 
 ```
-docker run mmap_proto_build \
+docker run \
   --mount 'type=bind,source=$(OTLP_MMAP_DIR)/proto_rust,target=/mmap/generated_rust' \
-  --mount 'type=bind,source=$(OTLP_MMAP_DIR)/proto_java,target=/mmap/generated_java'
+  --mount 'type=bind,source=$(OTLP_MMAP_DIR)/proto_java,target=/mmap/generated_java' \
+  mmap_proto_build
 ```

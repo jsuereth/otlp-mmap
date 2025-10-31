@@ -55,7 +55,7 @@ impl RawDictionary {
         if let Some(slice) = self.data.get(offset..) {
             Ok(T::decode_length_delimited(slice)?)
         } else {
-            Err(Error::NotFoundInDictoinary("<todo>".to_owned(), index))
+            Err(Error::NotFoundInDictionary("<todo>".to_owned(), index))
         }
     }
 

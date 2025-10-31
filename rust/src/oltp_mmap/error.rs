@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{array::TryFromSliceError, sync::Arc};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -13,7 +13,7 @@ pub enum OltpMmapError {
     ProtobufDecodeError(#[from] prost::DecodeError),
 
     #[error("Index {1} not found in dictionary {0}")]
-    NotFoundInDictoinary(String, i64),
+    NotFoundInDictionary(String, i64),
 
     #[error(transparent)]
     TonicStatus(#[from] tonic::Status),
@@ -23,4 +23,7 @@ pub enum OltpMmapError {
 
     #[error(transparent)]
     AsyncOltpMmapError(#[from] Arc<OltpMmapError>),
+
+    #[error(transparent)]
+    ConversionError(#[from] TryFromSliceError),
 }

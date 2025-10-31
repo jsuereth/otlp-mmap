@@ -120,15 +120,19 @@ impl RawRingBuffer {
     /// The availability array for ring buffer entries.
     fn availability_array(&self) -> &[AtomicI32] {
         unsafe {
-            let start_ptr = self.data.as_ref().as_ptr().add(self.availability_array_offset()).cast::<AtomicI32>();
+            let start_ptr = self
+                .data
+                .as_ref()
+                .as_ptr()
+                .add(self.availability_array_offset())
+                .cast::<AtomicI32>();
             std::slice::from_raw_parts(start_ptr, self.header().num_buffers as usize)
         }
     }
     /// The number of bytes this ring buffer will take.
     pub fn byte_size(&self) -> usize {
         // Header + Availability Array + Ring Buffer
-        let size = 
-            self.first_buffer_offset()
+        let size = self.first_buffer_offset()
             + (self.header().num_buffers * self.header().buffer_size) as usize;
         size
     }

@@ -17,7 +17,9 @@ syntax = "proto3";
 package opentelemetry.proto.mmap.v1;
 
 message SpanEvent {
-     // A unique identifier for a trace. All spans from the same trace share
+  // InsturmentationScope from which this was recorded.
+  int64 scope_ref = 20;
+  // A unique identifier for a trace. All spans from the same trace share
   // the same `trace_id`. The ID is a 16-byte array. An ID with all zeroes OR
   // of length other than 16 bytes is considered invalid (empty string in OTLP/JSON
   // is zero-length and thus is also invalid).

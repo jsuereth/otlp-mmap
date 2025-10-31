@@ -37,6 +37,7 @@ case class TracerSharedState(scopeId: Long, mmap: SdkMmapRaw, id_generator: IdGe
 class Tracer(state: TracerSharedState) extends io.opentelemetry.api.trace.Tracer:
   override def spanBuilder(spanName: String): SpanBuilder =
     val event = MmapProto.SpanEvent.newBuilder()
+    event.setScopeRef(state.scopeId)
     event.getStartBuilder.setName(spanName)
     event.getStartBuilder().setKind(MmapProto.SpanEvent.StartSpan.SpanKind.SPAN_KIND_INTERNAL)    
     SpanBuilder(event, state)
@@ -150,6 +151,7 @@ class Span(context: SpanContext, shared: TracerSharedState) extends io.opentelem
   // TODo - optimise this.
   private def newEventWithContext(): MmapProto.SpanEvent.Builder =
     MmapProto.SpanEvent.newBuilder()
+    .setScopeRef(shared.scopeId)
     .setTraceId(ByteString.copyFrom(context.getTraceIdBytes()))
     .setSpanId(ByteString.copyFrom(context.getSpanIdBytes()))
   override def updateName(name: String): Span =
