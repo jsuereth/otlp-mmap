@@ -394,6 +394,9 @@ message Event {
   // Span information in which this event was recorded.
   // [Optional].
   SpanContext span_context = 7;
+
+  // Attributes about this event.
+  repeated KeyValueRef attributes = 8;
 }
 
 // Resource information.

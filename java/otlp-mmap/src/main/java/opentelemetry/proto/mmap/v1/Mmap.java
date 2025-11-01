@@ -17855,6 +17855,50 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
      * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
      */
     opentelemetry.proto.mmap.v1.Mmap.SpanContextOrBuilder getSpanContextOrBuilder();
+
+    /**
+     * <pre>
+     * Attributes about this event.
+     * </pre>
+     *
+     * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+     */
+    java.util.List<opentelemetry.proto.mmap.v1.Mmap.KeyValueRef> 
+        getAttributesList();
+    /**
+     * <pre>
+     * Attributes about this event.
+     * </pre>
+     *
+     * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+     */
+    opentelemetry.proto.mmap.v1.Mmap.KeyValueRef getAttributes(int index);
+    /**
+     * <pre>
+     * Attributes about this event.
+     * </pre>
+     *
+     * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+     */
+    int getAttributesCount();
+    /**
+     * <pre>
+     * Attributes about this event.
+     * </pre>
+     *
+     * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+     */
+    java.util.List<? extends opentelemetry.proto.mmap.v1.Mmap.KeyValueRefOrBuilder> 
+        getAttributesOrBuilderList();
+    /**
+     * <pre>
+     * Attributes about this event.
+     * </pre>
+     *
+     * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+     */
+    opentelemetry.proto.mmap.v1.Mmap.KeyValueRefOrBuilder getAttributesOrBuilder(
+        int index);
   }
   /**
    * Protobuf type {@code opentelemetry.proto.mmap.v1.Event}
@@ -17880,6 +17924,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     private Event() {
       severityNumber_ = 0;
       severityText_ = "";
+      attributes_ = java.util.Collections.emptyList();
     }
 
     public static final com.google.protobuf.Descriptors.Descriptor
@@ -18114,6 +18159,67 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       return spanContext_ == null ? opentelemetry.proto.mmap.v1.Mmap.SpanContext.getDefaultInstance() : spanContext_;
     }
 
+    public static final int ATTRIBUTES_FIELD_NUMBER = 8;
+    @SuppressWarnings("serial")
+    private java.util.List<opentelemetry.proto.mmap.v1.Mmap.KeyValueRef> attributes_;
+    /**
+     * <pre>
+     * Attributes about this event.
+     * </pre>
+     *
+     * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+     */
+    @java.lang.Override
+    public java.util.List<opentelemetry.proto.mmap.v1.Mmap.KeyValueRef> getAttributesList() {
+      return attributes_;
+    }
+    /**
+     * <pre>
+     * Attributes about this event.
+     * </pre>
+     *
+     * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+     */
+    @java.lang.Override
+    public java.util.List<? extends opentelemetry.proto.mmap.v1.Mmap.KeyValueRefOrBuilder> 
+        getAttributesOrBuilderList() {
+      return attributes_;
+    }
+    /**
+     * <pre>
+     * Attributes about this event.
+     * </pre>
+     *
+     * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+     */
+    @java.lang.Override
+    public int getAttributesCount() {
+      return attributes_.size();
+    }
+    /**
+     * <pre>
+     * Attributes about this event.
+     * </pre>
+     *
+     * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+     */
+    @java.lang.Override
+    public opentelemetry.proto.mmap.v1.Mmap.KeyValueRef getAttributes(int index) {
+      return attributes_.get(index);
+    }
+    /**
+     * <pre>
+     * Attributes about this event.
+     * </pre>
+     *
+     * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+     */
+    @java.lang.Override
+    public opentelemetry.proto.mmap.v1.Mmap.KeyValueRefOrBuilder getAttributesOrBuilder(
+        int index) {
+      return attributes_.get(index);
+    }
+
     private byte memoizedIsInitialized = -1;
     @java.lang.Override
     public final boolean isInitialized() {
@@ -18148,6 +18254,9 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       if (((bitField0_ & 0x00000002) != 0)) {
         output.writeMessage(7, getSpanContext());
+      }
+      for (int i = 0; i < attributes_.size(); i++) {
+        output.writeMessage(8, attributes_.get(i));
       }
       getUnknownFields().writeTo(output);
     }
@@ -18185,6 +18294,10 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
         size += com.google.protobuf.CodedOutputStream
           .computeMessageSize(7, getSpanContext());
       }
+      for (int i = 0; i < attributes_.size(); i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(8, attributes_.get(i));
+      }
       size += getUnknownFields().getSerializedSize();
       memoizedSize = size;
       return size;
@@ -18219,6 +18332,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
         if (!getSpanContext()
             .equals(other.getSpanContext())) return false;
       }
+      if (!getAttributesList()
+          .equals(other.getAttributesList())) return false;
       if (!getUnknownFields().equals(other.getUnknownFields())) return false;
       return true;
     }
@@ -18250,6 +18365,10 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       if (hasSpanContext()) {
         hash = (37 * hash) + SPAN_CONTEXT_FIELD_NUMBER;
         hash = (53 * hash) + getSpanContext().hashCode();
+      }
+      if (getAttributesCount() > 0) {
+        hash = (37 * hash) + ATTRIBUTES_FIELD_NUMBER;
+        hash = (53 * hash) + getAttributesList().hashCode();
       }
       hash = (29 * hash) + getUnknownFields().hashCode();
       memoizedHashCode = hash;
@@ -18383,6 +18502,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
                 .alwaysUseFieldBuilders) {
           internalGetBodyFieldBuilder();
           internalGetSpanContextFieldBuilder();
+          internalGetAttributesFieldBuilder();
         }
       }
       @java.lang.Override
@@ -18404,6 +18524,13 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
           spanContextBuilder_.dispose();
           spanContextBuilder_ = null;
         }
+        if (attributesBuilder_ == null) {
+          attributes_ = java.util.Collections.emptyList();
+        } else {
+          attributes_ = null;
+          attributesBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000080);
         return this;
       }
 
@@ -18430,9 +18557,22 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       @java.lang.Override
       public opentelemetry.proto.mmap.v1.Mmap.Event buildPartial() {
         opentelemetry.proto.mmap.v1.Mmap.Event result = new opentelemetry.proto.mmap.v1.Mmap.Event(this);
+        buildPartialRepeatedFields(result);
         if (bitField0_ != 0) { buildPartial0(result); }
         onBuilt();
         return result;
+      }
+
+      private void buildPartialRepeatedFields(opentelemetry.proto.mmap.v1.Mmap.Event result) {
+        if (attributesBuilder_ == null) {
+          if (((bitField0_ & 0x00000080) != 0)) {
+            attributes_ = java.util.Collections.unmodifiableList(attributes_);
+            bitField0_ = (bitField0_ & ~0x00000080);
+          }
+          result.attributes_ = attributes_;
+        } else {
+          result.attributes_ = attributesBuilder_.build();
+        }
       }
 
       private void buildPartial0(opentelemetry.proto.mmap.v1.Mmap.Event result) {
@@ -18503,6 +18643,32 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
         if (other.hasSpanContext()) {
           mergeSpanContext(other.getSpanContext());
         }
+        if (attributesBuilder_ == null) {
+          if (!other.attributes_.isEmpty()) {
+            if (attributes_.isEmpty()) {
+              attributes_ = other.attributes_;
+              bitField0_ = (bitField0_ & ~0x00000080);
+            } else {
+              ensureAttributesIsMutable();
+              attributes_.addAll(other.attributes_);
+            }
+            onChanged();
+          }
+        } else {
+          if (!other.attributes_.isEmpty()) {
+            if (attributesBuilder_.isEmpty()) {
+              attributesBuilder_.dispose();
+              attributesBuilder_ = null;
+              attributes_ = other.attributes_;
+              bitField0_ = (bitField0_ & ~0x00000080);
+              attributesBuilder_ = 
+                com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders ?
+                   internalGetAttributesFieldBuilder() : null;
+            } else {
+              attributesBuilder_.addAllMessages(other.attributes_);
+            }
+          }
+        }
         this.mergeUnknownFields(other.getUnknownFields());
         onChanged();
         return this;
@@ -18568,6 +18734,19 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
                 bitField0_ |= 0x00000040;
                 break;
               } // case 58
+              case 66: {
+                opentelemetry.proto.mmap.v1.Mmap.KeyValueRef m =
+                    input.readMessage(
+                        opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.parser(),
+                        extensionRegistry);
+                if (attributesBuilder_ == null) {
+                  ensureAttributesIsMutable();
+                  attributes_.add(m);
+                } else {
+                  attributesBuilder_.addMessage(m);
+                }
+                break;
+              } // case 66
               default: {
                 if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                   done = true; // was an endgroup tag
@@ -19262,6 +19441,318 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
           spanContext_ = null;
         }
         return spanContextBuilder_;
+      }
+
+      private java.util.List<opentelemetry.proto.mmap.v1.Mmap.KeyValueRef> attributes_ =
+        java.util.Collections.emptyList();
+      private void ensureAttributesIsMutable() {
+        if (!((bitField0_ & 0x00000080) != 0)) {
+          attributes_ = new java.util.ArrayList<opentelemetry.proto.mmap.v1.Mmap.KeyValueRef>(attributes_);
+          bitField0_ |= 0x00000080;
+         }
+      }
+
+      private com.google.protobuf.RepeatedFieldBuilder<
+          opentelemetry.proto.mmap.v1.Mmap.KeyValueRef, opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.Builder, opentelemetry.proto.mmap.v1.Mmap.KeyValueRefOrBuilder> attributesBuilder_;
+
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public java.util.List<opentelemetry.proto.mmap.v1.Mmap.KeyValueRef> getAttributesList() {
+        if (attributesBuilder_ == null) {
+          return java.util.Collections.unmodifiableList(attributes_);
+        } else {
+          return attributesBuilder_.getMessageList();
+        }
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public int getAttributesCount() {
+        if (attributesBuilder_ == null) {
+          return attributes_.size();
+        } else {
+          return attributesBuilder_.getCount();
+        }
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public opentelemetry.proto.mmap.v1.Mmap.KeyValueRef getAttributes(int index) {
+        if (attributesBuilder_ == null) {
+          return attributes_.get(index);
+        } else {
+          return attributesBuilder_.getMessage(index);
+        }
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public Builder setAttributes(
+          int index, opentelemetry.proto.mmap.v1.Mmap.KeyValueRef value) {
+        if (attributesBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureAttributesIsMutable();
+          attributes_.set(index, value);
+          onChanged();
+        } else {
+          attributesBuilder_.setMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public Builder setAttributes(
+          int index, opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.Builder builderForValue) {
+        if (attributesBuilder_ == null) {
+          ensureAttributesIsMutable();
+          attributes_.set(index, builderForValue.build());
+          onChanged();
+        } else {
+          attributesBuilder_.setMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public Builder addAttributes(opentelemetry.proto.mmap.v1.Mmap.KeyValueRef value) {
+        if (attributesBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureAttributesIsMutable();
+          attributes_.add(value);
+          onChanged();
+        } else {
+          attributesBuilder_.addMessage(value);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public Builder addAttributes(
+          int index, opentelemetry.proto.mmap.v1.Mmap.KeyValueRef value) {
+        if (attributesBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureAttributesIsMutable();
+          attributes_.add(index, value);
+          onChanged();
+        } else {
+          attributesBuilder_.addMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public Builder addAttributes(
+          opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.Builder builderForValue) {
+        if (attributesBuilder_ == null) {
+          ensureAttributesIsMutable();
+          attributes_.add(builderForValue.build());
+          onChanged();
+        } else {
+          attributesBuilder_.addMessage(builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public Builder addAttributes(
+          int index, opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.Builder builderForValue) {
+        if (attributesBuilder_ == null) {
+          ensureAttributesIsMutable();
+          attributes_.add(index, builderForValue.build());
+          onChanged();
+        } else {
+          attributesBuilder_.addMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public Builder addAllAttributes(
+          java.lang.Iterable<? extends opentelemetry.proto.mmap.v1.Mmap.KeyValueRef> values) {
+        if (attributesBuilder_ == null) {
+          ensureAttributesIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, attributes_);
+          onChanged();
+        } else {
+          attributesBuilder_.addAllMessages(values);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public Builder clearAttributes() {
+        if (attributesBuilder_ == null) {
+          attributes_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000080);
+          onChanged();
+        } else {
+          attributesBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public Builder removeAttributes(int index) {
+        if (attributesBuilder_ == null) {
+          ensureAttributesIsMutable();
+          attributes_.remove(index);
+          onChanged();
+        } else {
+          attributesBuilder_.remove(index);
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.Builder getAttributesBuilder(
+          int index) {
+        return internalGetAttributesFieldBuilder().getBuilder(index);
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public opentelemetry.proto.mmap.v1.Mmap.KeyValueRefOrBuilder getAttributesOrBuilder(
+          int index) {
+        if (attributesBuilder_ == null) {
+          return attributes_.get(index);  } else {
+          return attributesBuilder_.getMessageOrBuilder(index);
+        }
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public java.util.List<? extends opentelemetry.proto.mmap.v1.Mmap.KeyValueRefOrBuilder> 
+           getAttributesOrBuilderList() {
+        if (attributesBuilder_ != null) {
+          return attributesBuilder_.getMessageOrBuilderList();
+        } else {
+          return java.util.Collections.unmodifiableList(attributes_);
+        }
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.Builder addAttributesBuilder() {
+        return internalGetAttributesFieldBuilder().addBuilder(
+            opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.getDefaultInstance());
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.Builder addAttributesBuilder(
+          int index) {
+        return internalGetAttributesFieldBuilder().addBuilder(
+            index, opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.getDefaultInstance());
+      }
+      /**
+       * <pre>
+       * Attributes about this event.
+       * </pre>
+       *
+       * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 8;</code>
+       */
+      public java.util.List<opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.Builder> 
+           getAttributesBuilderList() {
+        return internalGetAttributesFieldBuilder().getBuilderList();
+      }
+      private com.google.protobuf.RepeatedFieldBuilder<
+          opentelemetry.proto.mmap.v1.Mmap.KeyValueRef, opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.Builder, opentelemetry.proto.mmap.v1.Mmap.KeyValueRefOrBuilder> 
+          internalGetAttributesFieldBuilder() {
+        if (attributesBuilder_ == null) {
+          attributesBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
+              opentelemetry.proto.mmap.v1.Mmap.KeyValueRef, opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.Builder, opentelemetry.proto.mmap.v1.Mmap.KeyValueRefOrBuilder>(
+                  attributes_,
+                  ((bitField0_ & 0x00000080) != 0),
+                  getParentForChildren(),
+                  isClean());
+          attributes_ = null;
+        }
+        return attributesBuilder_;
       }
 
       // @@protoc_insertion_point(builder_scope:opentelemetry.proto.mmap.v1.Event)
@@ -27105,58 +27596,59 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       "Histogram\022T\n\027aggregation_temporality\030\001 \001" +
       "(\01623.opentelemetry.proto.mmap.v1.Aggrega" +
       "tionTemporality\022\023\n\013max_buckets\030\002 \001(\003\022\021\n\t" +
-      "max_scale\030\003 \001(\003B\r\n\013aggregation\"\234\002\n\005Event" +
+      "max_scale\030\003 \001(\003B\r\n\013aggregation\"\332\002\n\005Event" +
       "\022\021\n\tscope_ref\030\001 \001(\003\022\026\n\016time_unix_nano\030\002 " +
       "\001(\006\022D\n\017severity_number\030\003 \001(\0162+.opentelem" +
       "etry.proto.mmap.v1.SeverityNumber\022\025\n\rsev" +
       "erity_text\030\004 \001(\t\0223\n\004body\030\005 \001(\0132%.opentel" +
       "emetry.proto.mmap.v1.AnyValue\022\026\n\016event_n" +
       "ame_ref\030\006 \001(\003\022>\n\014span_context\030\007 \001(\0132(.op" +
-      "entelemetry.proto.mmap.v1.SpanContext\"j\n" +
-      "\010Resource\022<\n\nattributes\030\001 \003(\0132(.opentele" +
-      "metry.proto.mmap.v1.KeyValueRef\022 \n\030dropp" +
-      "ed_attributes_count\030\002 \001(\r\"\263\001\n\024Instrument" +
-      "ationScope\022\020\n\010name_ref\030\001 \001(\003\022\023\n\013version_" +
-      "ref\030\002 \001(\003\022<\n\nattributes\030\003 \003(\0132(.opentele" +
-      "metry.proto.mmap.v1.KeyValueRef\022 \n\030dropp" +
-      "ed_attributes_count\030\004 \001(\r\022\024\n\014resource_re" +
-      "f\030\005 \001(\003\"T\n\013KeyValueRef\022\017\n\007key_ref\030\001 \001(\003\022" +
-      "4\n\005value\030\002 \001(\0132%.opentelemetry.proto.mma" +
-      "p.v1.AnyValue\"\235\002\n\010AnyValue\022\026\n\014string_val" +
-      "ue\030\001 \001(\tH\000\022\024\n\nbool_value\030\002 \001(\010H\000\022\023\n\tint_" +
-      "value\030\003 \001(\003H\000\022\026\n\014double_value\030\004 \001(\001H\000\022>\n" +
-      "\013array_value\030\005 \001(\0132\'.opentelemetry.proto" +
-      ".mmap.v1.ArrayValueH\000\022A\n\014kvlist_value\030\006 " +
-      "\001(\0132).opentelemetry.proto.mmap.v1.KeyVal" +
-      "ueListH\000\022\025\n\013bytes_value\030\007 \001(\014H\000\022\023\n\tvalue" +
-      "_ref\030\010 \001(\003H\000B\007\n\005value\"C\n\nArrayValue\0225\n\006v" +
-      "alues\030\001 \003(\0132%.opentelemetry.proto.mmap.v" +
-      "1.AnyValue\"H\n\014KeyValueList\0228\n\006values\030\001 \003" +
-      "(\0132(.opentelemetry.proto.mmap.v1.KeyValu" +
-      "eRef\"?\n\013SpanContext\022\017\n\007span_id\030\001 \001(\014\022\020\n\010" +
-      "trace_id\030\002 \001(\014\022\r\n\005flags\030\003 \001(\007*\214\001\n\026Aggreg" +
-      "ationTemporality\022\'\n#AGGREGATION_TEMPORAL" +
-      "ITY_UNSPECIFIED\020\000\022!\n\035AGGREGATION_TEMPORA" +
-      "LITY_DELTA\020\001\022&\n\"AGGREGATION_TEMPORALITY_" +
-      "CUMULATIVE\020\002*\303\005\n\016SeverityNumber\022\037\n\033SEVER" +
-      "ITY_NUMBER_UNSPECIFIED\020\000\022\031\n\025SEVERITY_NUM" +
-      "BER_TRACE\020\001\022\032\n\026SEVERITY_NUMBER_TRACE2\020\002\022" +
-      "\032\n\026SEVERITY_NUMBER_TRACE3\020\003\022\032\n\026SEVERITY_" +
-      "NUMBER_TRACE4\020\004\022\031\n\025SEVERITY_NUMBER_DEBUG" +
-      "\020\005\022\032\n\026SEVERITY_NUMBER_DEBUG2\020\006\022\032\n\026SEVERI" +
-      "TY_NUMBER_DEBUG3\020\007\022\032\n\026SEVERITY_NUMBER_DE" +
-      "BUG4\020\010\022\030\n\024SEVERITY_NUMBER_INFO\020\t\022\031\n\025SEVE" +
-      "RITY_NUMBER_INFO2\020\n\022\031\n\025SEVERITY_NUMBER_I" +
-      "NFO3\020\013\022\031\n\025SEVERITY_NUMBER_INFO4\020\014\022\030\n\024SEV" +
-      "ERITY_NUMBER_WARN\020\r\022\031\n\025SEVERITY_NUMBER_W" +
-      "ARN2\020\016\022\031\n\025SEVERITY_NUMBER_WARN3\020\017\022\031\n\025SEV" +
-      "ERITY_NUMBER_WARN4\020\020\022\031\n\025SEVERITY_NUMBER_" +
-      "ERROR\020\021\022\032\n\026SEVERITY_NUMBER_ERROR2\020\022\022\032\n\026S" +
-      "EVERITY_NUMBER_ERROR3\020\023\022\032\n\026SEVERITY_NUMB" +
-      "ER_ERROR4\020\024\022\031\n\025SEVERITY_NUMBER_FATAL\020\025\022\032" +
-      "\n\026SEVERITY_NUMBER_FATAL2\020\026\022\032\n\026SEVERITY_N" +
-      "UMBER_FATAL3\020\027\022\032\n\026SEVERITY_NUMBER_FATAL4" +
-      "\020\030b\006proto3"
+      "entelemetry.proto.mmap.v1.SpanContext\022<\n" +
+      "\nattributes\030\010 \003(\0132(.opentelemetry.proto." +
+      "mmap.v1.KeyValueRef\"j\n\010Resource\022<\n\nattri" +
+      "butes\030\001 \003(\0132(.opentelemetry.proto.mmap.v" +
+      "1.KeyValueRef\022 \n\030dropped_attributes_coun" +
+      "t\030\002 \001(\r\"\263\001\n\024InstrumentationScope\022\020\n\010name" +
+      "_ref\030\001 \001(\003\022\023\n\013version_ref\030\002 \001(\003\022<\n\nattri" +
+      "butes\030\003 \003(\0132(.opentelemetry.proto.mmap.v" +
+      "1.KeyValueRef\022 \n\030dropped_attributes_coun" +
+      "t\030\004 \001(\r\022\024\n\014resource_ref\030\005 \001(\003\"T\n\013KeyValu" +
+      "eRef\022\017\n\007key_ref\030\001 \001(\003\0224\n\005value\030\002 \001(\0132%.o" +
+      "pentelemetry.proto.mmap.v1.AnyValue\"\235\002\n\010" +
+      "AnyValue\022\026\n\014string_value\030\001 \001(\tH\000\022\024\n\nbool" +
+      "_value\030\002 \001(\010H\000\022\023\n\tint_value\030\003 \001(\003H\000\022\026\n\014d" +
+      "ouble_value\030\004 \001(\001H\000\022>\n\013array_value\030\005 \001(\013" +
+      "2\'.opentelemetry.proto.mmap.v1.ArrayValu" +
+      "eH\000\022A\n\014kvlist_value\030\006 \001(\0132).opentelemetr" +
+      "y.proto.mmap.v1.KeyValueListH\000\022\025\n\013bytes_" +
+      "value\030\007 \001(\014H\000\022\023\n\tvalue_ref\030\010 \001(\003H\000B\007\n\005va" +
+      "lue\"C\n\nArrayValue\0225\n\006values\030\001 \003(\0132%.open" +
+      "telemetry.proto.mmap.v1.AnyValue\"H\n\014KeyV" +
+      "alueList\0228\n\006values\030\001 \003(\0132(.opentelemetry" +
+      ".proto.mmap.v1.KeyValueRef\"?\n\013SpanContex" +
+      "t\022\017\n\007span_id\030\001 \001(\014\022\020\n\010trace_id\030\002 \001(\014\022\r\n\005" +
+      "flags\030\003 \001(\007*\214\001\n\026AggregationTemporality\022\'" +
+      "\n#AGGREGATION_TEMPORALITY_UNSPECIFIED\020\000\022" +
+      "!\n\035AGGREGATION_TEMPORALITY_DELTA\020\001\022&\n\"AG" +
+      "GREGATION_TEMPORALITY_CUMULATIVE\020\002*\303\005\n\016S" +
+      "everityNumber\022\037\n\033SEVERITY_NUMBER_UNSPECI" +
+      "FIED\020\000\022\031\n\025SEVERITY_NUMBER_TRACE\020\001\022\032\n\026SEV" +
+      "ERITY_NUMBER_TRACE2\020\002\022\032\n\026SEVERITY_NUMBER" +
+      "_TRACE3\020\003\022\032\n\026SEVERITY_NUMBER_TRACE4\020\004\022\031\n" +
+      "\025SEVERITY_NUMBER_DEBUG\020\005\022\032\n\026SEVERITY_NUM" +
+      "BER_DEBUG2\020\006\022\032\n\026SEVERITY_NUMBER_DEBUG3\020\007" +
+      "\022\032\n\026SEVERITY_NUMBER_DEBUG4\020\010\022\030\n\024SEVERITY" +
+      "_NUMBER_INFO\020\t\022\031\n\025SEVERITY_NUMBER_INFO2\020" +
+      "\n\022\031\n\025SEVERITY_NUMBER_INFO3\020\013\022\031\n\025SEVERITY" +
+      "_NUMBER_INFO4\020\014\022\030\n\024SEVERITY_NUMBER_WARN\020" +
+      "\r\022\031\n\025SEVERITY_NUMBER_WARN2\020\016\022\031\n\025SEVERITY" +
+      "_NUMBER_WARN3\020\017\022\031\n\025SEVERITY_NUMBER_WARN4" +
+      "\020\020\022\031\n\025SEVERITY_NUMBER_ERROR\020\021\022\032\n\026SEVERIT" +
+      "Y_NUMBER_ERROR2\020\022\022\032\n\026SEVERITY_NUMBER_ERR" +
+      "OR3\020\023\022\032\n\026SEVERITY_NUMBER_ERROR4\020\024\022\031\n\025SEV" +
+      "ERITY_NUMBER_FATAL\020\025\022\032\n\026SEVERITY_NUMBER_" +
+      "FATAL2\020\026\022\032\n\026SEVERITY_NUMBER_FATAL3\020\027\022\032\n\026" +
+      "SEVERITY_NUMBER_FATAL4\020\030b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -27251,7 +27743,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     internal_static_opentelemetry_proto_mmap_v1_Event_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_opentelemetry_proto_mmap_v1_Event_descriptor,
-        new java.lang.String[] { "ScopeRef", "TimeUnixNano", "SeverityNumber", "SeverityText", "Body", "EventNameRef", "SpanContext", });
+        new java.lang.String[] { "ScopeRef", "TimeUnixNano", "SeverityNumber", "SeverityText", "Body", "EventNameRef", "SpanContext", "Attributes", });
     internal_static_opentelemetry_proto_mmap_v1_Resource_descriptor =
       getDescriptor().getMessageType(5);
     internal_static_opentelemetry_proto_mmap_v1_Resource_fieldAccessorTable = new

@@ -15,6 +15,7 @@ import io.opentelemetry.sdk.mmap.internal.data.ScopeDictionary
 import io.opentelemetry.api.trace.SpanContext
 import com.google.protobuf.ByteString
 import io.opentelemetry.sdk.mmap.internal.SdkMmapRaw
+import io.opentelemetry.sdk.mmap.internal.data.AttributeHelper
 
 /** Implementation of logger provider that fires all events on ringbuffer, and memoizes scope to dictionary. */
 class LoggerProvider(state: LoggerProviderSharedState) extends io.opentelemetry.api.logs.LoggerProvider:
@@ -52,7 +53,7 @@ case class LoggerSharedState(scopeId: Long, mmap: SdkMmapRaw)
 
 class LogRecordBuilder(loggerState: LoggerSharedState) extends io.opentelemetry.api.logs.LogRecordBuilder:
   val event = opentelemetry.proto.mmap.v1.Mmap.Event.newBuilder()
-  // TODO - Event name
+  // TODO - Event name?
   {
     val now = Instant.now()
     setContext(Context.current())
@@ -66,7 +67,8 @@ class LogRecordBuilder(loggerState: LoggerSharedState) extends io.opentelemetry.
     event.setSeverityNumberValue(severity.getSeverityNumber())
     this
   override def setAttribute[T](key: AttributeKey[T], value: T): LogRecordBuilder =
-    // TODO - add attributes to protocol.
+    val ref = AttributeHelper.convertKv(loggerState.mmap.strings)(key,value)
+    event.addAttributes(ref)
     this
   override def setSeverityText(severityText: String): LogRecordBuilder =
     event.setSeverityText(severityText)
@@ -86,6 +88,9 @@ class LogRecordBuilder(loggerState: LoggerSharedState) extends io.opentelemetry.
     setTimestamp(Instant.ofEpochMilli(unit.toMillis(timestamp)))
   override def setContext(context: Context): LogRecordBuilder =
     event.setSpanContext(internal.convertContext(context))
+    this
+  override def setEventName(eventName: String): io.opentelemetry.api.logs.LogRecordBuilder =
+    event.setEventNameRef(loggerState.mmap.strings.intern(eventName))
     this
   override def emit(): Unit = 
       // Send out output channel.

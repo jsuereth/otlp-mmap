@@ -137,6 +137,10 @@ impl EventCollector {
         } else {
             None
         };
+        let mut attributes = Vec::new();
+        for kv in e.attributes {
+            attributes.push(attr_lookup.try_convert_attribute(kv).await?);
+        }
         Ok(TrackedEvent {
             scope_ref: e.scope_ref,
             log: opentelemetry_proto::tonic::logs::v1::LogRecord {
@@ -145,8 +149,7 @@ impl EventCollector {
                 severity_number: e.severity_number,
                 severity_text: e.severity_text,
                 body,
-                // TODO - support these.
-                attributes: Vec::new(),
+                attributes,
                 dropped_attributes_count: 0,
                 flags,
                 trace_id,

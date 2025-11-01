@@ -234,14 +234,11 @@ class Span(context: SpanContext, shared: TracerSharedState) extends io.opentelem
       event.setSpanContext(internal.convertSpanContext(context))
       event.setScopeRef(shared.scopeId)
       event.setTimeUnixNano(internal.convertInstant(timestamp))
-      val as = MmapProto.KeyValueList.newBuilder()
+      event.setEventNameRef(shared.mmap.strings.intern(name))
+      // TODO - Where should we store attributes?
       attributes.forEach((k,v) => {
-        as.addValues(AttributeHelper.convertKv(shared.mmap.strings)(k,v))
+        event.addAttributes(AttributeHelper.convertKv(shared.mmap.strings)(k,v))
       })
-      event.setBody(
-        MmapProto.AnyValue.newBuilder()
-        .setKvlistValue(as)
-      )
       shared.mmap.events.write(event.build())
     this
   
