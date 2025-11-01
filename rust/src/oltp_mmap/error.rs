@@ -1,5 +1,6 @@
 use std::{array::TryFromSliceError, sync::Arc};
 use thiserror::Error;
+use tokio::task::JoinError;
 
 #[derive(Error, Debug)]
 pub enum OltpMmapError {
@@ -26,4 +27,7 @@ pub enum OltpMmapError {
 
     #[error(transparent)]
     ConversionError(#[from] TryFromSliceError),
+
+    #[error(transparent)]
+    JoinError(#[from] JoinError),
 }

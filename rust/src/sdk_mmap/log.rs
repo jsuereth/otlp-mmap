@@ -98,12 +98,14 @@ impl EventCollector {
     ) -> Result<Vec<TrackedEvent>, Error> {
         // TODO - check sanity on the file before continuing.
         // Here we create a batch of spans.
+        // println!("Buffering log events");
         let mut buf = Vec::new();
         let send_by_time = tokio::time::sleep_until(tokio::time::Instant::now() + timeout);
         tokio::pin!(send_by_time);
         loop {
             tokio::select! {
                 event = sdk.reader.events.next() => {
+                    // println!("Received log event");
                     let e = self.try_handle_log_event(event?, sdk).await?;
                     buf.push(e);
                     // TODO - configure the size of this.

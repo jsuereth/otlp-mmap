@@ -13,10 +13,12 @@ import io.opentelemetry.sdk.mmap.internal.SdkMmapRaw
 import java.io.RandomAccessFile
 import io.opentelemetry.sdk.mmap.internal.SdkMmapOptions
 import io.opentelemetry.sdk.mmap.internal.RingBufferOptions
+import java.io.PrintWriter
 
 val EXPORT_META_DIRECTORY = new File("../../export")
 
 @main def demo(): Unit =
+  val http_endpoint = sys.env.get("HTTP_ENDPOINT_PORT").map(port => port.toInt)
   val mmap_export = sys.env.get("OTLP_MMAP_EXPORTER_DIRECTORY").map(dir => new java.io.File(dir))
   val otlp_export = sys.env.get("OTEL_EXPORTER_OTLP_ENDPOINT")
   val mmap_sdk = sys.env.get("SDK_MMAP_EXPORTER_FILE").map(f => new java.io.File(f))
@@ -25,7 +27,9 @@ val EXPORT_META_DIRECTORY = new File("../../export")
     case (None, Some(mmap_file), _) =>
       // Kill the file if it exists or otherwise wipe it, until we sort out retry  / different loads.
       if mmap_file.exists()
-      then mmap_file.delete()
+      then
+        mmap_file.delete()
+        mmap_file.createNewFile()
       initOtel(StartupChoice.MmapSdk(SdkMmapRaw(new RandomAccessFile(mmap_file, "rw"), SdkMmapOptions(
         events = RingBufferOptions(512,64),
         measurements = RingBufferOptions(512,64),
@@ -33,8 +37,10 @@ val EXPORT_META_DIRECTORY = new File("../../export")
       ))))
     case (None, _, Some(otlp_endpoint)) => initOtel(StartupChoice.OtelSdk(OtlpHttpSpanExporter.builder().setEndpoint(otlp_endpoint).build()))
     case _ => initOtel(StartupChoice.OtelSdk(OtlpMmapExporter(EXPORT_META_DIRECTORY).spanExporter))
-  makeSpans(otel)
   // TODO - metrics.
+  http_endpoint match
+    case Some(endpoint) => runHttpServer(endpoint, otel)
+    case None => makeSpans(otel)
   
 
 enum StartupChoice:
@@ -78,4 +84,25 @@ def makeSpans(otel: OpenTelemetry): Unit =
     finally s.end()
 
     
-  
+// TODO - use an HTTP server that will generate spans.
+def runHttpServer(endpoint: Int, otel: OpenTelemetry): Unit =
+  println(s"Starting server on ${endpoint}")
+  import com.sun.net.httpserver.{HttpContext, HttpServer}
+  import java.net.InetSocketAddress
+  import io.opentelemetry.instrumentation.javahttpserver.JavaHttpServerTelemetry
+  val server = HttpServer.create(new InetSocketAddress(endpoint), 0)
+  val context = server.createContext(
+            "/",
+            ctx => {
+              // TODO - Update this if needed.
+              val body = "Hello"
+              ctx.sendResponseHeaders(200, body.length())
+              otel.getTracer("test").spanBuilder("test").startSpan().end()
+              val out = new PrintWriter(ctx.getResponseBody())
+              out.print(body)
+              out.close()
+            });
+  JavaHttpServerTelemetry.create(otel).configure(context)
+  server.start()
+  // TOOD - should we wait for server to stop?
+  ()

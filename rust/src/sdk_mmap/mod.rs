@@ -30,14 +30,8 @@ impl CollectorSdk {
         })
     }
 
-    pub async fn dev_null_events(&self) -> Result<(), Error> {
-        loop {
-            let _ = self.reader.events.next().await?;
-            ()
-        }
-    }
-
     pub async fn dev_null_metrics(&self) -> Result<(), Error> {
+        println!("Ignoring metrics");
         loop {
             let _ = self.reader.metrics.next().await?;
             ()
@@ -58,11 +52,12 @@ impl CollectorSdk {
         let mut collector = EventCollector::new();
         loop {
             // TODO - config.
+            // println!("Batching logs");
             if let Some(log_batch) = collector
                 .try_create_next_batch(&self, 100, Duration::from_secs(60))
                 .await?
             {
-                println!("Sending log batch #{batch_idx}");
+                // println!("Sending log batch #{batch_idx}");
                 endpoint.export(log_batch).await?;
                 batch_idx += 1;
             }
@@ -87,14 +82,17 @@ impl CollectorSdk {
         loop {
             // TODO - check_sanity() and fail on error.
             // TODO - Config
+            // println!("Batching spans");
             let span_batch = spans
                 .try_buffer_spans(&self, 100, Duration::from_secs(60))
                 .await?;
             let next_batch = self.try_create_span_batch(span_batch).await?;
             if !next_batch.resource_spans.is_empty() {
-                println!("Sending span batch #{batch_idx}");
+                // println!("Sending span batch #{batch_idx}");
                 endpoint.export(next_batch).await?;
                 batch_idx += 1;
+            } else {
+                // println!("No new batch of spans, in-flight spans: {}", spans.num_active());
             }
         }
     }

@@ -2,7 +2,7 @@ mod oltp_mmap;
 mod sdk_mmap;
 
 use oltp_mmap::{Error, OtlpMmapReader, OtlpMmapReaderConfig};
-use std::path::{Path, PathBuf};
+use std::{path::{Path, PathBuf}, rc::Rc, sync::Arc};
 
 use crate::sdk_mmap::CollectorSdk;
 
@@ -17,32 +17,50 @@ async fn main() -> Result<(), Error> {
         return run_exporter_mmap(&otlp_url, path).await;
     }
     if let Ok(path) = std::env::var("SDK_MMAP_EXPORTER_FILE").map(|v| Path::new(&v).to_path_buf()) {
+        // println!("Waiting for {} to be available", path.display());
+        // // We arbitrarily wait a few seconds for upstream to start up.
+        // tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
         // Wait for file to be available.
         while !path.exists() {
+            println!("Waiting for {} to be available", path.display());
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         }
+        println!("Starting SDK");
         return run_sdk_mmap(&otlp_url, path).await;
     }
     Ok(())
 }
 
 async fn run_sdk_mmap(otlp_url: &str, export_file: PathBuf) -> Result<(), Error> {
-    let sdk = CollectorSdk::new(&export_file)?;
+    let sdk = Arc::new(CollectorSdk::new(&export_file)?);
     // Create our event loops to handle things.
-    let trace_loop = sdk.send_traces_to(otlp_url);
-    let event_loop = sdk.send_logs_to(otlp_url);
-    let metric_loop = sdk.dev_null_metrics();
-
+    let metric_sdk = sdk.clone();
+    let metric_pipeline = tokio::task::spawn(async move {
+        metric_sdk.dev_null_metrics().await
+    });
+    let log_otlp = otlp_url.to_owned();
+    let log_sdk = sdk.clone();
+    let log_pipeline = tokio::task::spawn(async move {
+        log_sdk.send_logs_to(&log_otlp).await
+    });
+    let trace_otlp = otlp_url.to_owned();
+    let trace_sdk = sdk.clone();
+    let trace_pipeline = tokio::task::spawn(async move {
+        trace_sdk.send_traces_to(&trace_otlp).await
+    });
     // Run the event loops by waiting on them.
-    // If we return, then we are "done", we propagate the errors.
+    // TODO - wait for all to finish or crash?
     tokio::select! {
-        r = trace_loop => {
+        r = trace_pipeline => {
+            println!("Trace completed");
             let _ = r?;
         },
-        r = event_loop => {
+        r = log_pipeline => {
+            println!("Logs completed");
             let _ = r?;
         },
-        r = metric_loop => {
+        r = metric_pipeline => {
+            println!("Metrics completed");
             let _ = r?;
         },
     }

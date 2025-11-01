@@ -65,6 +65,11 @@ impl ActiveSpans {
         }
     }
 
+    /// Returns the number of active spans.
+    pub fn num_active(&self) -> usize {
+        self.spans.len()
+    }
+
     /// Reads events, tracking spans and attempts to construct a buffer.
     ///
     /// If timeout is met before buffer is filled, the buffer is returned.
@@ -80,9 +85,12 @@ impl ActiveSpans {
         let send_by_time = tokio::time::sleep_until(tokio::time::Instant::now() + timeout);
         tokio::pin!(send_by_time);
         loop {
+            // println!("Waiting for span event");
             tokio::select! {
                 event = sdk.reader.spans.next() => {
+                    // println!("Received span event");
                     if let Some(span) = self.try_handle_span_event(event?, sdk).await? {
+                        // println!("Buffering span");
                         buf.push(span);
                         // TODO - configure the size of this.
                         if buf.len() >= len {
@@ -91,6 +99,7 @@ impl ActiveSpans {
                     }
                 },
                 () = &mut send_by_time => {
+                    // println!("Got timeout waiting for span event");
                     return Ok(buf)
                 }
             }
@@ -106,6 +115,7 @@ impl ActiveSpans {
         attr_lookup: &CollectorSdk,
     ) -> Result<Option<TrackedSpan>, Error> {
         let hash = FullSpanId::try_from_event(&e)?;
+        // println!("Span event: {hash}");
         match e.event {
             Some(Event::Start(start)) => {
                 // TODO - optimise attribute load

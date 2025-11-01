@@ -69,7 +69,14 @@ class Meter(state: MeterSharedState) extends io.opentelemetry.api.metrics.Meter:
 
   override def upDownCounterBuilder(name: String): LongUpDownCounterBuilder = ???
 
-  override def histogramBuilder(name: String): DoubleHistogramBuilder = ???
+  override def histogramBuilder(name: String): DoubleHistogramBuilder =
+    val m = MmapProto.MetricRef.newBuilder()
+    m.setExpHist(MmapProto.MetricRef.ExponentialHistogram.newBuilder()
+    .setAggregationTemporality(MmapProto.AggregationTemporality.AGGREGATION_TEMPORALITY_CUMULATIVE)
+    .setMaxScale(20)
+    .setMaxBuckets(20)
+    )
+    DoubleHistogramBuilder(m, state)
 
   override def gaugeBuilder(name: String): DoubleGaugeBuilder = ???
 
@@ -112,7 +119,10 @@ class LongCounter(metric_ref: Long, mmap: SdkMmapRaw) extends io.opentelemetry.a
     import internal.data.given
     mmap.measurements.write(m.build())
 
-class DoubleCounterBuilder(state: MeterSharedState, metric: opentelemetry.proto.mmap.v1.Mmap.MetricRef.Builder) extends io.opentelemetry.api.metrics.DoubleCounterBuilder:
+class DoubleCounterBuilder(state: MeterSharedState, metric: opentelemetry.proto.mmap.v1.Mmap.MetricRef.Builder)
+extends io.opentelemetry.api.metrics.DoubleCounterBuilder
+// TODO - Use attribute advice.
+with io.opentelemetry.api.incubator.metrics.ExtendedDoubleCounterBuilder:
   override def setUnit(unit: String): io.opentelemetry.api.metrics.DoubleCounterBuilder = 
     metric.setUnit(unit)
     this
@@ -144,7 +154,10 @@ class DoubleCounter(metric_ref: Long, mmap: SdkMmapRaw) extends io.opentelemetry
     import internal.data.given
     mmap.measurements.write(m.build())
 
-class DoubleHistogramBuilder(metric: MmapProto.MetricRef.Builder, state: MeterSharedState) extends io.opentelemetry.api.metrics.DoubleHistogramBuilder:  
+class DoubleHistogramBuilder(metric: MmapProto.MetricRef.Builder, state: MeterSharedState)
+extends io.opentelemetry.api.metrics.DoubleHistogramBuilder
+// TODO - use this to limit attributes in resulting metric.
+with io.opentelemetry.api.incubator.metrics.ExtendedDoubleHistogramBuilder:  
   override def setUnit(unit: String): io.opentelemetry.api.metrics.DoubleHistogramBuilder =
     metric.setUnit(unit)
     this

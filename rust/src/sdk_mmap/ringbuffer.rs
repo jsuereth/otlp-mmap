@@ -42,6 +42,7 @@ where
         let input = self.input.lock().await;
         for _ in 0..10 {
             if let Some(result) = input.try_read::<T>()? {
+                // println!("Read {} event on fast path", std::any::type_name::<T>());
                 return Ok(result);
             } else {
                 tokio::task::yield_now().await;
@@ -51,6 +52,7 @@ where
         let mut d = Duration::from_millis(1);
         loop {
             if let Some(result) = input.try_read::<T>()? {
+                // println!("Read {} event on slow path", std::any::type_name::<T>());
                 return Ok(result);
             } else {
                 tokio::time::sleep(d).await;

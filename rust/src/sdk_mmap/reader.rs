@@ -35,6 +35,7 @@ impl MmapReader {
         let span_start = header.spans.load(Ordering::Relaxed);
         let measurement_start = header.measurements.load(Ordering::Relaxed);
         let dictionary_start = header.dictionary.load(Ordering::Relaxed);
+        println!("Loading log channel @ {}", event_start);
         let events: RingBufferReader<Event> = unsafe {
             let event_area = MmapOptions::new()
                 .len((span_start - event_start) as usize)
@@ -42,20 +43,23 @@ impl MmapReader {
                 .map_mut(&f)?;
             RingBufferReader::new(event_area, 0)
         };
+        println!("Loading span channel @ {}", span_start);
         let spans: RingBufferReader<SpanEvent> = unsafe {
-            let event_area = MmapOptions::new()
+            let span_area = MmapOptions::new()
                 .len((measurement_start - span_start) as usize)
                 .offset(span_start as u64)
                 .map_mut(&f)?;
-            RingBufferReader::new(event_area, 0)
+            RingBufferReader::new(span_area, 0)
         };
+        println!("Loading measurment channel @ {}", measurement_start);
         let metrics: RingBufferReader<Measurement> = unsafe {
-            let event_area = MmapOptions::new()
+            let measurement_area = MmapOptions::new()
                 .len((dictionary_start - measurement_start) as usize)
                 .offset(measurement_start as u64)
                 .map_mut(&f)?;
-            RingBufferReader::new(event_area, 0)
+            RingBufferReader::new(measurement_area, 0)
         };
+        println!("Loading dictionary @ {}", dictionary_start);
         // Dictionary may need to remap itself.
         let dictionary = Dictionary::try_new(f, dictionary_start as u64)?;
         Ok(MmapReader {
