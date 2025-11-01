@@ -2,18 +2,22 @@
 
 pub mod data;
 pub mod dictionary;
+mod log;
 pub mod reader;
 pub mod ringbuffer;
-
-use std::{collections::HashMap, path::Path, time::Duration};
-
-use opentelemetry_proto::tonic::collector::trace::v1::trace_service_client::TraceServiceClient;
-pub use reader::MmapReader;
+mod trace;
 
 use crate::{
     oltp_mmap::Error,
-    sdk_mmap::data::{KeyValueRef, SpanEvent},
+    sdk_mmap::{data::KeyValueRef, log::EventCollector},
 };
+use opentelemetry_proto::tonic::collector::{
+    logs::v1::logs_service_client::LogsServiceClient,
+    trace::v1::trace_service_client::TraceServiceClient,
+};
+pub use reader::MmapReader;
+use std::{collections::HashMap, path::Path, time::Duration};
+use trace::{ActiveSpans, TrackedSpan};
 
 /// Implementation of an OpenTelemetry SDK that pulls in events from an MMap file.
 pub struct CollectorSdk {
@@ -40,9 +44,35 @@ impl CollectorSdk {
         }
     }
 
+    pub async fn send_logs_to(&self, log_endpoint: &str) -> Result<(), Error> {
+        let client = LogsServiceClient::connect(log_endpoint.to_owned()).await?;
+        // TODO - if this fails, reopen SDK file and start again?
+        self.send_events_loop(client).await
+    }
+
+    async fn send_events_loop(
+        &self,
+        mut endpoint: LogsServiceClient<tonic::transport::Channel>,
+    ) -> Result<(), Error> {
+        let mut batch_idx = 1;
+        let mut collector = EventCollector::new();
+        loop {
+            // TODO - config.
+            if let Some(log_batch) = collector
+                .try_create_next_batch(&self, 100, Duration::from_secs(60))
+                .await?
+            {
+                println!("Sending log batch #{batch_idx}");
+                endpoint.export(log_batch).await?;
+                batch_idx += 1;
+            }
+        }
+    }
+
     /// Open an OTLP connection and fires traces at it.
     pub async fn send_traces_to(&self, trace_endpoint: &str) -> Result<(), Error> {
         let client = TraceServiceClient::connect(trace_endpoint.to_owned()).await?;
+        // TODO - if this fails, reopen SDK file and start again?
         self.send_traces_loop(client).await
     }
 
@@ -55,14 +85,14 @@ impl CollectorSdk {
         let mut batch_idx = 1;
         let mut spans = ActiveSpans::new();
         loop {
-            // TODO - check_sanity()
+            // TODO - check_sanity() and fail on error.
             // TODO - Config
             let span_batch = spans
                 .try_buffer_spans(&self, 100, Duration::from_secs(60))
                 .await?;
             let next_batch = self.try_create_span_batch(span_batch).await?;
             if !next_batch.resource_spans.is_empty() {
-                println!("Sending batch #{batch_idx}");
+                println!("Sending span batch #{batch_idx}");
                 endpoint.export(next_batch).await?;
                 batch_idx += 1;
             }
@@ -153,8 +183,16 @@ impl CollectorSdk {
         for kv in scope.attributes {
             attributes.push(self.try_convert_attribute(kv).await?);
         }
-        let name: String = self.reader.dictionary.try_read_string(scope.name_ref).await?;
-        let version: String = self.reader.dictionary.try_read_string(scope.version_ref).await?;
+        let name: String = self
+            .reader
+            .dictionary
+            .try_read_string(scope.name_ref)
+            .await?;
+        let version: String = self
+            .reader
+            .dictionary
+            .try_read_string(scope.version_ref)
+            .await?;
         Ok(PartialScope {
             scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
                 name,
@@ -171,211 +209,83 @@ impl CollectorSdk {
         &self,
         kv: KeyValueRef,
     ) -> Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error> {
-        let key= match self.reader.dictionary.try_read_string(kv.key_ref).await {
+        let key = match self.reader.dictionary.try_read_string(kv.key_ref).await {
             Ok(value) => value,
             // TODO - remove this, once we fix dictionary lookup.
             Err(_) => "<not found>".to_owned(),
         };
-        let value = match kv.value {
-            Some(data::AnyValue {
-                value: Some(data::any_value::Value::StringValue(s)),
-            }) => Some(opentelemetry_proto::tonic::common::v1::AnyValue {
-                value: Some(
-                    opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(s),
-                ),
-            }),
-            Some(data::AnyValue {
-                value: Some(data::any_value::Value::BoolValue(b)),
-            }) => Some(opentelemetry_proto::tonic::common::v1::AnyValue {
-                value: Some(opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(b)),
-            }),
-            Some(data::AnyValue {
-                value: Some(data::any_value::Value::IntValue(v)),
-            }) => Some(opentelemetry_proto::tonic::common::v1::AnyValue {
-                value: Some(opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(v)),
-            }),
-            Some(data::AnyValue {
-                value: Some(data::any_value::Value::DoubleValue(v)),
-            }) => Some(opentelemetry_proto::tonic::common::v1::AnyValue {
-                value: Some(
-                    opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(v),
-                ),
-            }),
-            // TODO - handle more
-            _ => None,
+        let value = if let Some(v) = kv.value {
+            Box::pin(self.try_convert_anyvalue(v)).await?
+        } else {
+            None
         };
         Ok(opentelemetry_proto::tonic::common::v1::KeyValue { key, value })
+    }
+
+    async fn try_convert_anyvalue(
+        &self,
+        value: data::AnyValue,
+    ) -> Result<Option<opentelemetry_proto::tonic::common::v1::AnyValue>, Error> {
+        let result = match value.value {
+            Some(data::any_value::Value::StringValue(v)) => {
+                Some(opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(v))
+            }
+            Some(data::any_value::Value::BoolValue(v)) => {
+                Some(opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(v))
+            }
+            Some(data::any_value::Value::IntValue(v)) => {
+                Some(opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(v))
+            }
+            Some(data::any_value::Value::DoubleValue(v)) => {
+                Some(opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(v))
+            }
+            Some(data::any_value::Value::BytesValue(v)) => {
+                Some(opentelemetry_proto::tonic::common::v1::any_value::Value::BytesValue(v))
+            }
+            Some(data::any_value::Value::ArrayValue(v)) => {
+                let mut values = Vec::new();
+
+                for av in v.values {
+                    if let Some(rav) = Box::pin(self.try_convert_anyvalue(av)).await? {
+                        values.push(rav);
+                    }
+                }
+                Some(
+                    opentelemetry_proto::tonic::common::v1::any_value::Value::ArrayValue(
+                        opentelemetry_proto::tonic::common::v1::ArrayValue { values },
+                    ),
+                )
+            }
+            Some(data::any_value::Value::KvlistValue(kvs)) => {
+                // TODO - implement.
+                let mut values = Vec::new();
+                for kv in kvs.values {
+                    values.push(self.try_convert_attribute(kv).await?);
+                }
+                Some(
+                    opentelemetry_proto::tonic::common::v1::any_value::Value::KvlistValue(
+                        opentelemetry_proto::tonic::common::v1::KeyValueList { values },
+                    ),
+                )
+            }
+            Some(data::any_value::Value::ValueRef(idx)) => {
+                // TODO - try to improve performance here.
+                let v: data::AnyValue = Box::pin(self.reader.dictionary.try_read(idx)).await?;
+                Box::pin(self.try_convert_anyvalue(v))
+                    .await?
+                    .and_then(|v| v.value)
+            }
+            None => None,
+        };
+        Ok(result
+            .map(|value| opentelemetry_proto::tonic::common::v1::AnyValue { value: Some(value) }))
+    }
+    async fn try_lookup_string(&self, index: i64) -> Result<String, Error> {
+        self.reader.dictionary.try_read_string(index).await
     }
 }
 
 struct PartialScope {
     pub scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope,
     pub resource_ref: i64,
-}
-
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
-struct FullSpanId {
-    trace_id: [u8; 16],
-    span_id: [u8; 8],
-}
-impl FullSpanId {
-    fn try_from_event(e: &SpanEvent) -> Result<FullSpanId, Error> {
-        Ok(FullSpanId {
-            trace_id: e.trace_id.as_slice().try_into()?,
-            span_id: e.span_id.as_slice().try_into()?,
-        })
-    }
-}
-
-fn bytes_to_hex_string(bytes: &[u8]) -> String {
-    bytes
-        .iter()
-        .map(|byte| format!("{:02x}", byte)) // Format each byte as a two-digit lowercase hex
-        .collect() // Collect the formatted strings into a single String
-}
-
-impl std::fmt::Display for FullSpanId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "span {} @ {}",
-            bytes_to_hex_string(&self.trace_id),
-            bytes_to_hex_string(&self.span_id)
-        )
-    }
-}
-
-// TODO - Sort out what this will need to do.
-pub struct TrackedSpan {
-    // Index into scope to use.
-    pub scope_ref: i64,
-    pub current: opentelemetry_proto::tonic::trace::v1::Span,
-}
-
-struct ActiveSpans {
-    spans: HashMap<FullSpanId, TrackedSpan>, // TODO a cache for lookups we need to send spans,
-                                             // e.g. scope, resource, attribute key names.
-}
-
-impl ActiveSpans {
-    fn new() -> ActiveSpans {
-        ActiveSpans {
-            spans: HashMap::new(),
-        }
-    }
-
-    /// Reads events, tracking spans and attempts to construct a buffer.
-    ///
-    /// If timeout is met before buffer is filled, the buffer is returned.
-    async fn try_buffer_spans(
-        &mut self,
-        sdk: &CollectorSdk,
-        len: usize,
-        timeout: tokio::time::Duration,
-    ) -> Result<Vec<TrackedSpan>, Error> {
-        // TODO - check sanity on the file before continuing.
-        // Here we create a batch of spans.
-        let mut buf = Vec::new();
-        let send_by_time =
-            // TODO - configurable batch timeouts.
-            tokio::time::sleep_until(tokio::time::Instant::now() + timeout);
-        tokio::pin!(send_by_time);
-        loop {
-            tokio::select! {
-                event = sdk.reader.spans.next() => {
-                    if let Some(span) = self.try_handle_span_event(event?, sdk).await? {
-                        println!("Span {:?} completed, adding to buffer", span.current);
-                        buf.push(span);
-                        // TODO - configure the size of this.
-                        if buf.len() >= len {
-                            return Ok(buf)
-                        }
-                    }
-                },
-                () = &mut send_by_time => {
-                    return Ok(buf)
-                }
-            }
-        }
-    }
-
-    /// Handles a span event.
-    ///
-    /// Returns a span, if this event has completed it.
-    async fn try_handle_span_event(
-        &mut self,
-        e: SpanEvent,
-        attr_lookup: &CollectorSdk,
-    ) -> Result<Option<TrackedSpan>, Error> {
-        let hash = FullSpanId::try_from_event(&e)?;
-        match e.event {
-            Some(data::span_event::Event::Start(start)) => {
-                // TODO - optimise attribute load
-                let mut attributes = Vec::new();
-                for kvr in start.attributes {
-                    attributes.push(attr_lookup.try_convert_attribute(kvr).await?);
-                }
-                let span_state = opentelemetry_proto::tonic::trace::v1::Span {
-                    trace_id: e.trace_id,
-                    span_id: e.span_id,
-                    // TODO - make sure we record trace state.
-                    trace_state: "".into(),
-                    parent_span_id: start.parent_span_id,
-                    flags: start.flags,
-                    name: start.name,
-                    kind: start.kind,
-                    start_time_unix_nano: start.start_time_unix_nano,
-                    attributes,
-                    // Things we don't have yet.
-                    end_time_unix_nano: 0,
-                    dropped_attributes_count: 0,
-                    events: Vec::new(),
-                    dropped_events_count: 0,
-                    links: Vec::new(),
-                    dropped_links_count: 0,
-                    status: None,
-                };
-                self.spans.insert(
-                    hash,
-                    TrackedSpan {
-                        current: span_state,
-                        scope_ref: e.scope_ref,
-                    },
-                );
-            }
-            Some(data::span_event::Event::Link(_)) => todo!(),
-            Some(data::span_event::Event::Name(ne)) => {
-                if let Some(entry) = self.spans.get_mut(&hash) {
-                    entry.current.name = ne.name;
-                }
-            }
-            Some(data::span_event::Event::Attributes(ae)) => {
-                // TODO - optimise attribute load
-                if let Some(entry) = self.spans.get_mut(&hash) {
-                    for kvr in ae.attributes {
-                        entry
-                            .current
-                            .attributes
-                            .push(attr_lookup.try_convert_attribute(kvr).await?);
-                    }
-                }
-            }
-            Some(data::span_event::Event::End(se)) => {
-                if let Some(mut entry) = self.spans.remove(&hash) {
-                    entry.current.end_time_unix_nano = se.end_time_unix_nano;
-                    if let Some(status) = se.status {
-                        entry.current.status = Some(opentelemetry_proto::tonic::trace::v1::Status {
-                            message: status.message,
-                            code: status.code,
-                        })
-                    }
-                    return Ok(Some(entry));
-                }
-            }
-            // Log the issue vs. crash.
-            None => todo!("logic error!"),
-        }
-        // TODO - garbage collection if dangling spans is too high?
-        Ok(None)
-    }
 }

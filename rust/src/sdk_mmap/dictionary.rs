@@ -54,15 +54,15 @@ impl RawDictionary {
         let mut mmap_size = file_size - offset;
         let min_size: u64 = 1024;
         if mmap_size < min_size {
-            f.set_len(offset+min_size)?;
+            f.set_len(offset + min_size)?;
             mmap_size = min_size;
         }
-        
-        let data = unsafe { 
+
+        let data = unsafe {
             MmapOptions::new()
-            .offset(offset)
-            .len(mmap_size as usize)
-            .map_mut(&f)? 
+                .offset(offset)
+                .len(mmap_size as usize)
+                .map_mut(&f)?
         };
         Ok(RawDictionary { data, f, offset })
     }
@@ -76,13 +76,10 @@ impl RawDictionary {
             let ctx = prost::encoding::DecodeContext::default();
             let wire_type = prost::encoding::WireType::LengthDelimited;
             prost::encoding::string::merge(wire_type, &mut result, &mut buf, ctx)?;
-            return Ok(result)
+            return Ok(result);
         }
         // TODO - Remap the mmap file and retry.
-        Err(Error::NotFoundInDictionary(
-            "string".to_owned(),
-            index,
-        ))
+        Err(Error::NotFoundInDictionary("string".to_owned(), index))
     }
 
     /// Attempts to read a message out of the dictionary.
@@ -92,7 +89,7 @@ impl RawDictionary {
     ) -> Result<T, Error> {
         let offset = (index as u64 - self.offset) as usize;
         if let Some(buf) = self.data.get(offset..) {
-            return Ok(T::decode_length_delimited(buf)?)
+            return Ok(T::decode_length_delimited(buf)?);
         }
         // TODO - Remap the mmap file and try again.
         // We were unable to recover here.

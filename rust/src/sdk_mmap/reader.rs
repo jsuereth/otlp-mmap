@@ -12,6 +12,7 @@ use memmap2::MmapOptions;
 
 use crate::{oltp_mmap::Error, sdk_mmap::dictionary::Dictionary};
 
+/// Raw reader of mmap files.
 pub struct MmapReader {
     pub events: RingBufferReader<Event>,
     pub spans: RingBufferReader<SpanEvent>,

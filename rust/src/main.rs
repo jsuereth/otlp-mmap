@@ -30,7 +30,7 @@ async fn run_sdk_mmap(otlp_url: &str, export_file: PathBuf) -> Result<(), Error>
     let sdk = CollectorSdk::new(&export_file)?;
     // Create our event loops to handle things.
     let trace_loop = sdk.send_traces_to(otlp_url);
-    let event_loop = sdk.dev_null_events();
+    let event_loop = sdk.send_logs_to(otlp_url);
     let metric_loop = sdk.dev_null_metrics();
 
     // Run the event loops by waiting on them.
