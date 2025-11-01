@@ -20,6 +20,8 @@ services:
     command: ["--config=/otel-config/otel-throughput-config.yaml"]
     ports:
       - "4317:4317"
+    depends_on:
+      - cadvisor # Avoid starting until cadvisor is up.
   # The actual HTTP server that is instrumented.
   java_http_server:
     image: otel/mmap-demo:latest
@@ -54,3 +56,16 @@ services:
       - java_http_server
     volumes: 
       - ./k6-config:/config
+  # cAdvisor (Collects container CPU and Memory metrics)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8090:8080"
+    privileged: true
+    # Ensures cAdvisor gets enough permissions to monitor the host
