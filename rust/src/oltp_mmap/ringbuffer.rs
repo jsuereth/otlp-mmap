@@ -1,5 +1,5 @@
 use super::Error;
-use memmap::MmapOptions;
+use memmap2::MmapOptions;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::atomic::Ordering;
@@ -70,7 +70,7 @@ pub struct RawRingbufferReader {
     // We own file to keep its lifetime.
     #[allow(dead_code)]
     f: std::fs::File,
-    data: memmap::MmapMut,
+    data: memmap2::MmapMut,
 }
 
 impl RawRingbufferReader {
@@ -122,7 +122,7 @@ impl RawRingbufferReader {
 
 /// Grants access to memory chunk in a ringbuffer.
 struct RawRingbufferEntry<'a> {
-    data: &'a memmap::MmapMut,
+    data: &'a memmap2::MmapMut,
     header: &'a mut RawRingBufferHeader,
     read_idx: i64,
 }

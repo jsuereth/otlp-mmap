@@ -15,8 +15,8 @@ services:
   collector:
     image: otel/opentelemetry-collector-contrib:0.72.0
     volumes:
-      - ./otel-config.yaml:/otel-config.yaml
-    command: ["--config=/otel-config.yaml"]
+      - ./otel-config:/otel-config
+    command: ["--config=/otel-config/otel-config.yaml"]
     ports:
       - "4317:4317"
   # Mmap OTLP Demo

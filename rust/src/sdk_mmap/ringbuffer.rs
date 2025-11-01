@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-use memmap::MmapMut;
+use memmap2::MmapMut;
 use tokio::sync::Mutex;
 
 use crate::oltp_mmap::Error;
@@ -53,7 +53,6 @@ where
             if let Some(result) = input.try_read::<T>()? {
                 return Ok(result);
             } else {
-                println!("Waiting {d:?} for input...");
                 tokio::time::sleep(d).await;
             }
             // TODO - Cap max wait time configuration.

@@ -118,7 +118,7 @@ impl OtlpMmapReader {
         };
         for (rid, spans) in spans.into_iter().chunk_by(|s| s.resource_ref).into_iter() {
             let resource = self.resources.get(rid).await?;
-            let mut resource_spans = ResourceSpans {
+            let mut resource_spans: ResourceSpans = ResourceSpans {
                 resource: Some(resource.as_ref().clone()),
                 scope_spans: Default::default(),
                 schema_url: "".to_owned(),

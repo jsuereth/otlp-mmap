@@ -22,7 +22,10 @@ val EXPORT_META_DIRECTORY = new File("../../export")
   val mmap_sdk = sys.env.get("SDK_MMAP_EXPORTER_FILE").map(f => new java.io.File(f))
   val otel = (mmap_export, mmap_sdk, otlp_export) match
     case (Some(mmap_dir), _, _) => initOtel(StartupChoice.OtelSdk(OtlpMmapExporter(mmap_dir).spanExporter))
-    case (None, Some(mmap_file), _) => 
+    case (None, Some(mmap_file), _) =>
+      // Kill the file if it exists or otherwise wipe it, until we sort out retry  / different loads.
+      if mmap_file.exists()
+      then mmap_file.delete()
       initOtel(StartupChoice.MmapSdk(SdkMmapRaw(new RandomAccessFile(mmap_file, "rw"), SdkMmapOptions(
         events = RingBufferOptions(512,64),
         measurements = RingBufferOptions(512,64),

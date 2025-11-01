@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-memmap = "0.7.0"
+memmap2 = "0.9.9"
 opentelemetry-proto = { version="0.31.0", features = ["full"] }
 serde={ version = "1.0.228", features = ["derive"] }
 prost = "0.14.1"

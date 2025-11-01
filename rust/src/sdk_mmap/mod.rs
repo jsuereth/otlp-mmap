@@ -5,9 +5,9 @@ pub mod dictionary;
 pub mod reader;
 pub mod ringbuffer;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path, time::Duration};
 
-use itertools::Itertools;
+use opentelemetry_proto::tonic::collector::trace::v1::trace_service_client::TraceServiceClient;
 pub use reader::MmapReader;
 
 use crate::{
@@ -16,40 +16,94 @@ use crate::{
 };
 
 /// Implementation of an OpenTelemetry SDK that pulls in events from an MMap file.
-struct CollectorSdk {
+pub struct CollectorSdk {
     reader: MmapReader,
 }
-
-struct PartialScope {
-    pub scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope,
-    pub resource_ref: i64,
-}
-
 impl CollectorSdk {
+    pub fn new(path: &Path) -> Result<CollectorSdk, Error> {
+        Ok(CollectorSdk {
+            reader: MmapReader::new(path)?,
+        })
+    }
+
+    pub async fn dev_null_events(&self) -> Result<(), Error> {
+        loop {
+            let _ = self.reader.events.next().await?;
+            ()
+        }
+    }
+
+    pub async fn dev_null_metrics(&self) -> Result<(), Error> {
+        loop {
+            let _ = self.reader.metrics.next().await?;
+            ()
+        }
+    }
+
+    /// Open an OTLP connection and fires traces at it.
+    pub async fn send_traces_to(&self, trace_endpoint: &str) -> Result<(), Error> {
+        let client = TraceServiceClient::connect(trace_endpoint.to_owned()).await?;
+        self.send_traces_loop(client).await
+    }
+
+    /// This will loop and attempt to send traces at an OTLP endpoint.
+    /// Continuing infinitely.
+    async fn send_traces_loop(
+        &self,
+        mut endpoint: TraceServiceClient<tonic::transport::Channel>,
+    ) -> Result<(), Error> {
+        let mut batch_idx = 1;
+        let mut spans = ActiveSpans::new();
+        loop {
+            // TODO - check_sanity()
+            // TODO - Config
+            let span_batch = spans
+                .try_buffer_spans(&self, 100, Duration::from_secs(60))
+                .await?;
+            let next_batch = self.try_create_span_batch(span_batch).await?;
+            if !next_batch.resource_spans.is_empty() {
+                println!("Sending batch #{batch_idx}");
+                endpoint.export(next_batch).await?;
+                batch_idx += 1;
+            }
+        }
+    }
 
     /// Converts a batch of tracked spans into OTLP batch of spans using dictionary lookup.
-    async fn try_create_span_batch(&self, batch: Vec<TrackedSpan>) -> Result<opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest, Error> {
+    async fn try_create_span_batch(
+        &self,
+        batch: Vec<TrackedSpan>,
+    ) -> Result<opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest, Error>
+    {
         // TODO - handle empty batch.
-        let mut scope_map: HashMap<i64, Vec<opentelemetry_proto::tonic::trace::v1::Span>> = HashMap::new();
+        let mut scope_map: HashMap<i64, Vec<opentelemetry_proto::tonic::trace::v1::Span>> =
+            HashMap::new();
         for span in batch {
             scope_map
-            .entry(span.scope_ref)
-            .or_insert(Vec::new())
-            .push(span.current);
+                .entry(span.scope_ref)
+                .or_insert(Vec::new())
+                .push(span.current);
         }
 
-        let mut resource_map: HashMap<i64, Vec<(i64, opentelemetry_proto::tonic::common::v1::InstrumentationScope)>> = HashMap::new();
+        let mut resource_map: HashMap<
+            i64,
+            Vec<(
+                i64,
+                opentelemetry_proto::tonic::common::v1::InstrumentationScope,
+            )>,
+        > = HashMap::new();
         for scope_ref in scope_map.keys() {
             let scope = self.try_lookup_scope(*scope_ref).await?;
             resource_map
-            .entry(scope.resource_ref)
-            .or_insert(Vec::new())
-            .push((*scope_ref, scope.scope));
+                .entry(scope.resource_ref)
+                .or_insert(Vec::new())
+                .push((*scope_ref, scope.scope));
         }
 
-        let mut result = opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest {
-            resource_spans: Default::default(),
-        };
+        let mut result =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest {
+                resource_spans: Default::default(),
+            };
         for (resource_ref, scopes) in resource_map.into_iter() {
             let resource = self.try_lookup_resource(resource_ref).await?;
             let mut resource_spans = opentelemetry_proto::tonic::trace::v1::ResourceSpans {
@@ -75,14 +129,17 @@ impl CollectorSdk {
         Ok(result)
     }
 
-    async fn try_lookup_resource(&self, resource_ref: i64) -> Result<opentelemetry_proto::tonic::resource::v1::Resource, Error> {
+    async fn try_lookup_resource(
+        &self,
+        resource_ref: i64,
+    ) -> Result<opentelemetry_proto::tonic::resource::v1::Resource, Error> {
         let resource: data::Resource = self.reader.dictionary.try_read(resource_ref).await?;
         let mut attributes = Vec::new();
         for kv in resource.attributes {
             attributes.push(self.try_convert_attribute(kv).await?);
         }
         Ok(opentelemetry_proto::tonic::resource::v1::Resource {
-            attributes: todo!(),
+            attributes,
             dropped_attributes_count: resource.dropped_attributes_count,
             // TODO - support entities.
             entity_refs: Vec::new(),
@@ -96,15 +153,15 @@ impl CollectorSdk {
         for kv in scope.attributes {
             attributes.push(self.try_convert_attribute(kv).await?);
         }
-        let name: String = self.reader.dictionary.try_read(scope.name_ref).await?;
-        let version: String = self.reader.dictionary.try_read(scope.version_ref).await?;
-        Ok(PartialScope { 
-            scope:  opentelemetry_proto::tonic::common::v1::InstrumentationScope { 
+        let name: String = self.reader.dictionary.try_read_string(scope.name_ref).await?;
+        let version: String = self.reader.dictionary.try_read_string(scope.version_ref).await?;
+        Ok(PartialScope {
+            scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
                 name,
                 version,
                 attributes,
                 dropped_attributes_count: scope.dropped_attributes_count,
-            }, 
+            },
             resource_ref: scope.resource_ref,
         })
     }
@@ -114,7 +171,11 @@ impl CollectorSdk {
         &self,
         kv: KeyValueRef,
     ) -> Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error> {
-        let key: String = self.reader.dictionary.try_read(kv.key_ref).await?;
+        let key= match self.reader.dictionary.try_read_string(kv.key_ref).await {
+            Ok(value) => value,
+            // TODO - remove this, once we fix dictionary lookup.
+            Err(_) => "<not found>".to_owned(),
+        };
         let value = match kv.value {
             Some(data::AnyValue {
                 value: Some(data::any_value::Value::StringValue(s)),
@@ -145,33 +206,11 @@ impl CollectorSdk {
         };
         Ok(opentelemetry_proto::tonic::common::v1::KeyValue { key, value })
     }
+}
 
-    async fn process_spans(&self) -> Result<(), Error> {
-        let mut spans = ActiveSpans::new();
-        loop {
-            // TODO - check sanity on the file before continuing.
-            // Here we create a batch of spans.
-            let mut buf = Vec::new();
-            let send_by_time =
-                // TODO - configurable batch timeouts.
-                tokio::time::sleep_until(tokio::time::Instant::now() + tokio::time::Duration::from_secs(60));
-            tokio::pin!(send_by_time);
-            tokio::select! {
-                event = self.reader.spans.next() => {
-                    if let Some(span) = spans.try_handle_span_event(event?, &self).await? {
-                        buf.push(span);
-                        // TODO - configure the size of this.
-                        if buf.len() >= 100 {
-                            // TODO - fire the buffer
-                        }
-                    }
-                },
-                () = &mut send_by_time => {
-                    // TODO - Fire the buffer
-                }
-            }
-        }
-    }
+struct PartialScope {
+    pub scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope,
+    pub resource_ref: i64,
 }
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
@@ -226,7 +265,7 @@ impl ActiveSpans {
     }
 
     /// Reads events, tracking spans and attempts to construct a buffer.
-    /// 
+    ///
     /// If timeout is met before buffer is filled, the buffer is returned.
     async fn try_buffer_spans(
         &mut self,
@@ -245,6 +284,7 @@ impl ActiveSpans {
             tokio::select! {
                 event = sdk.reader.spans.next() => {
                     if let Some(span) = self.try_handle_span_event(event?, sdk).await? {
+                        println!("Span {:?} completed, adding to buffer", span.current);
                         buf.push(span);
                         // TODO - configure the size of this.
                         if buf.len() >= len {
@@ -268,7 +308,6 @@ impl ActiveSpans {
         attr_lookup: &CollectorSdk,
     ) -> Result<Option<TrackedSpan>, Error> {
         let hash = FullSpanId::try_from_event(&e)?;
-        println!("Received event on {}", hash);
         match e.event {
             Some(data::span_event::Event::Start(start)) => {
                 // TODO - optimise attribute load

@@ -1,5 +1,5 @@
 use super::Error;
-use memmap::{Mmap, MmapOptions};
+use memmap2::{Mmap, MmapOptions};
 use moka::future::{Cache, CacheBuilder};
 use std::fs::{File, OpenOptions};
 use std::ops::Deref;

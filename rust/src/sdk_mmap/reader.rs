@@ -8,7 +8,7 @@ use std::{
 
 use crate::sdk_mmap::data::{Event, Measurement, SpanEvent};
 use crate::sdk_mmap::ringbuffer::RingBufferReader;
-use memmap::MmapOptions;
+use memmap2::MmapOptions;
 
 use crate::{oltp_mmap::Error, sdk_mmap::dictionary::Dictionary};
 
@@ -24,7 +24,7 @@ impl MmapReader {
         let f = OpenOptions::new()
             .read(true)
             .write(true)
-            .create(false)
+            .create(true)
             .open(path)?;
         let raw_header = unsafe { MmapOptions::new().offset(0).len(64).map_mut(&f)? };
         let header = unsafe { &*(raw_header.as_ref().as_ptr() as *const MmapHeader) };
@@ -55,12 +55,8 @@ impl MmapReader {
                 .map_mut(&f)?;
             RingBufferReader::new(event_area, 0)
         };
-        let dictionary = unsafe {
-            let dictionary_area = MmapOptions::new()
-                .offset(dictionary_start as u64)
-                .map_mut(&f)?;
-            Dictionary::new(dictionary_area, 0)
-        };
+        // Dictionary may need to remap itself.
+        let dictionary = Dictionary::try_new(f, dictionary_start as u64)?;
         Ok(MmapReader {
             events,
             spans,
