@@ -204,30 +204,28 @@ pub trait SpanEventQueue {
     >;
 }
 
-
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
-
-    use tokio::sync::Mutex;
-
-    use crate::oltp_mmap::Error;
     use crate::oltp_mmap::error::OltpMmapError;
-    use crate::sdk_mmap::AttributeLookup;
-    use crate::sdk_mmap::data::Status;
+    use crate::oltp_mmap::Error;
+    use crate::sdk_mmap::data::any_value::Value;
     use crate::sdk_mmap::data::span_event::{EndSpan, Event, StartSpan};
+    use crate::sdk_mmap::data::{AnyValue, KeyValueRef, Status};
     use crate::sdk_mmap::trace::ActiveSpans;
+    use crate::sdk_mmap::AttributeLookup;
     use crate::sdk_mmap::{data::SpanEvent, trace::SpanEventQueue};
+    use std::collections::HashMap;
+    use tokio::sync::Mutex;
 
     struct TestSpanEventQueue {
         index: Mutex<usize>,
-        events: Vec<SpanEvent>
+        events: Vec<SpanEvent>,
     }
 
     impl TestSpanEventQueue {
         fn new<E: Into<Vec<SpanEvent>>>(events: E) -> Self {
-            Self { 
-                index: Mutex::new(0), 
+            Self {
+                index: Mutex::new(0),
                 events: events.into(),
             }
         }
@@ -237,8 +235,9 @@ mod test {
             &'a self,
         ) -> std::pin::Pin<
             Box<
-                dyn core::future::Future<Output = Result<crate::sdk_mmap::data::SpanEvent, crate::oltp_mmap::Error>>
-                    + Send
+                dyn core::future::Future<
+                        Output = Result<crate::sdk_mmap::data::SpanEvent, crate::oltp_mmap::Error>,
+                    > + Send
                     + 'a,
             >,
         > {
@@ -255,6 +254,7 @@ mod test {
             })
         }
     }
+    // TODO - move this into some helper location for all SDK pieces.
     struct TestAttributeLookup {
         string_lookup: HashMap<i64, String>,
     }
@@ -271,56 +271,95 @@ mod test {
         ) -> std::pin::Pin<
             Box<
                 dyn core::future::Future<
-                        Output = Result<opentelemetry_proto::tonic::common::v1::KeyValue, crate::oltp_mmap::Error>,
+                        Output = Result<
+                            opentelemetry_proto::tonic::common::v1::KeyValue,
+                            crate::oltp_mmap::Error,
+                        >,
                     > + Send
                     + 'a,
             >,
         >
         where
-            Self: Sync + 'a {
-            todo!()
+            Self: Sync + 'a,
+        {
+            Box::pin(async move {
+                // TODO - share this definition with actual algorithm.
+                let key = self
+                    .string_lookup
+                    .get(&kv.key_ref)
+                    .cloned()
+                    .unwrap_or("<not found>".to_owned());
+                // TODO - handle real conversions.
+                let value = match kv.value {
+                    None => None,
+                    Some(v) => match v.value {
+                        None => None,
+                        Some(Value::IntValue(v)) => Some(
+                            opentelemetry_proto::tonic::common::v1::AnyValue {
+                                value: Some(
+                                    opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(v)
+                                ),
+                            }
+                        ),
+                        Some(v) => todo!("Support value {v:?}"),
+                    },
+                };
+                Ok(opentelemetry_proto::tonic::common::v1::KeyValue { key, value })
+            })
         }
     }
 
-
     #[tokio::test]
-    async fn active_spans_returns_completed_span() -> Result<(), Error> {
-        let attr = TestAttributeLookup::new(HashMap::new());
+    async fn test_active_spans_returns_completed_span() -> Result<(), Error> {
+        let attr = TestAttributeLookup::new([(1, "one".to_owned())].into_iter().collect());
         let mut tracker = ActiveSpans::new();
         let scope_ref = 10i64;
-        let trace_id: Vec<u8> = vec![0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
-        let span_id: Vec<u8> = vec![0,1,2,3,4,5,6,7];
-        let parent_span_id: Vec<u8> = vec![7,6,5,4,3,2,1,0];
-        let start = SpanEvent { 
-            scope_ref, 
-            trace_id: trace_id.clone(), 
-            span_id: span_id.clone(), 
-            event: Some(Event::Start(StartSpan { 
-                parent_span_id: parent_span_id.clone(), 
-                flags: 0, 
-                name: "name".to_owned(), 
-                kind: 1,
-                start_time_unix_nano: 1,
-                attributes: Vec::new(), 
-            })),
-        };
-        let result = tracker.try_handle_span_event(start, &attr).await?;
-        assert_eq!(result.is_none(), true, "Should not return complete span on start event");
-        let end = SpanEvent { 
+        let trace_id: Vec<u8> = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let span_id: Vec<u8> = vec![0, 1, 2, 3, 4, 5, 6, 7];
+        let parent_span_id: Vec<u8> = vec![7, 6, 5, 4, 3, 2, 1, 0];
+        let start = SpanEvent {
             scope_ref,
             trace_id: trace_id.clone(),
             span_id: span_id.clone(),
-            event: Some(Event::End(EndSpan { 
-                end_time_unix_nano: 10, 
-                status: Some(Status { 
-                    message: "Test status".to_owned(), 
-                    code: 2 
+            event: Some(Event::Start(StartSpan {
+                parent_span_id: parent_span_id.clone(),
+                flags: 0,
+                name: "name".to_owned(),
+                kind: 1,
+                start_time_unix_nano: 1,
+                // TODO - test attribute conversion.
+                attributes: vec![KeyValueRef {
+                    key_ref: 1,
+                    value: Some(AnyValue {
+                        value: Some(Value::IntValue(1)),
+                    }),
+                }],
+            })),
+        };
+        let result = tracker.try_handle_span_event(start, &attr).await?;
+        assert_eq!(
+            result.is_none(),
+            true,
+            "Should not return complete span on start event"
+        );
+        let end = SpanEvent {
+            scope_ref,
+            trace_id: trace_id.clone(),
+            span_id: span_id.clone(),
+            event: Some(Event::End(EndSpan {
+                end_time_unix_nano: 10,
+                status: Some(Status {
+                    message: "Test status".to_owned(),
+                    code: 2,
                 }),
             })),
-
         };
         let result2 = tracker.try_handle_span_event(end, &attr).await?;
-        assert_eq!(result2.is_some(), true, "Should return complete span after span end.");
+        assert_eq!(
+            result2.is_some(),
+            true,
+            "Should return complete span after span end."
+        );
         if let Some(span) = result2 {
             assert_eq!(span.scope_ref, scope_ref);
             assert_eq!(span.current.trace_id, trace_id);
@@ -331,9 +370,67 @@ mod test {
             assert_eq!(span.current.kind, 1);
             assert_eq!(span.current.name, "name");
             assert_eq!(span.current.status.is_some(), true);
-            // TODO - check status.
+            assert_eq!(span.current.attributes.len(), 1);
+            if let Some(attr) = span.current.attributes.iter().next() {
+                assert_eq!(attr.key, "one");
+            }
         }
         Ok(())
     }
 
+    fn make_span_id(i: u8) -> Vec<u8> {
+        vec![0,1,2,3,4,5,6,i]
+    }
+
+    fn make_span_start(span_id: Vec<u8>) -> SpanEvent {
+        SpanEvent {
+            scope_ref: 1,
+            trace_id: vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+            span_id: span_id,
+            event: Some(Event::Start(StartSpan {
+                parent_span_id: Vec::new(),
+                flags: 0,
+                name: "name".to_owned(),
+                kind: 1,
+                start_time_unix_nano: 1,
+                // TODO - test attribute conversion.
+                attributes: vec![],
+            })),
+        }
+    }
+    fn make_span_end(span_id: Vec<u8>) -> SpanEvent {
+        SpanEvent {
+            scope_ref: 1,
+            trace_id: vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+            span_id: span_id,
+            event: Some(Event::End(EndSpan {
+                end_time_unix_nano: 10,
+                status: Some(Status {
+                    message: "Test status".to_owned(),
+                    code: 2,
+                }),
+            })),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_active_spans_create_batch() -> Result<(), Error> {
+        let attr = TestAttributeLookup::new([(1, "one".to_owned())].into_iter().collect());
+        let mut tracker = ActiveSpans::new();
+        let event_queue = TestSpanEventQueue::new([
+            make_span_start(make_span_id(0)),
+            make_span_start(make_span_id(1)),
+            make_span_end(make_span_id(1)),
+            make_span_start(make_span_id(3)),
+            make_span_end(make_span_id(0)),
+            make_span_start(make_span_id(2)),
+            make_span_end(make_span_id(3)),
+            make_span_end(make_span_id(2)),
+        ]);
+        let batch = tracker.try_buffer_spans(&event_queue, &attr, 3, tokio::time::Duration::from_secs(10)).await?;
+        assert_eq!(batch.len(), 3, "Failed to batch three spans");
+        // We should have a remaining active span.
+        assert_eq!(tracker.num_active(), 1);
+        Ok(())
+    }
 }
