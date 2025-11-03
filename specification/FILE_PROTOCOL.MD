@@ -43,8 +43,9 @@ The header will consist of the following 64-byte block.
 | events           | 8    | 1     | int64 | offset to event ringbuffer.                       |
 | spans            | 8    | 2     | int64 | offest to span ringbufer.                         |
 | measurements     | 8    | 2     | int64 | offset to measurement ringbuffer.                 |
-| measurements     | 8    | 3     | int64 | offset to dictionary.                             |
-| unused           | 16   |       |       | zeroed out bits                                   |
+| dictionary       | 8    | 3     | int64 | offset to dictionary.                             |
+| time_unix_nano   | 8    | 4     | int64 | Time when SDK started                             |
+| unused           | 8    |       |       |                                                   |
 
 
 ### Ringbuffers

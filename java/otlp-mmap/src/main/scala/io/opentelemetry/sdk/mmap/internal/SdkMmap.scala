@@ -13,6 +13,7 @@ import io.opentelemetry.sdk.mmap.internal.data.StringDictionary
 import io.opentelemetry.sdk.mmap.internal.data.ResourceDictionary
 import io.opentelemetry.sdk.mmap.internal.data.ScopeDictionary
 import io.opentelemetry.sdk.mmap.internal.data.MetricDictionary
+import java.time.Instant
 
 class SdkMmap(raw: SdkMmapRaw):
     // Wrapper methods around SDK mmap file.
@@ -27,6 +28,7 @@ class FileHeader(val segment: MemorySegment) extends Header:
     val spans = MetadataLongField(2*8)
     val measurements = MetadataLongField(3*8)
     val dictionary = MetadataLongField(4*8)
+    val start_time = MetadataLongField(5*8)
 object FileHeader:
     def apply(channel: FileChannel): FileHeader =
         val arena = Arena.ofConfined()
@@ -84,6 +86,7 @@ object SdkMmapRaw:
         opt: SdkMmapOptions): SdkMmapRaw =
         val header = FileHeader(file.getChannel())
         header.version.set(SDK_MMAP_VERSION)
+        header.start_time.set(convertInstant(Instant.now()))
         // TODO - we need to sort out alignment here.
         var offset = 64L
         println(s"Creating event channel @ ${offset}")

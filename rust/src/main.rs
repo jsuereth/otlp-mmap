@@ -2,7 +2,10 @@ mod oltp_mmap;
 mod sdk_mmap;
 
 use oltp_mmap::{Error, OtlpMmapReader, OtlpMmapReaderConfig};
-use std::{path::{Path, PathBuf}, rc::Rc, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use crate::sdk_mmap::CollectorSdk;
 
@@ -33,21 +36,17 @@ async fn main() -> Result<(), Error> {
 
 async fn run_sdk_mmap(otlp_url: &str, export_file: PathBuf) -> Result<(), Error> {
     let sdk = Arc::new(CollectorSdk::new(&export_file)?);
-    // Create our event loops to handle things.
-    let metric_sdk = sdk.clone();
-    let metric_pipeline = tokio::task::spawn(async move {
-        metric_sdk.dev_null_metrics().await
-    });
+    // let metric_pipeline = tokio::task::spawn(async move { metric_sdk.record_metrics(&metric_otlp).await });
     let log_otlp = otlp_url.to_owned();
     let log_sdk = sdk.clone();
-    let log_pipeline = tokio::task::spawn(async move {
-        log_sdk.send_logs_to(&log_otlp).await
-    });
+    let log_pipeline = tokio::task::spawn(async move { log_sdk.send_logs_to(&log_otlp).await });
     let trace_otlp = otlp_url.to_owned();
     let trace_sdk = sdk.clone();
-    let trace_pipeline = tokio::task::spawn(async move {
-        trace_sdk.send_traces_to(&trace_otlp).await
-    });
+    let trace_pipeline =
+        tokio::task::spawn(async move { trace_sdk.send_traces_to(&trace_otlp).await });
+    // We do not pass the metric piepline to another thread.
+    // This is because we haven't made our aggregations "Send" yet.
+    let metric_pipeline = sdk.record_metrics(&otlp_url);
     // Run the event loops by waiting on them.
     // TODO - wait for all to finish or crash?
     tokio::select! {

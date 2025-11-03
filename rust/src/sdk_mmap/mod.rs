@@ -3,16 +3,18 @@
 pub mod data;
 pub mod dictionary;
 mod log;
+mod metric;
 pub mod reader;
 pub mod ringbuffer;
 mod trace;
 
 use crate::{
     oltp_mmap::Error,
-    sdk_mmap::{data::KeyValueRef, log::EventCollector},
+    sdk_mmap::{data::KeyValueRef, log::EventCollector, metric::MetricStorage},
 };
 use opentelemetry_proto::tonic::collector::{
     logs::v1::logs_service_client::LogsServiceClient,
+    metrics::v1::metrics_service_client::MetricsServiceClient,
     trace::v1::trace_service_client::TraceServiceClient,
 };
 pub use reader::MmapReader;
@@ -30,11 +32,32 @@ impl CollectorSdk {
         })
     }
 
-    pub async fn dev_null_metrics(&self) -> Result<(), Error> {
-        println!("Ignoring metrics");
+    /// Records metrics from the ringbuffer and repor them at an interval.
+    pub async fn record_metrics(&self, metric_endpoint: &str) -> Result<(), Error> {
+        // TODO - we need to set up a timer to export metrics periodically.
+        let _client = MetricsServiceClient::connect(metric_endpoint.to_owned()).await?;
+        let mut metric_storage = MetricStorage::new();
+        // Report metrics every minute.
+        let report_interval = tokio::time::Duration::from_secs(60);
         loop {
-            let _ = self.reader.metrics.next().await?;
-            ()
+            // TODO - Configuration.
+            let send_by_time =
+                tokio::time::sleep_until(tokio::time::Instant::now() + report_interval);
+            tokio::pin!(send_by_time);
+            loop {
+                tokio::select! {
+                    m = self.reader.metrics.next() => {
+                        metric_storage.handle_measurement(self, m?).await?
+                    },
+                    _ = &mut send_by_time => {
+                        let _metrics = metric_storage.collect(&metric::CollectionContext::new(self.reader.start_time(), 0)).await;
+                        // TODO - send the metrics.
+
+                        // Go back to outer loop and reset report time.
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -84,7 +107,7 @@ impl CollectorSdk {
             // TODO - Config
             // println!("Batching spans");
             let span_batch = spans
-                .try_buffer_spans(&self, 100, Duration::from_secs(60))
+                .try_buffer_spans(self, self, 100, Duration::from_secs(60))
                 .await?;
             let next_batch = self.try_create_span_batch(span_batch).await?;
             if !next_batch.resource_spans.is_empty() {
@@ -202,6 +225,11 @@ impl CollectorSdk {
         })
     }
 
+    async fn try_lookup_metric(&self, metric_ref: i64) -> Result<data::MetricRef, Error> {
+        let description: data::MetricRef = self.reader.dictionary.try_read(metric_ref).await?;
+        Ok(description)
+    }
+
     /// Converts a key-value pair reference by looking up key strings in the dictionary.
     async fn try_convert_attribute(
         &self,
@@ -286,4 +314,55 @@ impl CollectorSdk {
 struct PartialScope {
     pub scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope,
     pub resource_ref: i64,
+}
+
+// TODO - maybe just use async trait crate...
+/// Attribute lookup trait used so we can write tests without creating an mmap file.
+pub trait AttributeLookup {
+    fn try_convert_attribute<'a>(
+        &'a self,
+        kv: KeyValueRef,
+    ) -> std::pin::Pin<
+        Box<
+            dyn core::future::Future<
+                    Output = Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error>,
+                > + Send
+                + 'a,
+        >,
+    >
+    where
+        Self: Sync + 'a;
+}
+
+impl AttributeLookup for CollectorSdk {
+    fn try_convert_attribute<'a>(
+        &'a self,
+        kv: KeyValueRef,
+    ) -> std::pin::Pin<
+        Box<
+            dyn core::future::Future<
+                    Output = Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error>,
+                > + Send
+                + 'a,
+        >,
+    >
+    where
+        Self: Sync + 'a,
+    {
+        Box::pin(async { self.try_convert_attribute(kv).await })
+    }
+}
+
+impl trace::SpanEventQueue for CollectorSdk {
+    fn try_read_next<'a>(
+        &'a self,
+    ) -> std::pin::Pin<
+        Box<
+            dyn core::future::Future<Output = Result<crate::sdk_mmap::data::SpanEvent, Error>>
+                + Send
+                + 'a,
+        >,
+    > {
+        Box::pin(async { self.reader.spans.next().await })
+    }
 }

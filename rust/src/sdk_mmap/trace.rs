@@ -4,7 +4,7 @@ use crate::{
     oltp_mmap::Error,
     sdk_mmap::{
         data::{span_event::Event, SpanEvent},
-        CollectorSdk,
+        AttributeLookup,
     },
 };
 use std::collections::HashMap;
@@ -73,9 +73,10 @@ impl ActiveSpans {
     /// Reads events, tracking spans and attempts to construct a buffer.
     ///
     /// If timeout is met before buffer is filled, the buffer is returned.
-    pub async fn try_buffer_spans(
+    pub async fn try_buffer_spans<Q: SpanEventQueue + Sync, L: AttributeLookup + Sync>(
         &mut self,
-        sdk: &CollectorSdk,
+        event_queue: &Q,
+        lookup: &L,
         len: usize,
         timeout: tokio::time::Duration,
     ) -> Result<Vec<TrackedSpan>, Error> {
@@ -87,9 +88,9 @@ impl ActiveSpans {
         loop {
             // println!("Waiting for span event");
             tokio::select! {
-                event = sdk.reader.spans.next() => {
+                event = event_queue.try_read_next() => {
                     // println!("Received span event");
-                    if let Some(span) = self.try_handle_span_event(event?, sdk).await? {
+                    if let Some(span) = self.try_handle_span_event(event?, lookup).await? {
                         // println!("Buffering span");
                         buf.push(span);
                         // TODO - configure the size of this.
@@ -109,10 +110,10 @@ impl ActiveSpans {
     /// Handles a span event.
     ///
     /// Returns a span, if this event has completed it.
-    async fn try_handle_span_event(
+    async fn try_handle_span_event<AL: AttributeLookup + Sync>(
         &mut self,
         e: SpanEvent,
-        attr_lookup: &CollectorSdk,
+        attr_lookup: &AL,
     ) -> Result<Option<TrackedSpan>, Error> {
         let hash = FullSpanId::try_from_event(&e)?;
         // println!("Span event: {hash}");
@@ -186,4 +187,153 @@ impl ActiveSpans {
         // TODO - garbage collection if dangling spans is too high?
         Ok(None)
     }
+}
+
+/// Trait to read span events from the queue.
+/// Uses so we can write tests without a full MMAP file.
+pub trait SpanEventQueue {
+    /// Reads the next span event.
+    fn try_read_next<'a>(
+        &'a self,
+    ) -> std::pin::Pin<
+        Box<
+            dyn core::future::Future<Output = Result<crate::sdk_mmap::data::SpanEvent, Error>>
+                + Send
+                + 'a,
+        >,
+    >;
+}
+
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
+
+    use tokio::sync::Mutex;
+
+    use crate::oltp_mmap::Error;
+    use crate::oltp_mmap::error::OltpMmapError;
+    use crate::sdk_mmap::AttributeLookup;
+    use crate::sdk_mmap::data::Status;
+    use crate::sdk_mmap::data::span_event::{EndSpan, Event, StartSpan};
+    use crate::sdk_mmap::trace::ActiveSpans;
+    use crate::sdk_mmap::{data::SpanEvent, trace::SpanEventQueue};
+
+    struct TestSpanEventQueue {
+        index: Mutex<usize>,
+        events: Vec<SpanEvent>
+    }
+
+    impl TestSpanEventQueue {
+        fn new<E: Into<Vec<SpanEvent>>>(events: E) -> Self {
+            Self { 
+                index: Mutex::new(0), 
+                events: events.into(),
+            }
+        }
+    }
+    impl SpanEventQueue for TestSpanEventQueue {
+        fn try_read_next<'a>(
+            &'a self,
+        ) -> std::pin::Pin<
+            Box<
+                dyn core::future::Future<Output = Result<crate::sdk_mmap::data::SpanEvent, crate::oltp_mmap::Error>>
+                    + Send
+                    + 'a,
+            >,
+        > {
+            Box::pin(async {
+                let mut idx = self.index.lock().await;
+                if *idx < self.events.len() {
+                    let real_idx: usize = *idx;
+                    *idx += 1;
+                    Ok(self.events[real_idx].to_owned())
+                } else {
+                    // TODO - real error
+                    Err(OltpMmapError::VersionMismatch(1, 2))
+                }
+            })
+        }
+    }
+    struct TestAttributeLookup {
+        string_lookup: HashMap<i64, String>,
+    }
+    impl TestAttributeLookup {
+        fn new(string_lookup: HashMap<i64, String>) -> Self {
+            Self { string_lookup }
+        }
+    }
+
+    impl AttributeLookup for TestAttributeLookup {
+        fn try_convert_attribute<'a>(
+            &'a self,
+            kv: crate::sdk_mmap::data::KeyValueRef,
+        ) -> std::pin::Pin<
+            Box<
+                dyn core::future::Future<
+                        Output = Result<opentelemetry_proto::tonic::common::v1::KeyValue, crate::oltp_mmap::Error>,
+                    > + Send
+                    + 'a,
+            >,
+        >
+        where
+            Self: Sync + 'a {
+            todo!()
+        }
+    }
+
+
+    #[tokio::test]
+    async fn active_spans_returns_completed_span() -> Result<(), Error> {
+        let attr = TestAttributeLookup::new(HashMap::new());
+        let mut tracker = ActiveSpans::new();
+        let scope_ref = 10i64;
+        let trace_id: Vec<u8> = vec![0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+        let span_id: Vec<u8> = vec![0,1,2,3,4,5,6,7];
+        let parent_span_id: Vec<u8> = vec![7,6,5,4,3,2,1,0];
+        let start = SpanEvent { 
+            scope_ref, 
+            trace_id: trace_id.clone(), 
+            span_id: span_id.clone(), 
+            event: Some(Event::Start(StartSpan { 
+                parent_span_id: parent_span_id.clone(), 
+                flags: 0, 
+                name: "name".to_owned(), 
+                kind: 1,
+                start_time_unix_nano: 1,
+                attributes: Vec::new(), 
+            })),
+        };
+        let result = tracker.try_handle_span_event(start, &attr).await?;
+        assert_eq!(result.is_none(), true, "Should not return complete span on start event");
+        let end = SpanEvent { 
+            scope_ref,
+            trace_id: trace_id.clone(),
+            span_id: span_id.clone(),
+            event: Some(Event::End(EndSpan { 
+                end_time_unix_nano: 10, 
+                status: Some(Status { 
+                    message: "Test status".to_owned(), 
+                    code: 2 
+                }),
+            })),
+
+        };
+        let result2 = tracker.try_handle_span_event(end, &attr).await?;
+        assert_eq!(result2.is_some(), true, "Should return complete span after span end.");
+        if let Some(span) = result2 {
+            assert_eq!(span.scope_ref, scope_ref);
+            assert_eq!(span.current.trace_id, trace_id);
+            assert_eq!(span.current.span_id, span_id);
+            assert_eq!(span.current.parent_span_id, parent_span_id);
+            assert_eq!(span.current.start_time_unix_nano, 1);
+            assert_eq!(span.current.end_time_unix_nano, 10);
+            assert_eq!(span.current.kind, 1);
+            assert_eq!(span.current.name, "name");
+            assert_eq!(span.current.status.is_some(), true);
+            // TODO - check status.
+        }
+        Ok(())
+    }
+
 }

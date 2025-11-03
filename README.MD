@@ -63,9 +63,12 @@ See [Protocol](PROTOCOL.MD) for details on the file contents and layout.
 
 ## Prototyping TODOs
 
-- [ ] Throughput tests
+- [X] Throughput tests
+  - Basic k6 test for a server
+  - [ ] Max throughput tests
 - [ ] Benchmarks
     - Memory usage of traditonal otlp exporter vs. MMap-Writer + MMap-collector combined
+    - CPU usage of traditional otlp-exporter vs. MMap-Writer + Collector
     - Memory overhead of primary process
 - File format experiements
   - [X] variable sized entry dictionary
@@ -78,4 +81,5 @@ See [Protocol](PROTOCOL.MD) for details on the file contents and layout.
 - Deeper SDK hooks
   - [X] Directly keeping metric aggregations in mmap
   - [X] Directly writing span start/stop/event to ringbuffer
+  - [ ] Use instrument hints in metric aggregations in mmap.
 - Comparison w/ eBPF techniques

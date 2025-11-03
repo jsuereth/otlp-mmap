@@ -1,0 +1,50 @@
+# Otel SDK OTLP Throughput measurement scenario
+# 
+# This attempts to measure performance of throughput of OTEL sdk.
+
+services:
+  # OpenTelemetry collector actually pull
+  otel_collector:
+    image: otel/opentelemetry-collector-contrib:0.72.0
+    volumes:
+      - ./otel-config:/otel-config
+    command: ["--config=/otel-config/otel-throughput-config.yaml"]
+    ports:
+      - "4317:4317"
+    depends_on:
+      - cadvisor # Avoid starting until cadvisor is up.
+  # The actual HTTP server that is instrumented.
+  java_http_server:
+    image: otel/mmap-demo:latest
+    volumes: 
+      - ./export:/otlp/export
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel_collector:4317
+      HTTP_ENDPOINT_PORT: 8081
+    # TODO - share definiton w/ mmap collector
+    ports:
+      - "8081:8081"
+  # Load tester for our HTTP server
+  k6_loadtester:
+    image: grafana/k6:latest
+    container_name: k6_loadtester
+    command: ["run", "/config/k6-load-test.js"]
+    environment:
+      TARGET_URL: http://java_http_server:8081/
+    depends_on:
+      - java_http_server
+    volumes: 
+      - ./k6-config:/config
+  # cAdvisor (Collects container CPU and Memory metrics)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8090:8080"
+    privileged: true
+    # Ensures cAdvisor gets enough permissions to monitor the host

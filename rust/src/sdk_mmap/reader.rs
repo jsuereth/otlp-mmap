@@ -3,7 +3,7 @@
 use std::{
     fs::OpenOptions,
     path::Path,
-    sync::atomic::{AtomicI64, Ordering},
+    sync::atomic::{AtomicI64, AtomicU64, Ordering},
 };
 
 use crate::sdk_mmap::data::{Event, Measurement, SpanEvent};
@@ -18,6 +18,7 @@ pub struct MmapReader {
     pub spans: RingBufferReader<SpanEvent>,
     pub metrics: RingBufferReader<Measurement>,
     pub dictionary: Dictionary,
+    start_time: u64,
 }
 
 impl MmapReader {
@@ -29,6 +30,7 @@ impl MmapReader {
             .open(path)?;
         let raw_header = unsafe { MmapOptions::new().offset(0).len(64).map_mut(&f)? };
         let header = unsafe { &*(raw_header.as_ref().as_ptr() as *const MmapHeader) };
+        let start_time = header.start_time_unix_nano.load(Ordering::Relaxed);
         // This is the order of blocks in the file.
         // We use this to load separate MMap instances for the various sections.
         let event_start = header.events.load(Ordering::Relaxed);
@@ -67,7 +69,12 @@ impl MmapReader {
             spans,
             metrics,
             dictionary,
+            start_time,
         })
+    }
+
+    pub fn start_time(&self) -> u64 {
+        self.start_time
     }
 }
 
@@ -83,4 +90,6 @@ struct MmapHeader {
     measurements: AtomicI64,
     /// Location of dictionary.
     dictionary: AtomicI64,
+    /// Start timestamp.
+    start_time_unix_nano: AtomicU64,
 }
