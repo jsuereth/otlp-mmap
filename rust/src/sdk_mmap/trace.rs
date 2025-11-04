@@ -379,7 +379,7 @@ mod test {
     }
 
     fn make_span_id(i: u8) -> Vec<u8> {
-        vec![0,1,2,3,4,5,6,i]
+        vec![0, 1, 2, 3, 4, 5, 6, i]
     }
 
     fn make_span_start(span_id: Vec<u8>) -> SpanEvent {
@@ -427,7 +427,9 @@ mod test {
             make_span_end(make_span_id(3)),
             make_span_end(make_span_id(2)),
         ]);
-        let batch = tracker.try_buffer_spans(&event_queue, &attr, 3, tokio::time::Duration::from_secs(10)).await?;
+        let batch = tracker
+            .try_buffer_spans(&event_queue, &attr, 3, tokio::time::Duration::from_secs(10))
+            .await?;
         assert_eq!(batch.len(), 3, "Failed to batch three spans");
         // We should have a remaining active span.
         assert_eq!(tracker.num_active(), 1);
