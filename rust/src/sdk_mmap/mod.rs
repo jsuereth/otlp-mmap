@@ -10,7 +10,11 @@ mod trace;
 
 use crate::{
     oltp_mmap::Error,
-    sdk_mmap::{data::KeyValueRef, log::EventCollector, metric::MetricStorage},
+    sdk_mmap::{
+        data::KeyValueRef,
+        log::EventCollector,
+        metric::{CollectedMetric, MetricStorage},
+    },
 };
 use opentelemetry_proto::tonic::collector::{
     logs::v1::logs_service_client::LogsServiceClient,
@@ -35,7 +39,7 @@ impl CollectorSdk {
     /// Records metrics from the ringbuffer and repor them at an interval.
     pub async fn record_metrics(&self, metric_endpoint: &str) -> Result<(), Error> {
         // TODO - we need to set up a timer to export metrics periodically.
-        let _client = MetricsServiceClient::connect(metric_endpoint.to_owned()).await?;
+        let mut client = MetricsServiceClient::connect(metric_endpoint.to_owned()).await?;
         let mut metric_storage = MetricStorage::new();
         // Report metrics every minute.
         let report_interval = tokio::time::Duration::from_secs(60);
@@ -50,15 +54,77 @@ impl CollectorSdk {
                         metric_storage.handle_measurement(self, m?).await?
                     },
                     _ = &mut send_by_time => {
-                        let _metrics = metric_storage.collect(&metric::CollectionContext::new(self.reader.start_time(), 0)).await;
+                        let metrics = metric_storage.collect(&metric::CollectionContext::new(self.reader.start_time(), 0)).await;
                         // TODO - send the metrics.
-
+                        let batch = self.try_create_metric_batch(metrics).await?;
+                        // TODO - check response for retry, etc.
+                        let _ = client.export(batch).await?;
                         // Go back to outer loop and reset report time.
                         break;
                     }
                 }
             }
         }
+    }
+
+    /// Converts a batch of tracked spans into OTLP batch of spans using dictionary lookup.
+    async fn try_create_metric_batch(
+        &self,
+        batch: Vec<CollectedMetric>,
+    ) -> Result<
+        opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest,
+        Error,
+    > {
+        let mut scope_map: HashMap<i64, Vec<opentelemetry_proto::tonic::metrics::v1::Metric>> =
+            HashMap::new();
+        for metric in batch {
+            scope_map
+                .entry(metric.scope_ref)
+                .or_insert(Vec::new())
+                .push(metric.metric);
+        }
+        let mut resource_map: HashMap<
+            i64,
+            Vec<(
+                i64,
+                opentelemetry_proto::tonic::common::v1::InstrumentationScope,
+            )>,
+        > = HashMap::new();
+        for scope_ref in scope_map.keys() {
+            let scope = self.try_lookup_scope(*scope_ref).await?;
+            resource_map
+                .entry(scope.resource_ref)
+                .or_insert(Vec::new())
+                .push((*scope_ref, scope.scope));
+        }
+
+        let mut result =
+            opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest {
+                resource_metrics: Default::default(),
+            };
+        for (resource_ref, scopes) in resource_map.into_iter() {
+            let resource = self.try_lookup_resource(resource_ref).await?;
+            let mut resource_metrics = opentelemetry_proto::tonic::metrics::v1::ResourceMetrics {
+                resource: Some(resource),
+                scope_metrics: Default::default(),
+                // TODO - pull this
+                schema_url: "".to_owned(),
+            };
+            for (sid, scope) in scopes.into_iter() {
+                let mut scope_metrics = opentelemetry_proto::tonic::metrics::v1::ScopeMetrics {
+                    scope: Some(scope),
+                    metrics: Vec::new(),
+                    // TODO - pull this
+                    schema_url: "".to_owned(),
+                };
+                if let Some(metrics) = scope_map.remove(&sid) {
+                    scope_metrics.metrics.extend(metrics);
+                    resource_metrics.scope_metrics.push(scope_metrics);
+                }
+            }
+            result.resource_metrics.push(resource_metrics);
+        }
+        Ok(result)
     }
 
     pub async fn send_logs_to(&self, log_endpoint: &str) -> Result<(), Error> {

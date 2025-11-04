@@ -77,7 +77,6 @@ impl MetricStorage {
 }
 
 struct MetricAggregator {
-    scope_ref: i64,
     name: String,
     unit: String,
     description: String,
@@ -95,7 +94,6 @@ impl MetricAggregator {
         let aggregation: Box<dyn AggregationConfig> =
             aggregation::convert_sdk_mmap_config(definition.aggregation);
         Ok(MetricAggregator {
-            scope_ref: definition.instrumentation_scope_ref,
             name: definition.name,
             unit: definition.unit,
             description: definition.description,

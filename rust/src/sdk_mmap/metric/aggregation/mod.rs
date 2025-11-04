@@ -28,7 +28,10 @@ pub fn convert_sdk_mmap_config(
             aggregation_temporality: sum.aggregation_temporality,
         }),
         Some(data::metric_ref::Aggregation::Histogram(hist)) => todo!(),
-        Some(data::metric_ref::Aggregation::ExpHist(ehist)) => todo!(),
+        Some(data::metric_ref::Aggregation::ExpHist(ehist)) => Box::new(exp_hist::BucketConfig {
+            max_size: ehist.max_buckets as i32,
+            max_scale: ehist.max_scale as i8,
+        }),
         _ => Box::new(NoAggregationConfig {}),
     }
 }
