@@ -60,6 +60,7 @@ class Meter(state: MeterSharedState) extends io.opentelemetry.api.metrics.Meter:
 
   override def counterBuilder(name: String): LongCounterBuilder = 
     val m = MmapProto.MetricRef.newBuilder()
+    m.setInstrumentationScopeRef(state.scopeId)
     m.setSum(MmapProto.MetricRef.Sum.newBuilder()
     // TODO - pull temporality from SDK view config?
     .setAggregationTemporality(MmapProto.AggregationTemporality.AGGREGATION_TEMPORALITY_CUMULATIVE)
@@ -71,6 +72,7 @@ class Meter(state: MeterSharedState) extends io.opentelemetry.api.metrics.Meter:
 
   override def histogramBuilder(name: String): DoubleHistogramBuilder =
     val m = MmapProto.MetricRef.newBuilder()
+    m.setInstrumentationScopeRef(state.scopeId)
     m.setExpHist(MmapProto.MetricRef.ExponentialHistogram.newBuilder()
     .setAggregationTemporality(MmapProto.AggregationTemporality.AGGREGATION_TEMPORALITY_CUMULATIVE)
     .setMaxScale(20)
