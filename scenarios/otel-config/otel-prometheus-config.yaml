@@ -1,0 +1,33 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "otel_collector:4317"
+exporters:
+  debug:
+  prometheus:
+    endpoint: "otel_collector:8091"
+    send_timestamps: true
+    resource_to_telemetry_conversion:
+      enabled: true
+processors:
+  transform:
+    metric_statements:
+      - context: datapoint
+        statements:
+        - set(attributes["service"], resource.attributes["service.name"])
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [debug]
+    metrics:
+      receivers: [ otlp ]
+      processors:
+      - transform
+      exporters:
+      - debug
+      - prometheus
+    logs:
+      receivers: [otlp]
+      exporters: [debug]

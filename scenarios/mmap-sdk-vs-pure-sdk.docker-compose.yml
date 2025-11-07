@@ -1,0 +1,108 @@
+# Mmap SDK OTLP Demo
+# 
+# This demo replaces the entire SDK in java with something that pushes
+# data into an MMAP file as quickly as possible.
+#
+# A machine-local (but separate container) collector reads the file
+# and processes data into actual OTLP which is sent to an
+# OpenTelemetry collector
+x-otlp-mmap-volume:
+  &otlp-mmap-volume
+  type: bind
+  source: ./export
+  target: /otlp/export
+services:
+  # OpenTelemetry collector actually pull
+  otel_collector:
+    image: otel/opentelemetry-collector-contrib:0.139.0
+    volumes:
+      - ./otel-config:/otel-config
+    command: ["--config=/otel-config/otel-prometheus-config.yaml"]
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8091:8091"
+
+  # The HTTP server with normal java SDK
+  java_http_server_sdk:
+    image: otel/mmap-demo:latest
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel_collector:4317
+      HTTP_ENDPOINT_PORT: 8082
+      OTEL_SERVICE_NAME: http_java_sdk
+      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=1
+    # TODO - share definiton w/ mmap collector
+    ports:
+      - "8082:8082"
+  # HTTP server that is instrumented, configured to use SDK MMap
+  java_http_server_mmap_sdk:
+    image: otel/mmap-demo:latest
+    volumes: 
+      - ./export:/otlp/export
+    environment:
+      SDK_MMAP_EXPORTER_FILE: /otlp/export/mmap-throughput.otlp
+      HTTP_ENDPOINT_PORT: 8081
+      OTEL_SERVICE_NAME: http_java_mmap_sdk
+      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=2
+    # TODO - share definiton w/ mmap collector
+    ports:
+      - "8081:8081"
+  # Collector for the MMAP sdk file that will send OTLP to the otel collector.
+  mmap_collector:
+    image: otel/otlp-mmap-collector:latest
+    depends_on:
+      - otel_collector
+      - java_http_server_mmap_sdk
+    environment:
+      SDK_MMAP_EXPORTER_FILE: /otlp/export/mmap-throughput.otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel_collector:4317
+    # TODO - share definiton w/ demo
+    volumes: 
+      - ./export:/otlp/export
+  # Load tester for our HTTP server
+  k6_mmap_loadtester:
+    image: grafana/k6:latest
+    command: ["run", "/config/k6-load-test.js"]
+    environment:
+      TARGET_URL: http://java_http_server_mmap_sdk:8081/
+    depends_on:
+      - java_http_server_mmap_sdk
+    volumes: 
+      - ./k6-config:/config
+  k6_sdk_loadtester:
+    image: grafana/k6:latest
+    command: ["run", "/config/k6-load-test.js"]
+    environment:
+      TARGET_URL: http://java_http_server_sdk:8082/
+    depends_on:
+      - java_http_server_sdk
+    volumes: 
+      - ./k6-config:/config
+  # cAdvisor (Collects container CPU and Memory metrics)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8090:8080"
+    privileged: true
+    # Ensures cAdvisor gets enough permissions to monitor the host
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus-config:/etc/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-otlp-receiver'
+      - '--web.enable-remote-write-receiver'
+      - '--enable-feature=native-histograms'
+    ports:
+      - "9090:9090" # Prometheus UI and OTLP/HTTP endpoint
+    depends_on:
+      - cadvisor
+      - otel_collector
