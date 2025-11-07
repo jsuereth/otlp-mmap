@@ -96,6 +96,7 @@ impl MetricAggregator {
     /// Constructs a new metric aggregator.
     async fn new(metric_ref: i64, sdk: &CollectorSdk) -> Result<MetricAggregator, Error> {
         let definition = sdk.try_lookup_metric(metric_ref).await?;
+        println!("Discovered metric <{} on scope:{}>", definition.name, definition.instrumentation_scope_ref);
         // TODO - read exemplar config?
         let aggregation: Box<dyn AggregationConfig> =
             aggregation::convert_sdk_mmap_config(definition.aggregation);

@@ -92,7 +92,7 @@ def runHttpServer(endpoint: Int, otel: OpenTelemetry): Unit =
   import java.net.InetSocketAddress
   import io.opentelemetry.instrumentation.javahttpserver.JavaHttpServerTelemetry
   RuntimeMetrics.builder(otel)
-    .disableAllFeatures()
+    .disableAllJmx()
     .enableFeature(JfrFeature.CLASS_LOAD_METRICS)
     .enableFeature(JfrFeature.CPU_COUNT_METRICS)
     .enableFeature(JfrFeature.GC_DURATION_METRICS)
