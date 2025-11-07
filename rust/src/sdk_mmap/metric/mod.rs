@@ -8,6 +8,7 @@ use crate::sdk_mmap::data::{self};
 use crate::sdk_mmap::{data::Measurement, CollectorSdk};
 use aggregation::Aggregation;
 use aggregation::AggregationConfig;
+use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use timeseries_id::TimeSeriesIdentity;
 
@@ -53,22 +54,25 @@ impl MetricStorage {
         sdk: &CollectorSdk,
         measurement: Measurement,
     ) -> Result<(), Error> {
-        let aggregator = self
-            .metrics
-            .entry(measurement.metric_ref)
-            .or_insert(MetricAggregator::new(measurement.metric_ref, sdk).await?);
-        // TODO - GC on stale metrics?
-        aggregator.handle(sdk, measurement).await
+        match self.metrics.entry(measurement.metric_ref) {
+            Entry::Vacant(entry) => {
+                entry
+                    .insert(MetricAggregator::new(measurement.metric_ref, sdk).await?)
+                    .handle(sdk, measurement)
+                    .await
+            }
+            Entry::Occupied(mut aggregator) => aggregator.get_mut().handle(sdk, measurement).await,
+        }
     }
 
     /// Collects the metrics in this storage.
     /// TODO - add "end" timestamp.
     pub async fn collect(&self, ctx: &CollectionContext) -> Vec<CollectedMetric> {
         self.metrics
-            .iter()
-            .filter_map(|(m, storage)| {
+            .values()
+            .filter_map(|storage| {
                 storage.collect(ctx).map(|metric| CollectedMetric {
-                    scope_ref: *m,
+                    scope_ref: storage.scope_ref,
                     metric,
                 })
             })
@@ -84,6 +88,8 @@ struct MetricAggregator {
     aggregation: Box<dyn AggregationConfig>,
     /// The active timeseries in this current metric.
     timeseries: BTreeMap<TimeSeriesIdentity, Box<dyn Aggregation>>,
+    /// Reference to an instrumentation scope.
+    scope_ref: i64,
 }
 
 impl MetricAggregator {
@@ -99,6 +105,7 @@ impl MetricAggregator {
             description: definition.description,
             timeseries: BTreeMap::new(),
             aggregation,
+            scope_ref: definition.instrumentation_scope_ref,
         })
     }
 

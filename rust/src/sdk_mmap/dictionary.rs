@@ -71,6 +71,9 @@ impl RawDictionary {
     // Prost, by default, serializes "String" type as the google.proto.String message.
     fn try_read_string(&mut self, index: i64) -> Result<String, Error> {
         let offset = (index as u64 - self.offset) as usize;
+        if (index as u64) < self.offset {
+            return Err(Error::NotFoundInDictionary("string".to_owned(), index));
+        }
         if let Some(mut buf) = self.data.get(offset..) {
             let mut result = String::new();
             let ctx = prost::encoding::DecodeContext::default();
@@ -87,6 +90,18 @@ impl RawDictionary {
         &mut self,
         index: i64,
     ) -> Result<T, Error> {
+        if (index as u64) < self.offset {
+            return Err(Error::NotFoundInDictionary(
+                std::any::type_name::<T>().to_owned(),
+                index,
+            ));
+        }
+        // TODO - debug logs.
+        // println!(
+        //     "Loading {} from index {}",
+        //     std::any::type_name::<T>().to_owned(),
+        //     index
+        // );
         let offset = (index as u64 - self.offset) as usize;
         if let Some(buf) = self.data.get(offset..) {
             return Ok(T::decode_length_delimited(buf)?);
