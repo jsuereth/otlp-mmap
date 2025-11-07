@@ -26,6 +26,14 @@ import io.opentelemetry.sdk.mmap.internal.Dictionary
 import io.opentelemetry.api.metrics.LongHistogramBuilder
 import io.opentelemetry.api.metrics.DoubleHistogram
 import io.opentelemetry.sdk.mmap.internal.SdkMmapRaw
+import io.opentelemetry.api.metrics.LongGaugeBuilder
+import io.opentelemetry.api.metrics.ObservableDoubleGauge
+import io.opentelemetry.api.metrics.ObservableLongGauge
+import io.opentelemetry.api.metrics.ObservableLongUpDownCounter
+import io.opentelemetry.api.metrics.ObservableDoubleUpDownCounter
+import java.util.Timer
+import java.util.TimerTask
+import java.util.concurrent.TimeUnit
 
 
 class MeterProvider(state: MeterProviderState) extends io.opentelemetry.api.metrics.MeterProvider:
@@ -34,7 +42,8 @@ class MeterProvider(state: MeterProviderState) extends io.opentelemetry.api.metr
 
 case class MeterProviderState(
   resource_ref: Long,
-  mmap: SdkMmapRaw)
+  mmap: SdkMmapRaw,
+  timer: Timer)
 
 class MeterBuilder(name: String, provider_state: MeterProviderState) extends io.opentelemetry.api.metrics.MeterBuilder:
   private var version = ""
@@ -48,12 +57,68 @@ class MeterBuilder(name: String, provider_state: MeterProviderState) extends io.
     this
   override def build(): io.opentelemetry.api.metrics.Meter =
     val sid = provider_state.mmap.scopes.intern(provider_state.resource_ref, name, version, schema_url, Attributes.empty())
-    val meter_state = MeterSharedState(sid, provider_state.mmap)
+    val meter_state = MeterSharedState(sid, provider_state.mmap, java.util.ArrayList())
+    // TODO - Configuration for this.
+    val jitter = TimeUnit.SECONDS.toMillis(10)
+    val rate = TimeUnit.SECONDS.toMillis(30)
+    provider_state.timer.scheduleAtFixedRate(meter_state.collectionTask, jitter, rate)
     Meter(meter_state)
 
 case class MeterSharedState(
   scopeId: Long,
-  mmap: SdkMmapRaw)
+  mmap: SdkMmapRaw,
+  async_instruments: java.util.ArrayList[RegisteredMetric]
+):
+  def register(m: RegisteredMetric): Unit =
+    async_instruments.synchronized {
+      async_instruments.add(m)
+    }
+  val collectionTask = new TimerTask:
+    // TODO - set up a time thread to read async instruments.
+    override def run(): Unit =
+      async_instruments.synchronized {
+        async_instruments.forEach(_.collect())
+      }
+
+
+trait RegisteredMetric:
+  def collect(): Unit
+// TODO - implement.
+class RegisteredAsyncLongMetric(mmap: SdkMmapRaw, metric_ref: Long, callback: Consumer[ObservableLongMeasurement])
+extends RegisteredMetric
+with ObservableLongMeasurement:
+  override def record(value: Long): Unit = record(value, Attributes.empty())
+  override def record(value: Long, attributes: Attributes): Unit =
+    val m = MmapProto.Measurement.newBuilder()
+    m.setAsLong(value)
+    m.setMetricRef(metric_ref)
+    // TODO - more efficient attribute handling
+    attributes.forEach((k,v) => {
+      m.addAttributes(AttributeHelper.convertKv(mmap.strings)(k,v))
+    })
+    // TODO - more efficient clock
+    m.setTimeUnixNano(internal.convertInstant(Instant.now()))
+    import internal.data.given
+    mmap.measurements.write(m.build())
+  override def collect(): Unit = callback.accept(this)
+class RegisteredAsyncDoubleMetric(mmap: SdkMmapRaw, metric_ref: Long, callback: Consumer[ObservableDoubleMeasurement]) 
+extends RegisteredMetric
+with ObservableDoubleMeasurement:
+  override def record(value: Double): Unit = record(value, Attributes.empty())
+  override def record(value: Double, attributes: Attributes): Unit =
+    val m = MmapProto.Measurement.newBuilder()
+    m.setAsDouble(value)
+    m.setMetricRef(metric_ref)
+    // TODO - more efficient attribute handling
+    attributes.forEach((k,v) => {
+      m.addAttributes(AttributeHelper.convertKv(mmap.strings)(k,v))
+    })
+    // TODO - more efficient clock
+    m.setTimeUnixNano(internal.convertInstant(Instant.now()))
+    import internal.data.given
+    mmap.measurements.write(m.build())
+  override def collect(): Unit = callback.accept(this)
+
 
 /// Implementation of meter that records metric definitions in a dictionary, and measurements in ringbuffer.
 class Meter(state: MeterSharedState) extends io.opentelemetry.api.metrics.Meter:
@@ -68,7 +133,16 @@ class Meter(state: MeterSharedState) extends io.opentelemetry.api.metrics.Meter:
     .build())
     LongCounterBuilder(state, m)
 
-  override def upDownCounterBuilder(name: String): LongUpDownCounterBuilder = ???
+  override def upDownCounterBuilder(name: String): LongUpDownCounterBuilder =
+    val m = MmapProto.MetricRef.newBuilder()
+    m.setInstrumentationScopeRef(state.scopeId)
+    m.setSum(
+      MmapProto.MetricRef.Sum.newBuilder()
+      .setAggregationTemporality(MmapProto.AggregationTemporality.AGGREGATION_TEMPORALITY_CUMULATIVE)
+      .setIsMonotonic(false)
+      .build()
+    )
+    LongUpDownCounterBuilder(state, m)
 
   override def histogramBuilder(name: String): DoubleHistogramBuilder =
     val m = MmapProto.MetricRef.newBuilder()
@@ -80,8 +154,44 @@ class Meter(state: MeterSharedState) extends io.opentelemetry.api.metrics.Meter:
     )
     DoubleHistogramBuilder(m, state)
 
-  override def gaugeBuilder(name: String): DoubleGaugeBuilder = ???
+  override def gaugeBuilder(name: String): DoubleGaugeBuilder =
+    val m = MmapProto.MetricRef.newBuilder()
+    m.setInstrumentationScopeRef(state.scopeId)
+    m.setGauge(MmapProto.MetricRef.Gauge.newBuilder().build())
+    DoubleGaugeBuilder(state, m)
 
+
+class DoubleGaugeBuilder(state: MeterSharedState, metric: MmapProto.MetricRef.Builder) extends io.opentelemetry.api.metrics.DoubleGaugeBuilder:
+
+  override def buildWithCallback(callback: Consumer[ObservableDoubleMeasurement]): ObservableDoubleGauge =
+    val r = RegisteredAsyncDoubleMetric(state.mmap, state.mmap.metrics.intern(metric.build()), callback)
+    state.register(r)
+    new ObservableDoubleGauge {}
+
+  override def ofLongs(): LongGaugeBuilder = LongGaugeBuilder(state, metric)
+
+  override def setUnit(unit: String): io.opentelemetry.api.metrics.DoubleGaugeBuilder =
+    metric.setUnit(unit)
+    this
+
+  override def setDescription(description: String): io.opentelemetry.api.metrics.DoubleGaugeBuilder =
+    metric.setDescription(description)
+    this
+
+class LongGaugeBuilder(state: MeterSharedState, metric: MmapProto.MetricRef.Builder) extends io.opentelemetry.api.metrics.LongGaugeBuilder:
+
+  override def buildWithCallback(callback: Consumer[ObservableLongMeasurement]): io.opentelemetry.api.metrics.ObservableLongGauge =
+    val r = RegisteredAsyncLongMetric(state.mmap, state.mmap.metrics.intern(metric.build()), callback)
+    state.register(r)
+    new ObservableLongGauge {}
+
+  override def setUnit(unit: String): io.opentelemetry.api.metrics.LongGaugeBuilder =
+    metric.setUnit(unit)
+    this
+
+  override def setDescription(description: String): io.opentelemetry.api.metrics.LongGaugeBuilder =
+    metric.setDescription(description)
+    this
 
 class LongCounterBuilder(state: MeterSharedState, metric: opentelemetry.proto.mmap.v1.Mmap.MetricRef.Builder) extends io.opentelemetry.api.metrics.LongCounterBuilder:
   override def setUnit(unit: String): io.opentelemetry.api.metrics.LongCounterBuilder =
@@ -100,8 +210,9 @@ class LongCounterBuilder(state: MeterSharedState, metric: opentelemetry.proto.mm
     LongCounter(mid, state.mmap)
 
   override def buildWithCallback(callback: Consumer[ObservableLongMeasurement]): ObservableLongCounter = 
-    // TODO - register with something that will issue callbacks.
-    ???
+    val r = RegisteredAsyncLongMetric(state.mmap, state.mmap.metrics.intern(metric.build()), callback)
+    state.register(r)
+    new ObservableLongCounter {}
 
 
 class LongCounter(metric_ref: Long, mmap: SdkMmapRaw) extends io.opentelemetry.api.metrics.LongCounter:
@@ -133,7 +244,9 @@ with io.opentelemetry.api.incubator.metrics.ExtendedDoubleCounterBuilder:
     this
 
   override def buildWithCallback(callback: Consumer[ObservableDoubleMeasurement]): ObservableDoubleCounter =
-    ???
+    val r = RegisteredAsyncDoubleMetric(state.mmap, state.mmap.metrics.intern(metric.build()), callback)
+    state.register(r)
+    new ObservableDoubleCounter {}
 
   override def build(): DoubleCounter =
     val mid = state.mmap.metrics.intern(metric.build())
@@ -155,6 +268,82 @@ class DoubleCounter(metric_ref: Long, mmap: SdkMmapRaw) extends io.opentelemetry
     m.setTimeUnixNano(internal.convertInstant(Instant.now()))
     import internal.data.given
     mmap.measurements.write(m.build())
+
+
+
+class LongUpDownCounterBuilder(state: MeterSharedState, metric: opentelemetry.proto.mmap.v1.Mmap.MetricRef.Builder) extends io.opentelemetry.api.metrics.LongUpDownCounterBuilder:
+  override def setUnit(unit: String): io.opentelemetry.api.metrics.LongUpDownCounterBuilder =
+    metric.setUnit(unit)
+    this
+  override def setDescription(description: String): io.opentelemetry.api.metrics.LongUpDownCounterBuilder =
+      metric.setDescription(description)
+      this
+
+  override def ofDoubles(): DoubleUpDownCounterBuilder =
+    DoubleUpDownCounterBuilder(state, metric)
+
+  override def build(): LongUpDownCounter = 
+    // TODO - memoize the metric
+    val mid = state.mmap.metrics.intern(metric.build())
+    LongUpDownCounter(mid, state.mmap)
+
+  override def buildWithCallback(callback: Consumer[ObservableLongMeasurement]): io.opentelemetry.api.metrics.ObservableLongUpDownCounter = 
+    val r = RegisteredAsyncLongMetric(state.mmap, state.mmap.metrics.intern(metric.build()), callback)
+    state.register(r)
+    new ObservableLongUpDownCounter {}
+
+class DoubleUpDownCounterBuilder(state: MeterSharedState, metric: opentelemetry.proto.mmap.v1.Mmap.MetricRef.Builder) extends io.opentelemetry.api.metrics.DoubleUpDownCounterBuilder:
+  override def setUnit(unit: String): io.opentelemetry.api.metrics.DoubleUpDownCounterBuilder =
+    metric.setUnit(unit)
+    this
+  override def setDescription(description: String): io.opentelemetry.api.metrics.DoubleUpDownCounterBuilder =
+      metric.setDescription(description)
+      this
+
+  override def build(): DoubleUpDownCounter = 
+    // TODO - memoize the metric
+    val mid = state.mmap.metrics.intern(metric.build())
+    DoubleUpDownCounter(mid, state.mmap)
+
+  override def buildWithCallback(callback: Consumer[ObservableDoubleMeasurement]): io.opentelemetry.api.metrics.ObservableDoubleUpDownCounter = 
+    val r = RegisteredAsyncDoubleMetric(state.mmap, state.mmap.metrics.intern(metric.build()), callback)
+    state.register(r)
+    new ObservableDoubleUpDownCounter {}
+
+class LongUpDownCounter(metric_ref: Long, mmap: SdkMmapRaw) extends io.opentelemetry.api.metrics.LongUpDownCounter:
+  override def add(value: Long): Unit = add(value, Attributes.empty())
+  override def add(value: Long, attributes: Attributes): Unit = add(value, attributes, Context.current())
+  override def add(value: Long, attributes: Attributes, context: Context): Unit =
+    val m = MmapProto.Measurement.newBuilder()
+    m.setAsLong(value)
+    m.setMetricRef(metric_ref)
+    // TODO - more efficient attribute handling
+    attributes.forEach((k,v) => {
+      m.addAttributes(AttributeHelper.convertKv(mmap.strings)(k,v))
+    })
+    m.setSpanContext(internal.convertContext(context))
+    // TODO - more efficient clock
+    m.setTimeUnixNano(internal.convertInstant(Instant.now()))
+    import internal.data.given
+    mmap.measurements.write(m.build())
+
+class DoubleUpDownCounter(metric_ref: Long, mmap: SdkMmapRaw) extends io.opentelemetry.api.metrics.DoubleUpDownCounter:
+  override def add(value: Double): Unit = add(value, Attributes.empty())
+  override def add(value: Double, attributes: Attributes): Unit = add(value, attributes, Context.current())
+  override def add(value: Double, attributes: Attributes, context: Context): Unit =
+    val m = MmapProto.Measurement.newBuilder()
+    m.setAsDouble(value)
+    m.setMetricRef(metric_ref)
+    // TODO - more efficient attribute handling
+    attributes.forEach((k,v) => {
+      m.addAttributes(AttributeHelper.convertKv(mmap.strings)(k,v))
+    })
+    m.setSpanContext(internal.convertContext(context))
+    // TODO - more efficient clock
+    m.setTimeUnixNano(internal.convertInstant(Instant.now()))
+    import internal.data.given
+    mmap.measurements.write(m.build())
+
 
 class DoubleHistogramBuilder(metric: MmapProto.MetricRef.Builder, state: MeterSharedState)
 extends io.opentelemetry.api.metrics.DoubleHistogramBuilder

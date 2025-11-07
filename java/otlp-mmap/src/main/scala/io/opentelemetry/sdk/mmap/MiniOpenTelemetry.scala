@@ -8,6 +8,7 @@ import io.opentelemetry.context.propagation.TextMapPropagator
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
 import io.opentelemetry.api.baggage.propagation.W3CBaggagePropagator
 import io.opentelemetry.sdk.trace.IdGenerator
+import java.util.Timer
 
 
 /**
@@ -16,8 +17,8 @@ import io.opentelemetry.sdk.trace.IdGenerator
 class MiniOpenTelemetry(mmap: SdkMmapRaw) extends OpenTelemetry:
   // TODO - Don't use OpenTelemetry SDK for this.
   private val resource_ref = mmap.resources.intern(Resource.getDefault())
-  // TODO - View config
-  private val meters = MeterProvider(MeterProviderState(resource_ref, mmap))
+  // TODO - View config, Async Instrument Config.
+  private val meters = MeterProvider(MeterProviderState(resource_ref, mmap, new Timer))
   private val logs = LoggerProvider(LoggerProviderSharedState(resource_ref, mmap))
   // TODO - Sampling config
   private val spans = TracerProvider(TracerProviderSharedState(resource_ref, mmap, IdGenerator.random()))

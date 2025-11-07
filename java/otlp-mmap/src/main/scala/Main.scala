@@ -87,9 +87,22 @@ def makeSpans(otel: OpenTelemetry): Unit =
 // TODO - use an HTTP server that will generate spans.
 def runHttpServer(endpoint: Int, otel: OpenTelemetry): Unit =
   println(s"Starting server on ${endpoint}")
+  import io.opentelemetry.instrumentation.runtimemetrics.java17.*
   import com.sun.net.httpserver.{HttpContext, HttpServer}
   import java.net.InetSocketAddress
   import io.opentelemetry.instrumentation.javahttpserver.JavaHttpServerTelemetry
+  RuntimeMetrics.builder(otel)
+    .disableAllFeatures()
+    .enableFeature(JfrFeature.CLASS_LOAD_METRICS)
+    .enableFeature(JfrFeature.CPU_COUNT_METRICS)
+    .enableFeature(JfrFeature.GC_DURATION_METRICS)
+    .enableFeature(JfrFeature.LOCK_METRICS)
+    .enableFeature(JfrFeature.CONTEXT_SWITCH_METRICS)
+    .enableFeature(JfrFeature.MEMORY_ALLOCATION_METRICS)
+    .enableFeature(JfrFeature.MEMORY_POOL_METRICS)
+    .enableFeature(JfrFeature.NETWORK_IO_METRICS)
+    .enableFeature(JfrFeature.THREAD_METRICS)
+    .build()
   val server = HttpServer.create(new InetSocketAddress(endpoint), 0)
   val context = server.createContext(
             "/",

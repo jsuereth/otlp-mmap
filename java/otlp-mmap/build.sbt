@@ -16,6 +16,7 @@ lazy val root = project
     libraryDependencies += "org.scalameta" %% "munit" % "1.0.0" % Test,
     libraryDependencies += "com.google.protobuf" % "protobuf-java" % "4.33.0",
     libraryDependencies += "io.opentelemetry.instrumentation" % "opentelemetry-java-http-server" % "2.21.0-alpha",
+    libraryDependencies += "io.opentelemetry.instrumentation" % "opentelemetry-runtime-telemetry-java17" % "2.21.0-alpha",
     assembly / assemblyJarName := "demo.jar",
     assembly / assemblyMergeStrategy := {
        case PathList("META-INF", "versions", _*)           => MergeStrategy.preferProject
