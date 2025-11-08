@@ -1,0 +1,41 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "otel_collector:4317"
+      http:
+        endpoint: "otel_collector:4318"
+        cors:
+          allowed_origins:
+            - "http://*"
+            - "https://*"
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'cadvisor'
+          # Scrape interval for resource metrics
+          scrape_interval: 15s 
+          static_configs:
+            # Point to the cAdvisor service and its metrics port
+            - targets: ['cadvisor:8080']
+exporters:
+  debug:
+  otlp:
+    endpoint: "lgtm:4317"
+    tls:
+      insecure: true
+    sending_queue:
+          enabled: true
+          queue_size: 5000
+          num_consumers: 3
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlp]
+    metrics:
+      receivers: [otlp, prometheus]
+      exporters: [otlp]
+    logs:
+      receivers: [otlp]
+      exporters: [otlp]

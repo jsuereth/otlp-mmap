@@ -17,13 +17,13 @@ services:
     image: otel/opentelemetry-collector-contrib:0.139.0
     volumes:
       - ./otel-config:/otel-config
-    command: ["--config=/otel-config/otel-prometheus-config.yaml"]
+    command: ["--config=/otel-config/otel-lgtm-config.yaml"]
     depends_on:
-      - prometheus
+      - lgtm
     ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "8091:8091"
+      - "4317"
+      - "4318"
+      - "8091"
 
   # The HTTP server with normal java SDK
   java_http_server_sdk:
@@ -32,10 +32,10 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel_collector:4317
       HTTP_ENDPOINT_PORT: 8082
       OTEL_SERVICE_NAME: http_java_sdk
-      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=1
+      OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION: base2_exponential_bucket_histogram
     # TODO - share definiton w/ mmap collector
     ports:
-      - "8082:8082"
+      - "8082"
     depends_on:
       - otel_collector
   # HTTP server that is instrumented, configured to use SDK MMap
@@ -47,10 +47,9 @@ services:
       SDK_MMAP_EXPORTER_FILE: /otlp/export/mmap-throughput.otlp
       HTTP_ENDPOINT_PORT: 8081
       OTEL_SERVICE_NAME: http_java_mmap_sdk
-      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=2
     # TODO - share definiton w/ mmap collector
     ports:
-      - "8081:8081"
+      - "8081"
   # Collector for the MMAP sdk file that will send OTLP to the otel collector.
   mmap_collector:
     image: otel/otlp-mmap-collector:latest
@@ -96,32 +95,25 @@ services:
       - "8090:8080"
     privileged: true
     # Ensures cAdvisor gets enough permissions to monitor the host
-  prometheus:
-    image: prom/prometheus:latest
-    volumes:
-      - ./prometheus-config:/etc/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.enable-otlp-receiver'
-      - '--enable-feature=native-histograms'
-      - '--enable-feature=exemplar-storage'
+  lgtm:
+    # Use the official all-in-one image
+    image: grafana/otel-lgtm:latest
+    container_name: lgtm-backend
     ports:
-      - "9090:9090" # Prometheus UI and OTLP/HTTP endpoint
-    depends_on:
-      - cadvisor
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
+      # Grafana UI
+      - "3000:3000" 
+      - "4317" 
+      - "4318" 
     volumes:
-      - grafana-storage:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      # Persist the data for Prometheus, Loki, and Tempo across restarts
+      - dashboard-data:/data 
+    #environment:
+      # Optional: Troubleshooting
+      # ENABLE_LOGS_ALL: "true" 
     depends_on:
-      - prometheus 
+      # Ensure cAdvisor is running before the collector starts scraping it
+      - cadvisor 
     restart: unless-stopped
 volumes:
-  grafana-storage: {}
+  # Database/Dashbaords
+  dashboard-data: {}
