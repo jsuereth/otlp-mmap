@@ -3,14 +3,24 @@ receivers:
     protocols:
       grpc:
         endpoint: "otel_collector:4317"
+      http:
+        endpoint: "otel_collector:4318"
+        cors:
+          allowed_origins:
+            - "http://*"
+            - "https://*"
 exporters:
   debug:
-  prometheus:
-    endpoint: "otel_collector:8091"
-    send_timestamps: true
-    resource_to_telemetry_conversion:
-      enabled: true
+  otlphttp/prometheus:
+    endpoint: "http://prometheus:9090/api/v1/otlp"
+    tls:
+      insecure: true
+    sending_queue:
+          enabled: true
+          queue_size: 5000
+          num_consumers: 3
 processors:
+  batch:
   transform:
     metric_statements:
       - context: datapoint
@@ -27,7 +37,7 @@ service:
       - transform
       exporters:
       - debug
-      - prometheus
+      - otlphttp/prometheus
     logs:
       receivers: [otlp]
       exporters: [debug]

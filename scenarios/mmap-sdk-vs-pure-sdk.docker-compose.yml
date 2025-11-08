@@ -18,6 +18,8 @@ services:
     volumes:
       - ./otel-config:/otel-config
     command: ["--config=/otel-config/otel-prometheus-config.yaml"]
+    depends_on:
+      - prometheus
     ports:
       - "4317:4317"
       - "4318:4318"
@@ -34,6 +36,8 @@ services:
     # TODO - share definiton w/ mmap collector
     ports:
       - "8082:8082"
+    depends_on:
+      - otel_collector
   # HTTP server that is instrumented, configured to use SDK MMap
   java_http_server_mmap_sdk:
     image: otel/mmap-demo:latest
@@ -59,6 +63,7 @@ services:
     # TODO - share definiton w/ demo
     volumes: 
       - ./export:/otlp/export
+    restart: unless-stopped
   # Load tester for our HTTP server
   k6_mmap_loadtester:
     image: grafana/k6:latest
@@ -99,10 +104,24 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.enable-otlp-receiver'
-      - '--web.enable-remote-write-receiver'
       - '--enable-feature=native-histograms'
+      - '--enable-feature=exemplar-storage'
     ports:
       - "9090:9090" # Prometheus UI and OTLP/HTTP endpoint
     depends_on:
       - cadvisor
-      - otel_collector
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus 
+    restart: unless-stopped
+volumes:
+  grafana-storage: {}

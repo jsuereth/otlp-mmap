@@ -7,7 +7,7 @@ export let options = {
     // Ramp up to 20 Virtual Users over 10 seconds
     { duration: '10s', target: 200 },
     // Stay at 20 VUs for some time
-    { duration: '120s', target: 200 },
+    { duration: '600s', target: 200 },
     // Ramp down to 0 VUs over 5 seconds
     { duration: '5s', target: 0 },
   ],

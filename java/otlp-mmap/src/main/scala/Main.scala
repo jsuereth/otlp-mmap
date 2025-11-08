@@ -35,7 +35,7 @@ val EXPORT_META_DIRECTORY = new File("../../export")
         measurements = RingBufferOptions(512,64),
         spans = RingBufferOptions(512,64),
       ))))
-    case (None, _, Some(otlp_endpoint)) => initOtel(StartupChoice.OtelSdk(OtlpHttpSpanExporter.builder().setEndpoint(otlp_endpoint).build()))
+    case (None, _, Some(otlp_endpoint)) => initOtel(StartupChoice.NormalOtel(otlp_endpoint))
     case _ => initOtel(StartupChoice.OtelSdk(OtlpMmapExporter(EXPORT_META_DIRECTORY).spanExporter))
   // TODO - metrics.
   http_endpoint match
@@ -45,12 +45,23 @@ val EXPORT_META_DIRECTORY = new File("../../export")
 
 enum StartupChoice:
   case MmapSdk(mmap: SdkMmapRaw)
+  case NormalOtel(endpoint: String)
   case OtelSdk(exporter: SpanExporter)
 
 
 
 def initOtel(choice: StartupChoice): OpenTelemetry =
   choice match
+    case StartupChoice.NormalOtel(endpoint) => 
+      AutoConfiguredOpenTelemetrySdk
+      .builder()
+      .addPropertiesSupplier(() => java.util.Map.of(
+        "otel.traces.exporter", "otlp", 
+        "otel.metrics.exporter", "otlp",
+        "otel.logs.exporter", "otlp",
+        "otel.exporter.otlp.endpoint", endpoint,
+      ))
+      .build().getOpenTelemetrySdk()
     case StartupChoice.OtelSdk(exporter) =>
         AutoConfiguredOpenTelemetrySdk.builder()
         .addPropertiesSupplier(() => java.util.Map.of(

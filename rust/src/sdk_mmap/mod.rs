@@ -137,18 +137,18 @@ impl CollectorSdk {
         &self,
         mut endpoint: LogsServiceClient<tonic::transport::Channel>,
     ) -> Result<(), Error> {
-        let mut batch_idx = 1;
+        // let mut batch_idx = 1;
         let mut collector = EventCollector::new();
         loop {
             // TODO - config.
             // println!("Batching logs");
             if let Some(log_batch) = collector
-                .try_create_next_batch(&self, 100, Duration::from_secs(60))
+                .try_create_next_batch(&self, 1000, Duration::from_secs(60))
                 .await?
             {
                 // println!("Sending log batch #{batch_idx}");
                 endpoint.export(log_batch).await?;
-                batch_idx += 1;
+                // batch_idx += 1;
             }
         }
     }
@@ -173,7 +173,7 @@ impl CollectorSdk {
             // TODO - Config
             // println!("Batching spans");
             let span_batch = spans
-                .try_buffer_spans(self, self, 100, Duration::from_secs(60))
+                .try_buffer_spans(self, self, 1000, Duration::from_secs(60))
                 .await?;
             let next_batch = self.try_create_span_batch(span_batch).await?;
             if !next_batch.resource_spans.is_empty() {
