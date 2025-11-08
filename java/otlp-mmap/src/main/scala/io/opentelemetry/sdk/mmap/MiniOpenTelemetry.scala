@@ -38,7 +38,8 @@ class MiniOpenTelemetry(mmap: SdkMmapRaw) extends OpenTelemetry:
   )
   override def getPropagators(): ContextPropagators = propagators
   override def getTracerProvider(): io.opentelemetry.api.trace.TracerProvider = 
-    println("Someone is getting the tracer provider")
+    // println("Someone is getting the tracer provider")
+    // (new RuntimeException("check stack")).printStackTrace()
     spans
   override def getMeterProvider(): io.opentelemetry.api.metrics.MeterProvider = meters
   override def getLogsBridge(): io.opentelemetry.api.logs.LoggerProvider = logs

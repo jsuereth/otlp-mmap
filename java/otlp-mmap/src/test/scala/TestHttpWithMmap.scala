@@ -37,13 +37,21 @@ class TestHttpWithMmap extends FunSuite:
 
         // Start HTTP server
         val server = Util.startHttpServer(otel, 9091)
-        // Now do our test.
-        val response = httpGet("http://localhost:9091")
-        assertEquals(response.statusCode(), 200)
+        try
+            // Now do our test.
+            val response = httpGet("http://localhost:9091")
+            assertEquals(response.statusCode(), 200)
 
-        // Now check for spans.
-        assertEquals(true, mmap.spans.hasEvents())
-        val start_event = mmap.spans.readNextBuffer()
-        assertEquals(start_event.getStart().getName, "GET /")
-        server.stop(0)
+            // Now check for spans.
+            assertEquals(true, mmap.spans.hasEvents())
+            val start_event = mmap.spans.readNextBuffer()
+            assertEquals(start_event.getStart().getName, "GET /")
+            // TODO - read all intermediate events.
+            while mmap.spans.hasEvents()
+            do
+                val event = mmap.spans.readNextBuffer()
+                if event.hasEnd()
+                then
+                    assert(event.getEnd().getEndTimeUnixNano() != 0, s"End span does not include timestamp: ${event}")
+        finally server.stop(0)
     }

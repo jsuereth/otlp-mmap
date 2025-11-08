@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit
 
 class MeterProvider(state: MeterProviderState) extends io.opentelemetry.api.metrics.MeterProvider:
   override def meterBuilder(instrumentationScopeName: String): MeterBuilder =
+    println(s"Building meter: ${instrumentationScopeName}")
     MeterBuilder(instrumentationScopeName, state)
 
 case class MeterProviderState(
@@ -48,6 +49,7 @@ case class MeterProviderState(
 class MeterBuilder(name: String, provider_state: MeterProviderState) extends io.opentelemetry.api.metrics.MeterBuilder:
   private var version = ""
   private var schema_url = ""
+
   
   override def setInstrumentationVersion(instrumentationScopeVersion: String): io.opentelemetry.api.metrics.MeterBuilder = 
     version = instrumentationScopeVersion
@@ -124,6 +126,7 @@ with ObservableDoubleMeasurement:
 class Meter(state: MeterSharedState) extends io.opentelemetry.api.metrics.Meter:
 
   override def counterBuilder(name: String): LongCounterBuilder = 
+    println(s"Building counter: ${name}")
     val m = MmapProto.MetricRef.newBuilder()
     m.setName(name)
     m.setInstrumentationScopeRef(state.scopeId)
