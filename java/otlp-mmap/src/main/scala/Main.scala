@@ -14,6 +14,7 @@ import java.io.RandomAccessFile
 import io.opentelemetry.sdk.mmap.internal.SdkMmapOptions
 import io.opentelemetry.sdk.mmap.internal.RingBufferOptions
 import java.io.PrintWriter
+import java.util.UUID
 
 val EXPORT_META_DIRECTORY = new File("../../export")
 
@@ -35,7 +36,7 @@ val EXPORT_META_DIRECTORY = new File("../../export")
         measurements = RingBufferOptions(512,64),
         spans = RingBufferOptions(512,64),
       ))))
-    case (None, _, Some(otlp_endpoint)) => initOtel(StartupChoice.OtelSdk(OtlpHttpSpanExporter.builder().setEndpoint(otlp_endpoint).build()))
+    case (None, _, Some(otlp_endpoint)) => initOtel(StartupChoice.NormalOtel(otlp_endpoint))
     case _ => initOtel(StartupChoice.OtelSdk(OtlpMmapExporter(EXPORT_META_DIRECTORY).spanExporter))
   // TODO - metrics.
   http_endpoint match
@@ -44,6 +45,7 @@ val EXPORT_META_DIRECTORY = new File("../../export")
   
 
 enum StartupChoice:
+  case NormalOtel(endpoint: String)
   case MmapSdk(mmap: SdkMmapRaw)
   case OtelSdk(exporter: SpanExporter)
 
@@ -51,6 +53,24 @@ enum StartupChoice:
 
 def initOtel(choice: StartupChoice): OpenTelemetry =
   choice match
+    // TODO - This configures a batch export.
+    // OTLP-MMAP does synchronous export - however given batching is the default, we need to compare our
+    // performance against it.
+    case StartupChoice.NormalOtel(endpoint) => 
+      AutoConfiguredOpenTelemetrySdk
+      .builder()
+      .addPropertiesSupplier(() => java.util.Map.of(
+        "otel.traces.exporter", "otlp", 
+        "otel.metrics.exporter", "otlp",
+        "otel.logs.exporter", "otlp",
+        "otel.exporter.otlp.endpoint", endpoint,
+      ))
+      .addResourceCustomizer((r,prop) => {
+        r.toBuilder()
+        .put("service.instance.id", UUID.randomUUID().toString())
+        .build()
+      })
+      .build().getOpenTelemetrySdk()
     case StartupChoice.OtelSdk(exporter) =>
         AutoConfiguredOpenTelemetrySdk.builder()
         .addPropertiesSupplier(() => java.util.Map.of(
@@ -87,35 +107,7 @@ def makeSpans(otel: OpenTelemetry): Unit =
 // TODO - use an HTTP server that will generate spans.
 def runHttpServer(endpoint: Int, otel: OpenTelemetry): Unit =
   println(s"Starting server on ${endpoint}")
-  import io.opentelemetry.instrumentation.runtimemetrics.java17.*
-  import com.sun.net.httpserver.{HttpContext, HttpServer}
-  import java.net.InetSocketAddress
-  import io.opentelemetry.instrumentation.javahttpserver.JavaHttpServerTelemetry
-  RuntimeMetrics.builder(otel)
-    .disableAllJmx()
-    .enableFeature(JfrFeature.CLASS_LOAD_METRICS)
-    .enableFeature(JfrFeature.CPU_COUNT_METRICS)
-    .enableFeature(JfrFeature.GC_DURATION_METRICS)
-    .enableFeature(JfrFeature.LOCK_METRICS)
-    .enableFeature(JfrFeature.CONTEXT_SWITCH_METRICS)
-    .enableFeature(JfrFeature.MEMORY_ALLOCATION_METRICS)
-    .enableFeature(JfrFeature.MEMORY_POOL_METRICS)
-    .enableFeature(JfrFeature.NETWORK_IO_METRICS)
-    .enableFeature(JfrFeature.THREAD_METRICS)
-    .build()
-  val server = HttpServer.create(new InetSocketAddress(endpoint), 0)
-  val context = server.createContext(
-            "/",
-            ctx => {
-              // TODO - Update this if needed.
-              val body = "Hello"
-              ctx.sendResponseHeaders(200, body.length())
-              otel.getTracer("test").spanBuilder("test").startSpan().end()
-              val out = new PrintWriter(ctx.getResponseBody())
-              out.print(body)
-              out.close()
-            });
-  JavaHttpServerTelemetry.create(otel).configure(context)
-  server.start()
+  Util.startJvmMetrics(otel)
+  Util.startHttpServer(otel, endpoint)
   // TOOD - should we wait for server to stop?
   ()

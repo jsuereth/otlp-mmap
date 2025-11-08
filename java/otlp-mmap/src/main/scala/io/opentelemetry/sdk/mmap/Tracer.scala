@@ -21,10 +21,12 @@ import io.opentelemetry.api.trace.TraceId
 import io.opentelemetry.api.trace.TraceState
 import io.opentelemetry.sdk.trace.IdGenerator
 
-class TracerProvider(state: TracerProviderSharedState) extends io.opentelemetry.api.trace.TracerProvider:
+class TracerProvider(state: TracerProviderSharedState) 
+extends io.opentelemetry.api.trace.TracerProvider:
   override def get(instrumentationScopeName: String): io.opentelemetry.api.trace.Tracer = get(instrumentationScopeName, "")
   override def get(instrumentationScopeName: String, instrumentationScopeVersion: String): io.opentelemetry.api.trace.Tracer =
-    val scope_ref = state.mmap.scopes.intern(state.resourceId, instrumentationScopeName, instrumentationScopeVersion, "", Attributes.empty())
+    System.err.println(s"Creating tracer: ${instrumentationScopeName}")
+    val scope_ref = state.mmap.scopes.intern(state.resourceId, instrumentationScopeName, instrumentationScopeVersion, "", Attributes.empty())    
     Tracer(TracerSharedState(scope_ref, state.mmap, state.id_generator))
 
 case class TracerProviderSharedState(
@@ -36,6 +38,7 @@ case class TracerSharedState(scopeId: Long, mmap: SdkMmapRaw, id_generator: IdGe
 
 class Tracer(state: TracerSharedState) extends io.opentelemetry.api.trace.Tracer:
   override def spanBuilder(spanName: String): SpanBuilder =
+    System.err.println(s"Starting span: ${spanName}")
     val event = MmapProto.SpanEvent.newBuilder()
     event.setScopeRef(state.scopeId)
     event.getStartBuilder.setName(spanName)
