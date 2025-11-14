@@ -21,21 +21,39 @@ import io.opentelemetry.api.trace.TraceId
 import io.opentelemetry.api.trace.TraceState
 import io.opentelemetry.sdk.trace.IdGenerator
 
-class TracerProvider(state: TracerProviderSharedState) extends io.opentelemetry.api.trace.TracerProvider:
-  override def get(instrumentationScopeName: String): io.opentelemetry.api.trace.Tracer = get(instrumentationScopeName, "")
+class TracerProvider(state: TracerProviderSharedState) 
+extends io.opentelemetry.api.trace.TracerProvider:
+  override def get(instrumentationScopeName: String): io.opentelemetry.api.trace.Tracer = 
+    tracerBuilder(instrumentationScopeName).build()
   override def get(instrumentationScopeName: String, instrumentationScopeVersion: String): io.opentelemetry.api.trace.Tracer =
-    val scope_ref = state.mmap.scopes.intern(state.resourceId, instrumentationScopeName, instrumentationScopeVersion, "", Attributes.empty())
-    Tracer(TracerSharedState(scope_ref, state.mmap, state.id_generator))
+    tracerBuilder(instrumentationScopeName).setInstrumentationVersion(instrumentationScopeVersion).build()
+
+  override def tracerBuilder( instrumentationScopeName: String): io.opentelemetry.api.trace.TracerBuilder =
+    TracerBuilder(instrumentationScopeName, state)
 
 case class TracerProviderSharedState(
   resourceId: Long,
   mmap: SdkMmapRaw,
   // TODO - create our own id generator instead of depending on otel SDK.
   id_generator: IdGenerator)
+
+class TracerBuilder(name: String, shared: TracerProviderSharedState) extends io.opentelemetry.api.trace.TracerBuilder:
+  private var version = ""
+  private var schema_url: String = ""
+  override def setInstrumentationVersion(instrumentationScopeVersion: String): io.opentelemetry.api.trace.TracerBuilder =
+    version = instrumentationScopeVersion
+    this
+  override def setSchemaUrl(schemaUrl: String): io.opentelemetry.api.trace.TracerBuilder = 
+    schema_url = schemaUrl
+    this
+  override def build(): io.opentelemetry.api.trace.Tracer =
+    Tracer(TracerSharedState(shared.mmap.scopes.intern(shared.resourceId, name, version, schema_url, Attributes.empty()), shared.mmap, shared.id_generator))
+
 case class TracerSharedState(scopeId: Long, mmap: SdkMmapRaw, id_generator: IdGenerator)
 
 class Tracer(state: TracerSharedState) extends io.opentelemetry.api.trace.Tracer:
   override def spanBuilder(spanName: String): SpanBuilder =
+    // System.err.println(s"Starting span: ${spanName}")
     val event = MmapProto.SpanEvent.newBuilder()
     event.setScopeRef(state.scopeId)
     event.getStartBuilder.setName(spanName)

@@ -9,14 +9,22 @@ import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
 import io.opentelemetry.api.baggage.propagation.W3CBaggagePropagator
 import io.opentelemetry.sdk.trace.IdGenerator
 import java.util.Timer
+import java.util.UUID
 
 
 /**
   * An implementation of the OpenTelemetry APIs that tries to push as much as possible into the SDK-MMAP file as possible.
   */
 class MiniOpenTelemetry(mmap: SdkMmapRaw) extends OpenTelemetry:
+  val resource = Resource.builder()
+  .put("telemetry.sdk.language","java")
+  .put("telemetry.sdk.name","opentelemetry-mmap")
+  .put("telemetry.sdk.version", "0.1-alpha")
+  .put("service.name", sys.env.get("OTEL_SERVICE_NAME").getOrElse("unknown-service"))
+  .put("service.instance.id", UUID.randomUUID().toString())
+  .build();
   // TODO - Don't use OpenTelemetry SDK for this.
-  private val resource_ref = mmap.resources.intern(Resource.getDefault())
+  private val resource_ref = mmap.resources.intern(resource)
   // TODO - View config, Async Instrument Config.
   private val meters = MeterProvider(MeterProviderState(resource_ref, mmap, new Timer))
   private val logs = LoggerProvider(LoggerProviderSharedState(resource_ref, mmap))
@@ -29,7 +37,10 @@ class MiniOpenTelemetry(mmap: SdkMmapRaw) extends OpenTelemetry:
     )
   )
   override def getPropagators(): ContextPropagators = propagators
-  override def getTracerProvider(): io.opentelemetry.api.trace.TracerProvider = spans
+  override def getTracerProvider(): io.opentelemetry.api.trace.TracerProvider = 
+    // println("Someone is getting the tracer provider")
+    // (new RuntimeException("check stack")).printStackTrace()
+    spans
   override def getMeterProvider(): io.opentelemetry.api.metrics.MeterProvider = meters
   override def getLogsBridge(): io.opentelemetry.api.logs.LoggerProvider = logs
 

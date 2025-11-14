@@ -85,6 +85,11 @@ final class RingBuffer(
     // Ring buffer
     (header.buffer_size.get() * header.num_buffers.get())
 
+  def hasEvents(): Boolean =
+    val readerPosition = header.read_position.getVolatile()
+    val nextRead = readerPosition+1
+    availability.isAvailable(nextRead)
+
   private def hasWriteCapacity(currentIdx: Long): Boolean =
     // We calculate as far "back" in the ring buffer index
     // we can go before we'd overwrite something waiting to be read.

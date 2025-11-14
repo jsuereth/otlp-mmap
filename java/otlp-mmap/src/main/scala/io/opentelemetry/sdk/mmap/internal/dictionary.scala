@@ -18,7 +18,7 @@ final class DictionaryHeader(val segment: MemorySegment) extends Header:
 final class Dictionary(header: DictionaryHeader, channel: FileChannel):
     def write[A: Writable](value: A): Long = 
         val id = value.intern(this)
-        println(s"Creating dictionary entry ${summon[Writable[A]].getClass.getName()} @ ${id}")
+        // println(s"Creating dictionary entry ${summon[Writable[A]].getClass.getName()} @ ${id}")
         id
     def writeEntry(size: Long)(writer: ByteBuffer => Unit): Long =
         // Reserve space for the next entry.
