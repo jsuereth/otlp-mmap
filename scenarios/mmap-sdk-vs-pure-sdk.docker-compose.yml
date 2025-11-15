@@ -66,20 +66,33 @@ services:
   # Load tester for our HTTP server
   k6_mmap_loadtester:
     image: grafana/k6:latest
-    command: ["run", "/config/k6-load-test.js"]
+    command: ["run", "-o", "experimental-opentelemetry", "/config/k6-load-test.js"]
     environment:
       TARGET_URL: http://java_http_server_mmap_sdk:8081/
+      K6_OTEL_SERVICE_NAME: java_http_mmap_load_test
+      K6_OTEL_FLUSH_INTERVAL: 10s
+      K6_OTEL_EXPORTER_TYPE: grpc
+      K6_OTEL_GRPC_EXPORTER_INSECURE: true
+      K6_OTEL_GRPC_EXPORTER_ENDPOINT: lgtm:4317
+      K6_OTEL_METRIC_PREFIX: k6_
     depends_on:
       - java_http_server_mmap_sdk
     volumes: 
       - ./k6-config:/config
   k6_sdk_loadtester:
     image: grafana/k6:latest
-    command: ["run", "/config/k6-load-test.js"]
+    command: ["run", "-o", "experimental-opentelemetry", "/config/k6-load-test.js"]
     environment:
       TARGET_URL: http://java_http_server_sdk:8082/
+      K6_OTEL_SERVICE_NAME: java_http_sdk_load_test
+      K6_OTEL_FLUSH_INTERVAL: 10s
+      K6_OTEL_EXPORTER_TYPE: grpc
+      K6_OTEL_GRPC_EXPORTER_INSECURE: true
+      K6_OTEL_GRPC_EXPORTER_ENDPOINT: lgtm:4317
+      K6_OTEL_METRIC_PREFIX: k6_
     depends_on:
       - java_http_server_sdk
+      - lgtm
     volumes: 
       - ./k6-config:/config
   # cAdvisor (Collects container CPU and Memory metrics)
@@ -106,7 +119,8 @@ services:
       - "4318" 
     volumes:
       # Persist the data for Prometheus, Loki, and Tempo across restarts
-      - dashboard-data:/data 
+      - dashboard-data:/data
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
     #environment:
       # Optional: Troubleshooting
       # ENABLE_LOGS_ALL: "true" 
