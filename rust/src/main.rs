@@ -51,15 +51,15 @@ async fn run_sdk_mmap(otlp_url: &str, export_file: PathBuf) -> Result<(), Error>
     // TODO - wait for all to finish or crash?
     tokio::select! {
         r = trace_pipeline => {
-            println!("Trace completed");
+            println!("Trace completed {:?}", r);
             let _ = r?;
         },
         r = log_pipeline => {
-            println!("Logs completed");
+            println!("Logs completed {:?}", r);
             let _ = r?;
         },
         r = metric_pipeline => {
-            println!("Metrics completed");
+            println!("Metrics completed {:?}", r);
             let _ = r?;
         },
     }

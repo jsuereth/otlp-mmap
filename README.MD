@@ -67,9 +67,11 @@ See [Protocol](PROTOCOL.MD) for details on the file contents and layout.
   - Basic k6 test for a server
   - [ ] Max throughput tests
 - [ ] Benchmarks
-    - Memory usage of traditonal otlp exporter vs. MMap-Writer + MMap-collector combined
-    - CPU usage of traditional otlp-exporter vs. MMap-Writer + Collector
-    - Memory overhead of primary process
+    - Traditonal (batch) otlp exporter vs. MMap-Writer + MMap-collector combined
+      - CPU usage
+      - Memory overhead of primary process
+      - Garbage Collection pressure
+    - Figure out if we have "quick wins" in synchronous event export path in Java MMAP SDK.
 - File format experiements
   - [X] variable sized entry dictionary
   - [X] Metric file format
@@ -82,4 +84,8 @@ See [Protocol](PROTOCOL.MD) for details on the file contents and layout.
   - [X] Directly keeping metric aggregations in mmap
   - [X] Directly writing span start/stop/event to ringbuffer
   - [ ] Use instrument hints in metric aggregations in mmap.
+- Resiliency
+  - [ ] Detect File resets
+  - [ ] MMAP Collector retry-batch
+  - [ ] Restart MMap collector when needed
 - Comparison w/ eBPF techniques

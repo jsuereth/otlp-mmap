@@ -1,0 +1,43 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "otel_collector:4317"
+      http:
+        endpoint: "otel_collector:4318"
+        cors:
+          allowed_origins:
+            - "http://*"
+            - "https://*"
+exporters:
+  debug:
+  otlphttp/prometheus:
+    endpoint: "http://prometheus:9090/api/v1/otlp"
+    tls:
+      insecure: true
+    sending_queue:
+          enabled: true
+          queue_size: 5000
+          num_consumers: 3
+processors:
+  batch:
+  transform:
+    metric_statements:
+      - context: datapoint
+        statements:
+        - set(attributes["service"], resource.attributes["service.name"])
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [debug]
+    metrics:
+      receivers: [ otlp ]
+      processors:
+      - transform
+      exporters:
+      - debug
+      - otlphttp/prometheus
+    logs:
+      receivers: [otlp]
+      exporters: [debug]
