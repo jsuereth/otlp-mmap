@@ -18,7 +18,7 @@ import io.opentelemetry.api.trace.SpanId
 import io.opentelemetry.api.trace.TraceFlags
 import io.opentelemetry.api.trace.TraceId
 import io.opentelemetry.api.trace.TraceState
-import io.opentelemetry.sdk.trace.IdGenerator
+import io.opentelemetry.sdk.internal.IdGenerator
 
 class TracerProvider(state: TracerProviderSharedState) 
 extends io.opentelemetry.api.trace.TracerProvider:

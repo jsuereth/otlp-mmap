@@ -3,26 +3,27 @@ package io.opentelemetry.sdk.mmap
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.context.propagation.ContextPropagators
 import io.opentelemetry.sdk.mmap.internal.SdkMmapRaw
-import io.opentelemetry.sdk.resources.Resource
 import io.opentelemetry.context.propagation.TextMapPropagator
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
 import io.opentelemetry.api.baggage.propagation.W3CBaggagePropagator
-import io.opentelemetry.sdk.trace.IdGenerator
 import java.util.Timer
 import java.util.UUID
+import io.opentelemetry.sdk.internal.IdGenerator
+import io.opentelemetry.api.common.Attributes
+import io.opentelemetry.sdk.mmap.internal.data.Resource
 
 
 /**
   * An implementation of the OpenTelemetry APIs that tries to push as much as possible into the SDK-MMAP file as possible.
   */
 class MiniOpenTelemetry(mmap: SdkMmapRaw) extends OpenTelemetry:
-  val resource = Resource.builder()
+  val resource = Resource(Attributes.builder()
   .put("telemetry.sdk.language","java")
   .put("telemetry.sdk.name","opentelemetry-mmap")
   .put("telemetry.sdk.version", "0.1-alpha")
   .put("service.name", sys.env.get("OTEL_SERVICE_NAME").getOrElse("unknown-service"))
   .put("service.instance.id", UUID.randomUUID().toString())
-  .build();
+  .build());
   // TODO - Don't use OpenTelemetry SDK for this.
   private val resource_ref = mmap.resources.intern(resource)
   // TODO - View config, Async Instrument Config.

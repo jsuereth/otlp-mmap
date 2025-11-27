@@ -5,7 +5,7 @@ import io.opentelemetry.api.common.AttributeType
 import io.opentelemetry.api.common.AttributeKey
 
 object AttributeHelper:
-    def convertKv(strings: StringDictionary)(k: AttributeKey[_], v: Any): opentelemetry.proto.mmap.v1.Mmap.KeyValueRef =
+    def convertKv(strings: StringDictionary)(k: AttributeKey[?], v: Any): opentelemetry.proto.mmap.v1.Mmap.KeyValueRef =
         val kv = opentelemetry.proto.mmap.v1.Mmap.KeyValueRef.newBuilder()
         kv.setKeyRef(strings.intern(k.getKey()))
         k.getType match

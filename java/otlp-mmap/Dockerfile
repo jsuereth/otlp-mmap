@@ -4,6 +4,7 @@ WORKDIR /build
 # COPY IMPORTANT FILES
 COPY build.sbt /build/build.sbt
 COPY src /build/src
+COPY mmapsdk/src /build/mmapsdk/src
 COPY project/build.properties /build/project/build.properties
 COPY project/plugins.sbt /build/project/plugins.sbt
 

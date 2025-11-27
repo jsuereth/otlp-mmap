@@ -47,6 +47,8 @@ characteristics of the MMAP SDK on larger servers. This demo will:
 - Record all metrics/spans/events from these servers in an LGTM container.
 - Record cadvisor metrics from these servers into an LGTM container.
 
+You can view collected metrics at http://localhost:3000/ via Grafana.
+
 This is an ideal test for checking *pure overhead* of using MMAP vs. a traditional SDK. This is because the Java HTTP server does *very little* so most deviations in latency, CPU or Memory usage is purely from the overhead of instrumentation and OpenTelemetry.
 This will *not* give accurate numbers on a real-world HTTP server for overhead, but instead can be used to find bottlenecks,
 assess macro-performance issues (e.g. cpu contention) and otherwise tune the MMAP SDK.

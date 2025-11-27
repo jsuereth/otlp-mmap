@@ -1,7 +1,6 @@
 package io.opentelemetry.sdk.mmap.internal
 package data
 
-import io.opentelemetry.sdk.common.InstrumentationScopeInfo
 import io.opentelemetry.api.common.Attributes
 
 class ScopeDictionary(d: Dictionary, strings: StringDictionary):
