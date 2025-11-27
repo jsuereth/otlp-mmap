@@ -1,6 +1,6 @@
 //! Gauge Aggregation
 
-use crate::oltp_mmap::Error;
+use crate::sdk_mmap::Error;
 
 /// Configuration for a Gauge aggregation.
 pub struct GaugeAggregationConfig {}

@@ -1,7 +1,7 @@
 //! Timeseries identity helpers.
 
 use crate::{
-    oltp_mmap::Error,
+    sdk_mmap::Error,
     sdk_mmap::{data::KeyValueRef, CollectorSdk},
 };
 

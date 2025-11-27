@@ -1,4 +1,4 @@
-package io.opentelemetry.otlp.mmap.internal
+package io.opentelemetry.sdk.mmap.internal
 
 import java.nio.ByteBuffer
 import java.io.OutputStream

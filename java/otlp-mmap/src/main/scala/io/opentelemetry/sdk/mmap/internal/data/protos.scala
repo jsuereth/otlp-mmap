@@ -3,7 +3,7 @@ package data
 
 import com.google.protobuf.MessageLite
 import java.nio.ByteBuffer
-import io.opentelemetry.otlp.mmap.internal.ByteBufferOutputStream
+import io.opentelemetry.sdk.mmap.internal.ByteBufferOutputStream
 
 given [T <: MessageLite]: Writable[T] with
   extension (data: T) override def write(buffer: ByteBuffer): Unit = 

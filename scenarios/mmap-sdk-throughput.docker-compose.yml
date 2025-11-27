@@ -6,6 +6,8 @@
 # A machine-local (but separate container) collector reads the file
 # and processes data into actual OTLP which is sent to an
 # OpenTelemetry collector
+#
+# This leverages k6 to push HTTP requests at the server quickly.
 x-otlp-mmap-volume:
   &otlp-mmap-volume
   type: bind
@@ -24,7 +26,7 @@ services:
       - cadvisor # Avoid starting until cadvisor is up.
   # The actual HTTP server that is instrumented.
   java_http_server:
-    image: otel/mmap-demo:latest
+    image: ghcr.io/jsuereth/mmap-demo:main
     volumes: 
       - ./export:/otlp/export
     environment:
@@ -35,7 +37,7 @@ services:
       - "8081:8081"
   # Collector for the MMAP sdk file that will send OTLP to the otel collector.
   mmap_collector:
-    image: otel/otlp-mmap-collector:latest
+    image: ghcr.io/jsuereth/mmap-collector:main
     depends_on:
       - otel_collector
       - java_http_server

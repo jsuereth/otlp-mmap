@@ -13,7 +13,7 @@ use std::{
 use memmap2::MmapMut;
 use tokio::sync::Mutex;
 
-use crate::oltp_mmap::Error;
+use crate::sdk_mmap::Error;
 
 /// Async access to RingBuffer inputs.
 ///

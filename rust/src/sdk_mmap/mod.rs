@@ -2,19 +2,18 @@
 
 pub mod data;
 pub mod dictionary;
+mod error;
 mod log;
 mod metric;
 pub mod reader;
 pub mod ringbuffer;
 mod trace;
 
-use crate::{
-    oltp_mmap::Error,
-    sdk_mmap::{
-        data::KeyValueRef,
-        log::EventCollector,
-        metric::{CollectedMetric, MetricStorage},
-    },
+pub use crate::sdk_mmap::error::Error;
+use crate::sdk_mmap::{
+    data::KeyValueRef,
+    log::EventCollector,
+    metric::{CollectedMetric, MetricStorage},
 };
 use opentelemetry_proto::tonic::collector::{
     logs::v1::logs_service_client::LogsServiceClient,

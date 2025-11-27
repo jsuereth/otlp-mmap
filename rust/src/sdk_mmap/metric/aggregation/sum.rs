@@ -32,7 +32,7 @@ impl super::Aggregation for SumAggregation {
     fn join(
         &mut self,
         m: crate::sdk_mmap::data::Measurement,
-    ) -> Result<(), crate::oltp_mmap::Error> {
+    ) -> Result<(), crate::sdk_mmap::Error> {
         // TODO - exemplars, timestamps, etc.
         if let Some(v) = m.value {
             match v {

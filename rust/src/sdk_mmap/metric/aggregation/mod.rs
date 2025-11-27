@@ -1,11 +1,9 @@
 //! Aggregation extraction for metric SDK implementation.
 
-use crate::{
-    oltp_mmap::Error,
-    sdk_mmap::{
-        data::{self, Measurement},
-        metric::{CollectionContext, TimeSeriesIdentity},
-    },
+use crate::sdk_mmap::{
+    data::{self, Measurement},
+    metric::{CollectionContext, TimeSeriesIdentity},
+    Error,
 };
 
 mod exp_hist;

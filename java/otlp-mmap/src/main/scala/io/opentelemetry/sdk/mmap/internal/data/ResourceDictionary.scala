@@ -7,7 +7,7 @@ import io.opentelemetry.exporter.internal.marshal.Serializer
 import io.opentelemetry.exporter.internal.marshal.Marshaler
 import io.opentelemetry.exporter.internal.marshal.MarshalerUtil
 import java.nio.ByteBuffer
-import io.opentelemetry.otlp.mmap.internal.ByteBufferOutputStream
+import io.opentelemetry.sdk.mmap.internal.ByteBufferOutputStream
 import io.opentelemetry.api.common.AttributeType
 
 

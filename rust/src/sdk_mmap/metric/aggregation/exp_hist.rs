@@ -322,7 +322,7 @@ impl super::Aggregation for ExpoHistogramDataPoint {
     fn join(
         &mut self,
         m: crate::sdk_mmap::data::Measurement,
-    ) -> Result<(), crate::oltp_mmap::Error> {
+    ) -> Result<(), crate::sdk_mmap::Error> {
         if let Some(v) = m.value {
             match v {
                 super::super::data::measurement::Value::AsLong(lv) => self.record(lv as f64),

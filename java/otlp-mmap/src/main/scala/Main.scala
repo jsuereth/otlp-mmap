@@ -1,5 +1,4 @@
 import java.io.File
-import io.opentelemetry.otlp.mmap.OtlpMmapExporter
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk
 import io.opentelemetry.sdk.trace.`export`.SimpleSpanProcessor
 import io.opentelemetry.sdk.trace.`export`.SpanExporter
@@ -20,12 +19,10 @@ val EXPORT_META_DIRECTORY = new File("../../export")
 
 @main def demo(): Unit =
   val http_endpoint = sys.env.get("HTTP_ENDPOINT_PORT").map(port => port.toInt)
-  val mmap_export = sys.env.get("OTLP_MMAP_EXPORTER_DIRECTORY").map(dir => new java.io.File(dir))
   val otlp_export = sys.env.get("OTEL_EXPORTER_OTLP_ENDPOINT")
   val mmap_sdk = sys.env.get("SDK_MMAP_EXPORTER_FILE").map(f => new java.io.File(f))
-  val otel = (mmap_export, mmap_sdk, otlp_export) match
-    case (Some(mmap_dir), _, _) => initOtel(StartupChoice.OtelSdk(OtlpMmapExporter(mmap_dir).spanExporter))
-    case (None, Some(mmap_file), _) =>
+  val otel = (mmap_sdk, otlp_export) match
+    case (Some(mmap_file), _) =>
       // Kill the file if it exists or otherwise wipe it, until we sort out retry  / different loads.
       if mmap_file.exists()
       then
@@ -36,8 +33,8 @@ val EXPORT_META_DIRECTORY = new File("../../export")
         measurements = RingBufferOptions(512,64),
         spans = RingBufferOptions(512,64),
       ))))
-    case (None, _, Some(otlp_endpoint)) => initOtel(StartupChoice.NormalOtel(otlp_endpoint))
-    case _ => initOtel(StartupChoice.OtelSdk(OtlpMmapExporter(EXPORT_META_DIRECTORY).spanExporter))
+    case (_, Some(otlp_endpoint)) => initOtel(StartupChoice.NormalOtel(otlp_endpoint))
+    case _ => throw new RuntimeException("Must provide eitehr an OTEL_EXPORTER_OTLP_ENDPOINT or SDK_MMAP_EXPORTER_FILE env var.")
   // TODO - metrics.
   http_endpoint match
     case Some(endpoint) => runHttpServer(endpoint, otel)

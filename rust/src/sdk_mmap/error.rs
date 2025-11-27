@@ -3,7 +3,7 @@ use thiserror::Error;
 use tokio::task::JoinError;
 
 #[derive(Error, Debug)]
-pub enum OltpMmapError {
+pub enum Error {
     #[error("OTLP mmap version mismatch. {0} != {1}")]
     VersionMismatch(i64, i64),
 
@@ -23,7 +23,7 @@ pub enum OltpMmapError {
     TonicTransportError(#[from] tonic::transport::Error),
 
     #[error(transparent)]
-    AsyncOltpMmapError(#[from] Arc<OltpMmapError>),
+    AsyncOltpMmapError(#[from] Arc<Error>),
 
     #[error(transparent)]
     ConversionError(#[from] TryFromSliceError),

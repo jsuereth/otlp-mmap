@@ -1,7 +1,6 @@
-mod oltp_mmap;
 mod sdk_mmap;
 
-use oltp_mmap::{Error, OtlpMmapReader, OtlpMmapReaderConfig};
+use sdk_mmap::Error;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -13,12 +12,7 @@ use crate::sdk_mmap::CollectorSdk;
 async fn main() -> Result<(), Error> {
     let otlp_url = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
         .unwrap_or(String::from("http://localhost:4317"));
-    // TODO - CLI argument.
-    if let Ok(path) =
-        std::env::var("OTLP_MMAP_EXPORTER_DIRECTORY").map(|v| Path::new(&v).to_path_buf())
-    {
-        return run_exporter_mmap(&otlp_url, path).await;
-    }
+    // TODO - CLI arguments.
     if let Ok(path) = std::env::var("SDK_MMAP_EXPORTER_FILE").map(|v| Path::new(&v).to_path_buf()) {
         // println!("Waiting for {} to be available", path.display());
         // // We arbitrarily wait a few seconds for upstream to start up.
@@ -64,14 +58,4 @@ async fn run_sdk_mmap(otlp_url: &str, export_file: PathBuf) -> Result<(), Error>
         },
     }
     Ok(())
-}
-
-async fn run_exporter_mmap(otlp_url: &str, exporter_dir: PathBuf) -> Result<(), Error> {
-    let input = OtlpMmapReader::new(
-        &exporter_dir,
-        OtlpMmapReaderConfig {
-            ..Default::default()
-        },
-    )?;
-    input.send_traces_to(&otlp_url).await
 }

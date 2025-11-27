@@ -2,7 +2,7 @@ package io.opentelemetry.sdk.mmap.internal
 package data
 
 import java.nio.ByteBuffer
-import io.opentelemetry.otlp.mmap.internal.ByteBufferOutputStream
+import io.opentelemetry.sdk.mmap.internal.ByteBufferOutputStream
 import java.nio.charset.StandardCharsets
 
 

@@ -1,7 +1,10 @@
-# Mmap SDK OTLP Demo
+# Mmap SDK vs traditional SDK comparison
 # 
-# This demo replaces the entire SDK in java with something that pushes
-# data into an MMAP file as quickly as possible.
+# This Compose spins up two Java severs -
+# 1. A simple Java http server using a traditional OpenTelemetry SDK
+# 2. A simple Java http server using a streamlined MMAP SDK.
+#
+# This runs cadvisor + k6 load testing on each server to demonstrate latency + performance characteristics.
 #
 # A machine-local (but separate container) collector reads the file
 # and processes data into actual OTLP which is sent to an
@@ -27,7 +30,7 @@ services:
 
   # The HTTP server with normal java SDK
   java_http_server_sdk:
-    image: otel/mmap-demo:latest
+    image: ghcr.io/jsuereth/mmap-demo:main
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel_collector:4317
       HTTP_ENDPOINT_PORT: 8082
@@ -40,7 +43,7 @@ services:
       - otel_collector
   # HTTP server that is instrumented, configured to use SDK MMap
   java_http_server_mmap_sdk:
-    image: otel/mmap-demo:latest
+    image: ghcr.io/jsuereth/mmap-demo:main
     volumes: 
       - ./export:/otlp/export
     environment:
@@ -52,7 +55,7 @@ services:
       - "8081"
   # Collector for the MMAP sdk file that will send OTLP to the otel collector.
   mmap_collector:
-    image: otel/otlp-mmap-collector:latest
+    image: ghcr.io/jsuereth/mmap-collector:main
     depends_on:
       - otel_collector
       - java_http_server_mmap_sdk

@@ -1,11 +1,8 @@
 //! Contains components that implement the necessary pieces of tracing SDK on the collection side of the mmap.
 
-use crate::{
-    oltp_mmap::Error,
-    sdk_mmap::{
-        data::{span_event::Event, SpanEvent},
-        AttributeLookup,
-    },
+use crate::sdk_mmap::{
+    data::{span_event::Event, SpanEvent},
+    AttributeLookup, Error,
 };
 use std::collections::HashMap;
 /// An efficient mechanism to hash and lookup spans.
@@ -206,13 +203,12 @@ pub trait SpanEventQueue {
 
 #[cfg(test)]
 mod test {
-    use crate::oltp_mmap::error::OltpMmapError;
-    use crate::oltp_mmap::Error;
     use crate::sdk_mmap::data::any_value::Value;
     use crate::sdk_mmap::data::span_event::{EndSpan, Event, StartSpan};
     use crate::sdk_mmap::data::{AnyValue, KeyValueRef, Status};
     use crate::sdk_mmap::trace::ActiveSpans;
     use crate::sdk_mmap::AttributeLookup;
+    use crate::sdk_mmap::Error;
     use crate::sdk_mmap::{data::SpanEvent, trace::SpanEventQueue};
     use std::collections::HashMap;
     use tokio::sync::Mutex;
@@ -235,9 +231,8 @@ mod test {
             &'a self,
         ) -> std::pin::Pin<
             Box<
-                dyn core::future::Future<
-                        Output = Result<crate::sdk_mmap::data::SpanEvent, crate::oltp_mmap::Error>,
-                    > + Send
+                dyn core::future::Future<Output = Result<crate::sdk_mmap::data::SpanEvent, Error>>
+                    + Send
                     + 'a,
             >,
         > {
@@ -249,7 +244,7 @@ mod test {
                     Ok(self.events[real_idx].to_owned())
                 } else {
                     // TODO - real error
-                    Err(OltpMmapError::VersionMismatch(1, 2))
+                    Err(Error::VersionMismatch(1, 2))
                 }
             })
         }
@@ -271,10 +266,7 @@ mod test {
         ) -> std::pin::Pin<
             Box<
                 dyn core::future::Future<
-                        Output = Result<
-                            opentelemetry_proto::tonic::common::v1::KeyValue,
-                            crate::oltp_mmap::Error,
-                        >,
+                        Output = Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error>,
                     > + Send
                     + 'a,
             >,

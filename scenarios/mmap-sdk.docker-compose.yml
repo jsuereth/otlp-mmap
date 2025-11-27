@@ -21,14 +21,14 @@ services:
       - "4317:4317"
   # Mmap OTLP Demo
   mmap_otlp_demo:
-    image: otel/mmap-demo:latest
+    image: ghcr.io/jsuereth/mmap-demo:main
     environment:
       SDK_MMAP_EXPORTER_FILE: /otlp/export/mmap-demo.otlp
     # TODO - share definiton w/ mmap collector
     volumes: 
       - ./export:/otlp/export
   mmap_collector:
-    image: otel/otlp-mmap-collector:latest
+    image: ghcr.io/jsuereth/mmap-collector:main
     depends_on:
       - collector
       - mmap_otlp_demo

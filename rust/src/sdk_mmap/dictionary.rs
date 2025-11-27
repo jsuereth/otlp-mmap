@@ -5,7 +5,7 @@ use std::{fs::File, sync::atomic::AtomicI64};
 use memmap2::{MmapMut, MmapOptions};
 use tokio::sync::Mutex;
 
-use crate::oltp_mmap::Error;
+use crate::sdk_mmap::Error;
 
 /// A thread-safe version of the mmap dictionary
 pub struct Dictionary {

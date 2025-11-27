@@ -8,7 +8,6 @@ import java.util.concurrent.TimeUnit
 import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.context.Context
 import io.opentelemetry.api.trace.Span
-import io.opentelemetry.otlp.mmap.internal.RingBufferOutputChannel
 import io.opentelemetry.api.trace.StatusCode
 import java.time.Instant
 import io.opentelemetry.sdk.mmap.internal.SdkMmapRaw

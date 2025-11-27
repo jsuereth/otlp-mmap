@@ -2,10 +2,7 @@
 
 use std::{collections::HashMap, time::Duration};
 
-use crate::{
-    oltp_mmap::Error,
-    sdk_mmap::{data::Event, CollectorSdk},
-};
+use crate::sdk_mmap::{data::Event, CollectorSdk, Error};
 
 /// A collector of events.
 pub(crate) struct EventCollector {}

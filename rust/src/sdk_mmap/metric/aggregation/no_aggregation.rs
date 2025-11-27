@@ -1,11 +1,9 @@
 //! Aggregation which drops data on the floor.
 
-use crate::{
-    oltp_mmap::Error,
-    sdk_mmap::{
-        data::Measurement,
-        metric::{CollectionContext, TimeSeriesIdentity},
-    },
+use crate::sdk_mmap::{
+    data::Measurement,
+    metric::{CollectionContext, TimeSeriesIdentity},
+    Error,
 };
 
 /// Aggregation which does not remember any metric.

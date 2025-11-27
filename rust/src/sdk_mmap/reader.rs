@@ -10,7 +10,7 @@ use crate::sdk_mmap::data::{Event, Measurement, SpanEvent};
 use crate::sdk_mmap::ringbuffer::RingBufferReader;
 use memmap2::MmapOptions;
 
-use crate::{oltp_mmap::Error, sdk_mmap::dictionary::Dictionary};
+use crate::{sdk_mmap::dictionary::Dictionary, sdk_mmap::Error};
 
 /// Raw reader of mmap files.
 pub struct MmapReader {
@@ -18,6 +18,7 @@ pub struct MmapReader {
     pub spans: RingBufferReader<SpanEvent>,
     pub metrics: RingBufferReader<Measurement>,
     pub dictionary: Dictionary,
+    // TODO - Should we keep the header around so we can check sanity?
     start_time: u64,
 }
 

@@ -6,9 +6,8 @@ import io.opentelemetry.api.logs.Severity
 import io.opentelemetry.context.Context
 import io.opentelemetry.api.common.AttributeKey
 import java.time.Instant
-import io.opentelemetry.otlp.mmap.internal.RingBufferOutputChannel
 import io.opentelemetry.api.common.Attributes
-import io.opentelemetry.otlp.mmap.internal.ByteBufferOutputStream
+import io.opentelemetry.sdk.mmap.internal.ByteBufferOutputStream
 import io.opentelemetry.api.logs.LoggerBuilder
 import io.opentelemetry.sdk.mmap.internal.Dictionary
 import io.opentelemetry.sdk.mmap.internal.data.ScopeDictionary
