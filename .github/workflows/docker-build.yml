@@ -27,8 +27,8 @@ jobs:
             dockerfile: ./java/otlp-mmap/Dockerfile
             context: ./java/otlp-mmap
           - image: mmap-collector
-            dockerfile: ./rust/Dockerfile
-            context: ./rust
+            dockerfile: ./mmap-collector/Dockerfile
+            context: ./mmap-collector
 
     steps:
       - name: checkout

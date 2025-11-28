@@ -89,7 +89,7 @@ You can also build the images locally as follows:
 1. Build mmap-collector image
 
 ```
-cd rust
+cd mmap_collector
 docker build . -t ghcr.io/jsuereth/mmap-collector:main
 ```
 
@@ -113,7 +113,7 @@ docker run   -p 127.0.0.1:4317:4317   -p 127.0.0.1:55679:55679   otel/openteleme
 
 2. Set the ENV variable, e.g. `export SDK_MMAP_EXPORTER_FILE=/path/to/mmap.otlp`
 3. Run the `java/otlp-mmap` server: `sbt run`
-4. With the same ENV variable, inside `rust` directory, Type `cargo run`.
+4. With the same ENV variable, inside `mmap-collector` directory, Type `cargo run`.
 
 You should see a Java (scala) program generating Spans and firing them into the `export` directory.  The Rust
 program will be reading these spans and sending them via regular OTLP to the collector.
