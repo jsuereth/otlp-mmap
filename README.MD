@@ -9,6 +9,14 @@ Using memory mapped files for export has drawbacks, but a few important upsides:
 - Shared mmap file region can be used communicate across processes via simple memory concurrency primitives.
 - Process death of the system being observed still allows the observability consumer to collect data. Think of this like a "black box" on an airplane.
 
+See also:
+
+- [Protocol Specification](specification/FILE_PROTOCOL.MD)
+- [Benchmarks](benchmarks/README.MD)
+- [mmap-collector implementation](rust)
+- [Try it out](#try-it-yourself)
+- [Frequently Asked Questions](FAQS.md)
+
 ## Principles
 
 The design of otlp-mmap is guided by the following:
@@ -130,7 +138,7 @@ See [Protocol](PROTOCOL.MD) for details on the file contents and layout.
   - [X] variable sized entry dictionary
   - [X] Metric file format
   - [ ] Evaluate Parquet
-  - [ ] Evaluate STEF
+  - [X] Evaluate STEF
 - More Language Writers
   - [ ] Go
   - [ ] Python
