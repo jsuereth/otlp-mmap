@@ -9,16 +9,37 @@ Using memory mapped files for export has drawbacks, but a few important upsides:
 - Shared mmap file region can be used communicate across processes via simple memory concurrency primitives.
 - Process death of the system being observed still allows the observability consumer to collect data. Think of this like a "black box" on an airplane.
 
+## Principles
 
-A few principles:
+The design of otlp-mmap is guided by the following:
 
 - *Limited Persistence:* We do not (truly) care about persistence. This could leverage shared memory. However, persistence can be a benefit in the event the collection process dies and need to restart.
 - *Concurrent Access:* We must assume at least 1 producer and at most 1 consumer of o11y data. All access to files should leverage memory safety primitves, and encourage direct page sharing between processes.
-- *Fixed sized entries:* We start with fixed-size assumptions and can adapt/scale based on performance benchmarks.
+- *Fixed sized buffers:* We start with fixed-size assumptions and can adapt/scale based on performance benchmarks.
+  This is to avoid forcing an ever growing file and requiring file-rotations and detecting file-truncation, as
+  is done in most log-based observability collection today.
+- *SDK makes all the decisions*: We still require the SDK to instantiate the mmapped-file and determine its size and
+  characteristics. While an `mmap-collector` component may have performance related configuration, it should be fully
+  reactive to the size configuration from the SDK. Any OTEL file-based configuration support should find a way to flow
+  from an `mmap-sdk` through the mmap file into the `mmap-collector`
+- *Shared description*: The OTLP-mmap file is *not* a self-describing format that could encode any possible data.
+  Instead, the definition of data it passes MUST be known ahead of time.
 
-## Docker-Compose Demo
+## Results
 
-Run the desired demo:
+See our [Benchmarks](benchmarks/README.MD) for the current status.
+
+Today, the following is true:
+
+- (For Java) using `mmap-sdk` + `mmap-collector` results in less Memory usage, higher CPU usage and little impact
+  to throughput against an SDK configured with reasonable batching.
+- `mmap-sdk` + `mmap-collector` have dramatically increased performance of "synchronous network export" - which would
+  be the direct alternative way in OpenTelemetry today for getting data out of process quickly. This means
+  *for batch jobs*, this may be a MUCH more efficient mechanism of getting data out.
+
+## Try it yourself
+
+You can run any of the docker compose demos found in the `scenarios` directory.
 
 ```
 docker compose -f scenarios/{scenario}.yml up
@@ -72,7 +93,7 @@ cd otlp-mmap
 docker build . -t ghcr.io/jsuereth/mmap-demo:main
 ```
 
-## Running manually
+### Running manually
 
 To run the example outside of docker, do the following:
 

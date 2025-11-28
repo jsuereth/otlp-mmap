@@ -30,14 +30,14 @@ async fn main() -> Result<(), Error> {
 
 async fn run_sdk_mmap(otlp_url: &str, export_file: PathBuf) -> Result<(), Error> {
     let sdk = Arc::new(CollectorSdk::new(&export_file)?);
-    // let metric_pipeline = tokio::task::spawn(async move { metric_sdk.record_metrics(&metric_otlp).await });
+    // Note: We do NOT put the different pipelines on different tasks.  We do NOT want different CPUs causing
+    // cache coherency problems as this may actually slow down performance.
     let log_otlp = otlp_url.to_owned();
     let log_sdk = sdk.clone();
-    let log_pipeline = tokio::task::spawn(async move { log_sdk.send_logs_to(&log_otlp).await });
+    let log_pipeline = async move { log_sdk.send_logs_to(&log_otlp).await };
     let trace_otlp = otlp_url.to_owned();
     let trace_sdk = sdk.clone();
-    let trace_pipeline =
-        tokio::task::spawn(async move { trace_sdk.send_traces_to(&trace_otlp).await });
+    let trace_pipeline = async move { trace_sdk.send_traces_to(&trace_otlp).await };
     // We do not pass the metric piepline to another thread.
     // This is because we haven't made our aggregations "Send" yet.
     let metric_pipeline = sdk.record_metrics(&otlp_url);
