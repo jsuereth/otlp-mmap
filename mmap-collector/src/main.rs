@@ -1,31 +1,44 @@
 mod sdk_mmap;
 
+use crate::sdk_mmap::CollectorSdk;
+use clap::Parser;
 use sdk_mmap::Error;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
 
-use crate::sdk_mmap::CollectorSdk;
+/// An MMAP Collector.
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Name of the OTLP-MMAP file to read in.
+    #[arg(short, long, env = "SDK_MMAP_EXPORTER_FILE")]
+    input: String,
+
+    /// The OTLP exporter endpoint to fire data into.
+    #[arg(
+        short,
+        long,
+        env = "OTEL_EXPORTER_OTLP_ENDPOINT",
+        default_value = "http://localhost:4317"
+    )]
+    otlp_endpoint: String,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let otlp_url = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
-        .unwrap_or(String::from("http://localhost:4317"));
-    // TODO - CLI arguments.
-    if let Ok(path) = std::env::var("SDK_MMAP_EXPORTER_FILE").map(|v| Path::new(&v).to_path_buf()) {
-        // println!("Waiting for {} to be available", path.display());
-        // // We arbitrarily wait a few seconds for upstream to start up.
-        // tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-        // Wait for file to be available.
-        while !path.exists() {
-            println!("Waiting for {} to be available", path.display());
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        }
-        println!("Starting SDK");
-        return run_sdk_mmap(&otlp_url, path).await;
+    let args = Args::try_parse()?;
+    let path = Path::new(&args.input).to_path_buf();
+    // We arbitrarily wait a few seconds for upstream to start up.
+    // tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+    // Wait for file to be available.
+    while !path.exists() {
+        println!("Waiting for {} to be available", path.display());
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
-    Ok(())
+    println!("Starting SDK");
+    run_sdk_mmap(&args.otlp_endpoint, path).await
 }
 
 async fn run_sdk_mmap(otlp_url: &str, export_file: PathBuf) -> Result<(), Error> {

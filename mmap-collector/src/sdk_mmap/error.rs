@@ -30,4 +30,9 @@ pub enum Error {
 
     #[error(transparent)]
     JoinError(#[from] JoinError),
+
+    #[error(transparent)]
+    ClapError(#[from] clap::Error),
 }
+
+// TODO - Format errors.
