@@ -53,21 +53,21 @@ async fn run_sdk_mmap(otlp_url: &str, export_file: PathBuf) -> Result<(), Error>
     let trace_pipeline = async move { trace_sdk.send_traces_to(&trace_otlp).await };
     // We do not pass the metric piepline to another thread.
     // This is because we haven't made our aggregations "Send" yet.
-    let metric_pipeline = sdk.record_metrics(&otlp_url);
+    let metric_pipeline = sdk.record_metrics(otlp_url);
     // Run the event loops by waiting on them.
     // TODO - wait for all to finish or crash?
     tokio::select! {
         r = trace_pipeline => {
-            println!("Trace completed {:?}", r);
-            let _ = r?;
+            println!("Trace completed {r:?}");
+            r?;
         },
         r = log_pipeline => {
-            println!("Logs completed {:?}", r);
-            let _ = r?;
+            println!("Logs completed {r:?}");
+            r?;
         },
         r = metric_pipeline => {
-            println!("Metrics completed {:?}", r);
-            let _ = r?;
+            println!("Metrics completed {r:?}");
+            r?;
         },
     }
     Ok(())

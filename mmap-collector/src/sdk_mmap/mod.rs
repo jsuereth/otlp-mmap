@@ -85,7 +85,7 @@ impl CollectorSdk {
         for metric in batch {
             scope_map
                 .entry(metric.scope_ref)
-                .or_insert(Vec::new())
+                .or_default()
                 .push(metric.metric);
         }
         let mut resource_map: HashMap<
@@ -99,7 +99,7 @@ impl CollectorSdk {
             let scope = self.try_lookup_scope(*scope_ref).await?;
             resource_map
                 .entry(scope.resource_ref)
-                .or_insert(Vec::new())
+                .or_default()
                 .push((*scope_ref, scope.scope));
         }
 
@@ -148,7 +148,7 @@ impl CollectorSdk {
             // TODO - config.
             // println!("Batching logs");
             if let Some(log_batch) = collector
-                .try_create_next_batch(&self, 1000, Duration::from_secs(60))
+                .try_create_next_batch(self, 1000, Duration::from_secs(60))
                 .await?
             {
                 // println!("Sending log batch #{batch_idx}");
@@ -203,7 +203,7 @@ impl CollectorSdk {
         for span in batch {
             scope_map
                 .entry(span.scope_ref)
-                .or_insert(Vec::new())
+                .or_default()
                 .push(span.current);
         }
 
@@ -218,7 +218,7 @@ impl CollectorSdk {
             let scope = self.try_lookup_scope(*scope_ref).await?;
             resource_map
                 .entry(scope.resource_ref)
-                .or_insert(Vec::new())
+                .or_default()
                 .push((*scope_ref, scope.scope));
         }
 

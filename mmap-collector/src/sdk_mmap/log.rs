@@ -40,7 +40,7 @@ impl EventCollector {
         for log in batch {
             scope_map
                 .entry(log.scope_ref)
-                .or_insert(Vec::new())
+                .or_default()
                 .push(log.log);
         }
         let mut resource_map: HashMap<
@@ -54,7 +54,7 @@ impl EventCollector {
             let scope = sdk.try_lookup_scope(*scope_ref).await?;
             resource_map
                 .entry(scope.resource_ref)
-                .or_insert(Vec::new())
+                .or_default()
                 .push((*scope_ref, scope.scope));
         }
         let mut result =

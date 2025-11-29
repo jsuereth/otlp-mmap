@@ -27,7 +27,7 @@ impl FullSpanId {
 fn bytes_to_hex_string(bytes: &[u8]) -> String {
     bytes
         .iter()
-        .map(|byte| format!("{:02x}", byte)) // Format each byte as a two-digit lowercase hex
+        .map(|byte| format!("{byte:02x}")) // Format each byte as a two-digit lowercase hex
         .collect() // Collect the formatted strings into a single String
 }
 
@@ -333,9 +333,8 @@ mod test {
             })),
         };
         let result = tracker.try_handle_span_event(start, &attr).await?;
-        assert_eq!(
+        assert!(
             result.is_none(),
-            true,
             "Should not return complete span on start event"
         );
         let end = SpanEvent {
@@ -351,9 +350,8 @@ mod test {
             })),
         };
         let result2 = tracker.try_handle_span_event(end, &attr).await?;
-        assert_eq!(
+        assert!(
             result2.is_some(),
-            true,
             "Should return complete span after span end."
         );
         if let Some(span) = result2 {
@@ -365,9 +363,9 @@ mod test {
             assert_eq!(span.current.end_time_unix_nano, 10);
             assert_eq!(span.current.kind, 1);
             assert_eq!(span.current.name, "name");
-            assert_eq!(span.current.status.is_some(), true);
+            assert!(span.current.status.is_some());
             assert_eq!(span.current.attributes.len(), 1);
-            if let Some(attr) = span.current.attributes.iter().next() {
+            if let Some(attr) = span.current.attributes.first() {
                 assert_eq!(attr.key, "one");
             }
         }
@@ -382,7 +380,7 @@ mod test {
         SpanEvent {
             scope_ref: 1,
             trace_id: vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-            span_id: span_id,
+            span_id,
             event: Some(Event::Start(StartSpan {
                 parent_span_id: Vec::new(),
                 flags: 0,
@@ -398,7 +396,7 @@ mod test {
         SpanEvent {
             scope_ref: 1,
             trace_id: vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-            span_id: span_id,
+            span_id,
             event: Some(Event::End(EndSpan {
                 end_time_unix_nano: 10,
                 status: Some(Status {

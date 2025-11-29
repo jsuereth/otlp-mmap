@@ -74,7 +74,7 @@ where
             }
             // TODO - Cap max wait time configuration.
             if d.as_secs() < 1 {
-                d = d * 2;
+                d *= 2;
             }
         }
     }
@@ -116,7 +116,7 @@ impl RawRingBuffer {
         // TODO - Validate memory bounds on MmapMut.
         unsafe {
             // Set header for RingBuffer
-            let num_buffers_ptr = data.as_mut_ptr().add(offset + 0) as *mut i64;
+            let num_buffers_ptr = data.as_mut_ptr().add(offset) as *mut i64;
             *num_buffers_ptr = num_buffers as i64;
             let buffer_size_ptr = data.as_mut_ptr().add(offset + 8) as *mut i64;
             *buffer_size_ptr = buffer_size as i64;
@@ -368,19 +368,16 @@ mod test {
                 while !done {
                     {
                         let ring = read_buffer.read().await;
-                        match ring.try_read::<AnyValue>()? {
-                            Some(value) => {
-                                if let AnyValue {
-                                    value: Some(Value::StringValue(sv)),
-                                } = value
-                                {
-                                    assert_eq!(sv, format!("{i}"));
-                                } else {
-                                    panic!("Expected string value, found: {value:?}")
-                                }
-                                done = true
+                        if let Some(value) = ring.try_read::<AnyValue>()? {
+                            if let AnyValue {
+                                value: Some(Value::StringValue(sv)),
+                            } = value
+                            {
+                                assert_eq!(sv, format!("{i}"));
+                            } else {
+                                panic!("Expected string value, found: {value:?}")
                             }
-                            None => (),
+                            done = true
                         }
                     }
                     tokio::task::yield_now().await;
@@ -390,8 +387,8 @@ mod test {
         });
         // Propogate errors and wait for complete.
         let (r1, r2) = tokio::try_join!(publish, consume)?;
-        let _ = r1?;
-        let _ = r2?;
+        r1?;
+        r2?;
         Ok(())
     }
 }
