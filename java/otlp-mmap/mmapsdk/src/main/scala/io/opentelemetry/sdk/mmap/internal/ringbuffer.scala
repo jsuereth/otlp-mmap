@@ -103,7 +103,6 @@ final class RingBuffer(
     // First we grab the next value.
     val current = header.write_position.get()
     val next = current + 1
-    val reader = header.read_position.getVolatile()
     val hasCapacity = hasWriteCapacity(current)
     if hasCapacity && header.write_position.compareAndSet(current, next)
     then Some(next)

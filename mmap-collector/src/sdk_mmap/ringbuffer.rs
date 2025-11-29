@@ -1,7 +1,19 @@
-//! Multi-Producer, single-consumer ring buffer
-//
-// A RingBuffer is structured as follows:
-// | Header | Availability Array | Buffer1 | ... | BufferN |
+//! Multi-Producer, single-consumer ring buffer.
+//!
+//! A RingBuffer is the heart of the OTLP-MMAP implementation.
+//! This package provides everything we need to read, efficiently, from a RingBuffer.
+//!
+//! A RingBuffer is structured as follows:
+//! | Header | Availability Array | Buffer1 | ... | BufferN |
+//!
+//! More than one process is expected to mount a file containing the ring buffer, and
+//! communication between processes MUST be done via atomic memory operations (e.g. CAS).
+//!
+//! This ringbuffer is designed to allow multi-producer, single-consumer.
+//! The header contains information about the position of the single reader, in
+//! addition to the *maximum taken* buffers for writing. When a producer is finished
+//! writing to a buffer, it will update the availability array with a given flag.
+//! Reader MUST check the availability array to ensure a buffer is complete before reading.
 
 use std::{
     marker::PhantomData,
@@ -9,6 +21,9 @@ use std::{
     sync::atomic::{AtomicI32, AtomicI64, Ordering},
     time::Duration,
 };
+
+#[cfg(test)]
+use std::ops::DerefMut;
 
 use memmap2::MmapMut;
 use tokio::sync::Mutex;
@@ -90,6 +105,36 @@ impl RawRingBuffer {
         }
     }
 
+    /// Constructs a new ring buffer, but sets the header values for it as well.
+    #[cfg(test)]
+    fn new_for_write(
+        mut data: MmapMut,
+        offset: usize,
+        buffer_size: usize,
+        num_buffers: usize,
+    ) -> RawRingBuffer {
+        // TODO - Validate memory bounds on MmapMut.
+        unsafe {
+            // Set header for RingBuffer
+            let num_buffers_ptr = data.as_mut_ptr().add(offset + 0) as *mut i64;
+            *num_buffers_ptr = num_buffers as i64;
+            let buffer_size_ptr = data.as_mut_ptr().add(offset + 8) as *mut i64;
+            *buffer_size_ptr = buffer_size as i64;
+            let read_posiiton_ptr = data.as_mut_ptr().add(offset + 16) as *mut i64;
+            *read_posiiton_ptr = -1;
+            let write_posiiton_ptr = data.as_mut_ptr().add(offset + 24) as *mut i64;
+            *write_posiiton_ptr = -1;
+            // Set availability array to -1.
+            for i in 0..num_buffers {
+                // Offset is overall offset + HEADER + offset into availability array.
+                let av_offset = offset + 32 + i * 4;
+                let av_ptr = data.as_mut_ptr().add(av_offset) as *mut i32;
+                *av_ptr = -1;
+            }
+        }
+        Self::new(data, offset)
+    }
+
     fn try_read<T: prost::Message + std::default::Default>(&self) -> Result<Option<T>, Error> {
         if let Some(idx) = self.try_obtain_read_idx() {
             let result = Ok(Some(T::decode_length_delimited(self.entry(idx).deref())?));
@@ -101,6 +146,18 @@ impl RawRingBuffer {
         }
     }
 
+    #[cfg(test)]
+    fn try_write<T: prost::Message + std::fmt::Debug>(&mut self, msg: &T) -> Result<bool, Error> {
+        if let Some(idx) = self.try_obtain_write_idx() {
+            println!("Writing index {idx}: {msg:?}");
+            msg.encode_length_delimited(&mut self.entry_mut(idx).deref_mut())?;
+            self.set_read_available(idx);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Checks to see if we can read the next available buffer.
     ///
     /// Note: This will perform TWO atomic operations, one to get current position
@@ -109,6 +166,26 @@ impl RawRingBuffer {
         let next = self.header().reader_index.load(Ordering::Acquire) + 1;
         if self.is_read_available(next) {
             Some(next)
+        } else {
+            None
+        }
+    }
+
+    /// Attempts to obtain a write index or None, if buffer is full.
+    #[cfg(test)]
+    fn try_obtain_write_idx(&self) -> Option<i64> {
+        let current = self.header().writer_index.load(Ordering::Acquire);
+        let reader = self.header().reader_index.load(Ordering::Acquire);
+        let num_buffers = self.header().num_buffers;
+        let has_capacity = (current + 1 - num_buffers) < reader;
+        if has_capacity
+            && self
+                .header()
+                .writer_index
+                .compare_exchange(current, current + 1, Ordering::Acquire, Ordering::Relaxed)
+                .is_ok()
+        {
+            Some(current + 1)
         } else {
             None
         }
@@ -161,6 +238,7 @@ impl RawRingBuffer {
     }
 
     /// Marks a buffer as availabel to read.
+    #[cfg(test)]
     fn set_read_available(&self, idx: i64) {
         let shift = (self.header().num_buffers as i32).ilog2();
         let ring_index = self.ring_buffer_index(idx);
@@ -180,6 +258,20 @@ impl RawRingBuffer {
             end_offset: end_byte_idx,
         }
     }
+
+    /// Returns a mutable entry for writing.
+    #[cfg(test)]
+    fn entry_mut<'a>(&'a mut self, idx: i64) -> RingBufferEntryMut<'a> {
+        let offset_to_ring = self.first_buffer_offset();
+        let ring_index = self.ring_buffer_index(idx);
+        let start_byte_idx = offset_to_ring + (ring_index * (self.header().buffer_size as usize));
+        let end_byte_idx = start_byte_idx + (self.header().buffer_size as usize);
+        RingBufferEntryMut {
+            data: &mut self.data,
+            start_offset: start_byte_idx,
+            end_offset: end_byte_idx,
+        }
+    }
 }
 
 struct RingBufferEntry<'a> {
@@ -191,6 +283,28 @@ impl<'a> Deref for RingBufferEntry<'a> {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
         &self.data[self.start_offset..self.end_offset]
+    }
+}
+
+#[cfg(test)]
+struct RingBufferEntryMut<'a> {
+    data: &'a mut MmapMut,
+    start_offset: usize,
+    end_offset: usize,
+}
+
+#[cfg(test)]
+impl<'a> Deref for RingBufferEntryMut<'a> {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        &self.data[self.start_offset..self.end_offset]
+    }
+}
+
+#[cfg(test)]
+impl<'a> DerefMut for RingBufferEntryMut<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data[self.start_offset..self.end_offset]
     }
 }
 
@@ -206,4 +320,78 @@ struct RawRingBufferHeader {
     reader_index: AtomicI64,
     /// Number of events claimed by writers.
     writer_index: AtomicI64,
+}
+
+#[cfg(test)]
+mod test {
+    use crate::sdk_mmap::data::any_value::Value;
+    use crate::sdk_mmap::data::AnyValue;
+    use crate::sdk_mmap::{ringbuffer::RawRingBuffer, Error};
+    use memmap2::MmapOptions;
+    use std::{fs::OpenOptions, sync::Arc};
+    use tokio::{sync::RwLock, task::JoinHandle};
+
+    #[tokio::test]
+    async fn test_read_and_write() -> Result<(), Error> {
+        // TODO - Make sure tempfile works appropriately.
+        let path = tempfile::NamedTempFile::new()?;
+        let f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path.path())?;
+        let desired_len = 512 * 8 + 64 + 128;
+        f.set_len(desired_len)?;
+        let data = unsafe { MmapOptions::new().map_mut(&f)? };
+        let buffer = Arc::new(RwLock::new(RawRingBuffer::new_for_write(data, 0, 512, 8)));
+        let read_buffer = buffer.clone();
+        let publish: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
+            for i in 0..1000 {
+                let mut done = false;
+                while !done {
+                    {
+                        let mut ring = buffer.write().await;
+                        let value = AnyValue {
+                            value: Some(Value::StringValue(format!("{i}"))),
+                        };
+                        done = ring.try_write(&value)?;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            }
+            Ok(())
+        });
+        let consume: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
+            for i in 0..1000 {
+                let mut done = false;
+                while !done {
+                    {
+                        let ring = read_buffer.read().await;
+                        match ring.try_read::<AnyValue>()? {
+                            Some(value) => {
+                                if let AnyValue {
+                                    value: Some(Value::StringValue(sv)),
+                                } = value
+                                {
+                                    assert_eq!(sv, format!("{i}"));
+                                } else {
+                                    panic!("Expected string value, found: {value:?}")
+                                }
+                                done = true
+                            }
+                            None => (),
+                        }
+                    }
+                    tokio::task::yield_now().await;
+                }
+            }
+            Ok(())
+        });
+        // Propogate errors and wait for complete.
+        let (r1, r2) = tokio::try_join!(publish, consume)?;
+        let _ = r1?;
+        let _ = r2?;
+        Ok(())
+    }
 }

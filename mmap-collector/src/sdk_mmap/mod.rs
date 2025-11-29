@@ -1,4 +1,10 @@
-//! SDK MMap file reading components.
+//! SDK MMap file collector.
+//!
+//! This package define necessary components and methods to read an OTLP-mmap file and
+//! convert it into vanilla OTLP messages that can fired at an OTLP endpoint.
+//!
+//! This should mirror the implementation behavior of an OpenTelemetry SDK and provide
+//! compliance to its specification.
 
 pub mod data;
 pub mod dictionary;

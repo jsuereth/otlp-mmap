@@ -13,6 +13,9 @@ pub enum Error {
     #[error(transparent)]
     ProtobufDecodeError(#[from] prost::DecodeError),
 
+    #[error(transparent)]
+    ProtobufEncodeError(#[from] prost::EncodeError),
+
     #[error("Index {1} not found in dictionary {0}")]
     NotFoundInDictionary(String, i64),
 

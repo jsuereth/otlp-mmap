@@ -1,4 +1,8 @@
-//! Contains components that implement the necessary pieces of tracing SDK on the collection side of the mmap.
+//! Contains components that implement the necessary pieces of the OpenTelemetry tracing SDK on the collection side of the mmap.
+//!
+//! This should expect incoming SpanEvents from the OTLP-MMAP protocol, and generate TrackedSpan structures when these spans complete.
+//! The `ActiveSpans` struct is used to store spans in-flight, and may contain spans which will never complete and must be removed
+//! after some time.
 
 use crate::sdk_mmap::{
     data::{span_event::Event, SpanEvent},
