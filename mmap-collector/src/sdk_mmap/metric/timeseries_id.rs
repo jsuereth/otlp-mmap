@@ -81,7 +81,7 @@ fn compare_values(
     r: &opentelemetry_proto::tonic::common::v1::any_value::Value,
 ) -> std::cmp::Ordering {
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
-    // TODO - We need to handle same key id, but different types...
+    // TODO - We need to handle same key id, but different types...  Treat them the same if their "to_string" is the same.
     match (l, r) {
         (Value::StringValue(ls), Value::StringValue(rs)) => ls.cmp(rs),
         (Value::StringValue(_), Value::BoolValue(_)) => todo!(),

@@ -4,8 +4,11 @@ use tokio::task::JoinError;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("OTLP mmap version mismatch. {0} != {1}")]
-    VersionMismatch(i64, i64),
+    #[error("OTLP MMap file start time has changed since reading")]
+    OtlpMmapOutofData,
+
+    #[error("OTLP mmap version mismatch. Found: {0}, Supported: {1:?}")]
+    VersionMismatch(i64, &'static [i64]),
 
     #[error(transparent)]
     IoError(#[from] std::io::Error),

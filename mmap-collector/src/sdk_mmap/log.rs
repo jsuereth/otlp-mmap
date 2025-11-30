@@ -38,10 +38,7 @@ impl EventCollector {
         let mut scope_map: HashMap<i64, Vec<opentelemetry_proto::tonic::logs::v1::LogRecord>> =
             HashMap::new();
         for log in batch {
-            scope_map
-                .entry(log.scope_ref)
-                .or_default()
-                .push(log.log);
+            scope_map.entry(log.scope_ref).or_default().push(log.log);
         }
         let mut resource_map: HashMap<
             i64,

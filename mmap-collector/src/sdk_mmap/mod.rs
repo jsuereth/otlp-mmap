@@ -49,6 +49,10 @@ impl CollectorSdk {
         // Report metrics every minute.
         let report_interval = tokio::time::Duration::from_secs(60);
         loop {
+            // If the file is out of date, bail on this reading.
+            if self.reader.has_file_changed() {
+                return Err(Error::OtlpMmapOutofData);
+            }
             // TODO - Configuration.
             let send_by_time =
                 tokio::time::sleep_until(tokio::time::Instant::now() + report_interval);
@@ -146,6 +150,10 @@ impl CollectorSdk {
         let mut collector = EventCollector::new();
         loop {
             // TODO - config.
+            // If the file is out of date, bail on this reading.
+            if self.reader.has_file_changed() {
+                return Err(Error::OtlpMmapOutofData);
+            }
             // println!("Batching logs");
             if let Some(log_batch) = collector
                 .try_create_next_batch(self, 1000, Duration::from_secs(60))
@@ -171,10 +179,13 @@ impl CollectorSdk {
         &self,
         mut endpoint: TraceServiceClient<tonic::transport::Channel>,
     ) -> Result<(), Error> {
-        let mut batch_idx = 1;
+        // let mut batch_idx = 1;
         let mut spans = ActiveSpans::new();
         loop {
-            // TODO - check_sanity() and fail on error.
+            // If the file is out of date, bail on this reading.
+            if self.reader.has_file_changed() {
+                return Err(Error::OtlpMmapOutofData);
+            }
             // TODO - Config
             // println!("Batching spans");
             let span_batch = spans
@@ -184,7 +195,7 @@ impl CollectorSdk {
             if !next_batch.resource_spans.is_empty() {
                 // println!("Sending span batch #{batch_idx}");
                 endpoint.export(next_batch).await?;
-                batch_idx += 1;
+                // batch_idx += 1;
             } else {
                 // println!("No new batch of spans, in-flight spans: {}", spans.num_active());
             }

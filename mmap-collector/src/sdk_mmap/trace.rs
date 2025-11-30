@@ -248,7 +248,10 @@ mod test {
                     Ok(self.events[real_idx].to_owned())
                 } else {
                     // TODO - real error
-                    Err(Error::VersionMismatch(1, 2))
+                    Err(Error::NotFoundInDictionary(
+                        "Index is too large".to_owned(),
+                        *idx as i64,
+                    ))
                 }
             })
         }
