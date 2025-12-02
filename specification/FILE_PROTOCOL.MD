@@ -3,19 +3,16 @@
 Expanding on the OTLP-mmap protocol, we can look at a mechanism to put all SDK
 output into a single, consumable file. Unlike normal log files, this would rotate
 via ring-buffers and be designed for co-reading/writing where both sides can mmap
-the file.  Additionally, much SDK processing would move to the "collector"
-component vs. being in-process.
+the file.  Additionally, much SDK processing would move to the "collector" component rather than being in-process.
 
 ## Overview
 
 The SDK MMap File protocol allows the SDK to write all telemetry data directly into
-a file for better resiliency in the case of system crashing.
-
+a file for better resiliency in the case of system crashes.
 
 Generally, the MMAP File Protocol SHOULD do the following:
 
-- events in the SDK *should* be written to preallocated memory via the use of mmapped file
-  primitives.
+- events in the SDK *should* be written to preallocated memory using memory-mapped file primitives.
 - A dictionary is used to record things which do not change often or can be re-used across
   many events (e.g. attribute sets).
 
@@ -35,17 +32,17 @@ Note: there is currently no way to "clean" the dictionary, outside of opening a 
 
 ### Header
 
-The header will consist of the following 64-byte block.
+The header will consist of the following 64-byte block. Fields that are updated by the SDK after initialization (e.g., offsets and timestamps) MUST be accessed using atomic operations to ensure safety across multiple processes.
 
-| Field            | Size | Index | Type | Description                                        |
-|------------------|------|-------|------|----------------------------------------------------|
-| version          | 8    | 0     | int64 | version number of the OTLP export                 |
-| events           | 8    | 1     | int64 | offset to event ringbuffer.                       |
-| spans            | 8    | 2     | int64 | offest to span ringbufer.                         |
-| measurements     | 8    | 2     | int64 | offset to measurement ringbuffer.                 |
-| dictionary       | 8    | 3     | int64 | offset to dictionary.                             |
-| time_unix_nano   | 8    | 4     | int64 | Time when SDK started                             |
-| unused           | 8    |       |       |                                                   |
+| Field            | Size | Offset | Type | Description                                        |
+|------------------|------|--------|------|----------------------------------------------------|
+| version          | 8    | 0      | int64 | Version number of the OTLP export.                 |
+| events           | 8    | 8      | int64 | Offset to event ring buffer.                       |
+| spans            | 8    | 16     | int64 | Offset to span ring buffer.                         |
+| measurements     | 8    | 24     | int64 | Offset to measurement ring buffer.                 |
+| dictionary       | 8    | 32     | int64 | Offset to dictionary.                             |
+| time_unix_nano   | 8    | 40     | uint64| Time when SDK started.                             |
+| unused           | 16   | 48     |       | Reserved for future use. Must be zeroed.           |
 
 
 ### Ringbuffers
@@ -63,19 +60,21 @@ Ringbuffers are an array laid out as follows:
 | header | availability array | buffer 1 | buffer 2 | ... |
 ```
 
-The header is 32-bytes and consists of the following:
+The header is 32-bytes and consists of the following. The `reader_index` and `writer_index` fields MUST be accessed using atomic operations.
 
-| Field             | Size | Index | Type | Description                                        |
-|-------------------|------|-------|------|----------------------------------------------------|
-| num_buffers       | 8    | 0     | int64 | number of buffers in the ring buffer              |
-| buffer_size       | 8    | 1     | int64 | size, in bytes, of a buffer in the ring buffers   |
-| reader_index      | 8    | 2     | int64 | index of the number of events the reader has read |
-| writer_index      | 8    | 3     | int64 | index of the number of events claimed by writers  |
+| Field             | Size | Offset | Type | Description                                        |
+|-------------------|------|--------|------|----------------------------------------------------|
+| num_buffers       | 8    | 0      | int64 | Number of buffers in the ring buffer.              |
+| buffer_size       | 8    | 8      | int64 | Size, in bytes, of a buffer in the ring buffers.   |
+| reader_index      | 8    | 16     | int64 | Index of the number of events the reader has read. |
+| writer_index      | 8    | 24     | int64 | Index of the number of events claimed by writers.  |
 
-The header is immediately followed by a int32 array representing buffer availability. The length of
+Note: Upon initialization of a new file, both `reader_index` and `writer_index` MUST be set to `-1`. The entire availability array MUST be filled with a sentinel value of `-1`.
+
+The header is immediately followed by a an `int32` array representing buffer availability. The length of
 the availability array is equal to number of buffers in the ring buffer.
 
-The availibility array is then followed by the actual buffers themselves.
+The availability array is then followed by the actual buffers themselves.
 
 Ringbuffers are designed to be lock-less multi-producer single-consumer (MPSC) queues. To support
 multiple writers concurrently, we have mechanism that allows producers to claim unique slots atomically
@@ -87,24 +86,24 @@ All index values are monotonically increasing sequences (vs. current index in th
 use this property to understand, via the availability array, whether any particular buffer is ready
 to be read.
 
-Note: Ringbuffers *must* be have size equal to a power-of-two, to optimise latency-sensitive math used in hot-paths.
+Note: Ring buffers *must* have size equal to a power-of-two, to optimise latency-sensitive math used in hot-paths.
 
 #### Producer Algorithm
 
-First a producer attempts to claim the next `writer_position` (atomically). 
+First a producer attempts to claim the next `writer_index` (atomically). 
 This sequence number serves as the guaranteed unique index for the buffer.
 This should have a capacity check.  An example algorithm:
 
 ```rust
 fn tryObtainNextWrite() -> Option<i64> {
-  let current = header.write_position.load(Ordering::Relaxed)
+  let current = header.writer_index.load(Ordering::Relaxed)
   let next = current + 1
-  let reader = header.read_position.load(Ordering::Acquire)
+  let reader = header.reader_index.load(Ordering::Acquire)
   let hasCapacity = {
     let previousIndexWithConflict = current + 1 - header.num_buffers
     previousIndexWithConflict < reader
   }
-  if hasCapacity && header.write_position.compare_exchange(
+  if hasCapacity && header.writer_index.compare_exchange(
     current, next, Ordering::SeqCst, Ordering::Relaxed
   ) {
     Some(next)
@@ -117,7 +116,7 @@ fn tryObtainNextWrite() -> Option<i64> {
 This producer now owns this section of the ring-buffer.
 
 Once a producer has finished writing data to its claimed slot, it atomically updates the availability
-buffer entry at the corresponding index using a release store operation. This releases the buffer
+buffer entry at the corresponding index using a release store operation, which releases the buffer
 from the producer.
 
 This can be done as follows:
@@ -131,6 +130,7 @@ fn ringIndex(idx: i64) -> usize {
   (idx & indexMask) as usize
 }
 fn availabilityFlagForIndex(idx: i64) -> i32 {
+  // Note: this should be a logical (zero-fill) right shift.
   (idx >>> shift) as i32
 }
 fn setAvailable(idx: i64) {
@@ -140,18 +140,18 @@ fn setAvailable(idx: i64) {
 
 #### Consumer algorithm
 
-The single consumer checks consecutive availability starting from its current reader_position. A buffer
+The single consumer checks consecutive availability starting from its current `reader_index`. A buffer
 is considered available only if the flag stored in the availability buffer matches the expected availability
  for that sequence number. 
  
- The consumer increments its reader_position only after it reads the next sequence, ensuring producers do not overwrite data it is reading.
+The consumer increments its `reader_index` only after it reads the next sequence, ensuring producers do not overwrite data it is reading.
 
 An example check for availability:
 
 ```rust
 fn tryObtainNextRead() -> Option<i64> {
-  let reader = header.read_position.load(Ordering::Acquire)
-  let writer = header.write_position.load(Ordering::Acquire)
+  let reader = header.reader_index.load(Ordering::Acquire)
+  let writer = header.writer_index.load(Ordering::Acquire)
   let next = reader + 1
   if isReadable(next) {
     Some(next)
@@ -163,118 +163,65 @@ fn tryObtainNextRead() -> Option<i64> {
 fn isReadable(idx: i64) -> bool {
   let ridx = ringIndex(idx)
   let flag = availabilityFlagForIndex(idx)
-  availability_array[idx] == flag
+  availability_array[ringIndex(idx)] == flag
 }
 ```
-
-Note: When done reading, make sure to increment the current read index
+Note: When done reading, ensure the current read index is incremented
 to match the value returned from `tryObtainNextRead`.
 
 ### Dictionary
 
-The dictiionary is a large, variable sized, collection of data types.
+The dictionary is a large, variable sized, collection of data types.
 
-The type of any particularly entry can only be determined via a ringbuffer association.  For example, the `Measurement` ringbuffer will include a reference to a "resource" in the dictionary, which may also reference an "attribute set".
+The type of any particular entry can only be determined via a ring buffer association.  For example, the `Measurement` ringbuffer will include a reference to a "resource" in the dictionary, which may also reference an "attribute set".
 
 
-The dictionary begins with a 64-byte header:
+The dictionary begins with a 64-byte header. The `end` and `num_entries` fields MUST be accessed using atomic operations.
 
-| Field            | Size | Index | Type  | Description                                        |
-|------------------|------|-------|-------|----------------------------------------------------|
-| end              | 8    | 1     | int64 | index after the last entry was written.                |
-| num_entries      | 8    | 2     | int64 | the number of entries written.                     |
-| unused           | 48   |       |       | zeroed out bits                                    |
+| Field            | Size | Offset | Type  | Description                                        |
+|------------------|------|--------|-------|----------------------------------------------------|
+| end              | 8    | 0      | int64 | Offset of the end of the last written entry.       |
+| num_entries      | 8    | 8      | int64 | The number of entries written.                     |
+| unused           | 48   | 16     |       | Reserved for future use. Must be zeroed.           |
 
 When interacting with the dictionary, all references are *offsets from the start of the file*.
 
-Dictionary entries are serialized protocol buffer messages (so they MUST begin with serialized size, as a varint).
+Dictionary entries are serialized Protocol Buffer messages (they MUST begin with a serialized size as a varint).
 
 ## Specific Types
 
 ### Ringbuffer - Events
 
-TODO
+The event ringbuffer is composed of events that match the `Event` message in
+`mmap.proto`.
 
 ### Ringbuffer - Spans
 
-The span metric ringbuffer contains "span" events.  These events contain:
-
-- scope_ref: Dictionary offset to an InstrumentationScope
-- trace id: TODO
-- span id: TODO
-- one of the following:
-  - Start Span Event
-    - span name
-    - timestamp
-    - parent_span_id
-    - span flags
-    - span kind
-    - attribute_ref: Dictionary offset to an Attribute Set.
-  - Change Span Name Event
-    - span name
-  - Update Attributes Event
-    - attribute_ref: Dictionary offset to additional attributes.
-  - End Span Event
-    - timestamp
-    - status
-  - Add Span Link Event
-    - other trace id
-    - other span id
-    - attributes_ref
+The span event ring buffer contains `SpanEvent` messages in `mmap.proto`.
 
 ### RingBuffer - Metrics
 
-The core metric ringbuffer contains "measurement" events. These events contain:
+The core metric ring buffer contains `Measurement` messages from `mmap.proto`.
 
-- scope_ref: Dictionary offset to InstrumentationScope definition.
-- metric_ref: Dictionary offset to metric definition.
-- span_context: Current span context
-- timestamp: Current timestamp of the measurement.
-- timeseries_ref: Dictionary offset to Attribute set.
-- value: The value being recorded (integer or double)
-- TODO - "additional attributes"?
+### Dictionary - Instrumentation Scope
 
-
-### Dictionary - InstrumentationScope
-
-The core instrumentation scope entry contains the following:
-
-- resource_ref: Dictionary offset to a resource.
-- name: name of the instrumentation scope
-- version: the version of the instrumentation scope
-- schema_url: the schema url of the instrumentation scope.
-- attributes_ref: Dictionary offset to an attribute set.
+Anywhere a `scope_ref` or `instrumentation_scope_ref` is defined, you
+should expect a dictionary entry at this location which is a
+serialized `InstrumentationScope` message from `mmap.proto`.
 
 ### Dictionary - Resource
 
-```proto
-message Resource {
-  repeated KeyValueRef attributes = 1;
-  // TODO - entities?
-}
-```
+Anywhere a `resource_ref` is defined, you should expect a dictionary
+entry at this location which is a serialized `Resource` message from
+`mmap.proto`.
 
-### Payload - Attribute Set (TODO)
+### Dictionary - Strings
 
-The attribute set entry contains a set of key-value attributes.
+Anywhere a `key_ref` is defined, you should expect a dictionary entry at this location which is a length-delimited, serialized UTF-8 `String`.
 
-An attribute set is a repeated field of containing one of the following:
+This is also used for `name_ref`, `version_ref`, and `event_name_ref`.
 
-- A KeyValue pair
-- A dictionary offset to another attribute set.
+### Dictionary - MetricDefinitions
 
-### Payload - KeyValue pair
-
-A key value pair is the following:
-
-- A dictionary offset to the key (a string).
-- The value (serialized in proto)
-
-```proto
-message KeyValueRef {
-  // Offset to the key in the dictionary.
-  long key_ref = 1;
-  // OTLP anyvalue.
-  AnyValue value = 2;
-}
-```
+Anywhere a `metric_ref` is defined, you should expect a dictionary
+entry at this location which is a `MetricRef` message from `mmap.proto`.
