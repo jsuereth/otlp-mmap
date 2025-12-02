@@ -17,7 +17,7 @@ syntax = "proto3";
 package opentelemetry.proto.mmap.v1;
 
 message SpanEvent {
-  // InsturmentationScope from which this was recorded.
+  // InstrumentationScope from which this was recorded.
   int64 scope_ref = 20;
   // A unique identifier for a trace. All spans from the same trace share
   // the same `trace_id`. The ID is a 16-byte array. An ID with all zeroes OR
@@ -283,22 +283,15 @@ message Status {
 // collector.  This MUST use the metric_ref to determine
 // how to aggregate the measurement into a real OTLP metric.
 message Measurement {
-    // Reference to the definitiion of this metric.
+    // Reference to the definition of this metric in the dictionary.
     int64 metric_ref = 1;
-    // TODO- use a ref for this?
-    // A collection of attribute key/value pairs on the link.
-    // Attribute keys MUST be unique (it is not allowed to have more than one
-    // attribute with the same key).
-    //
-    // The attribute values SHOULD NOT contain empty values.
-    // The attribute values SHOULD NOT contain bytes values.
-    // The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-    // double values.
-    // The attribute values SHOULD NOT contain kvlist values.
-    // The behavior of software that receives attributes containing such values can be unpredictable.
-    // These restrictions can change in a minor release.
-    // The restrictions take origin from the OpenTelemetry specification:
-    // https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+
+    // A collection of attribute key/value pairs that identify the time series.
+    // For performance, it is recommended to use a `value_ref` in `AnyValue`
+    // to point to a dictionary entry for attribute sets, especially for metrics
+    // with high cardinality.
+    // TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+    // entry to better deduplicate attribute sets.
     repeated KeyValueRef attributes = 2;
     // Value is UNIX Epoch time in nanoseconds since 00:00:00 UTC on 1 January
     // 1970.
@@ -342,7 +335,7 @@ message MetricRef {
     // since last report time, or cumulative changes since a fixed start time.
     AggregationTemporality aggregation_temporality = 1;
     // Bucket boundaries to use for this histogram.
-    repeated double bucket_boundares = 2;
+    repeated double bucket_boundaries = 2;
   }
   message ExponentialHistogram {
     // aggregation_temporality describes if the aggregator reports delta changes
@@ -363,7 +356,7 @@ message MetricRef {
 }
 
 message Event {
-  // InsturmentationScope from which this was recorded.
+  // InstrumentationScope from which this was recorded.
   int64 scope_ref = 1; 
 
   // time_unix_nano is the time when the event occurred.
@@ -421,8 +414,7 @@ message Resource {
   uint32 dropped_attributes_count = 2;
 }
 
-// InstrumentationScope is a message representing the instrumentation scope information
-// such as the fully qualified name and version. 
+// InstrumentationScope defines a logical unit of code instrumentation. 
 message InstrumentationScope {
 
   // A name denoting the Instrumentation scope.
@@ -446,7 +438,7 @@ message InstrumentationScope {
   int64 resource_ref = 5;
 }
 
-// KeyValue Ref represents a Key-Value pair.
+// KeyValueRef represents a key-value pair.
 message KeyValueRef {
     // Reference to a key in the dictionary.
     int64 key_ref = 1;
@@ -466,7 +458,8 @@ message AnyValue {
     int64 int_value = 3;
     double double_value = 4;
     ArrayValue array_value = 5;
-    // TODO - should we force keys to be in dictionaries here?
+    // TODO: Consider forcing keys for KeyValueList to be dictionary references
+    // for consistency and to reduce data size.
     KeyValueList kvlist_value = 6;
     bytes bytes_value = 7;
     // Reference to a value in the dictionary.
@@ -488,7 +481,7 @@ message ArrayValue {
 // avoid unnecessary extra wrapping (which slows down the protocol). The 2 approaches
 // are semantically equivalent.
 message KeyValueList {
-  // A collection of key/value pairs of key-value pairs. The list may be empty (may
+  // A collection of key/value pairs. The list may be empty (may
   // contain 0 elements).
   // The keys MUST be unique (it is not allowed to have more than one
   // value with the same key).
