@@ -170,7 +170,7 @@ mod tests {
     use std::io::{Seek, Write};
     use tempfile::NamedTempFile;
 
-    // The header is 40 bytes, but MmapHeader maps 64 bytes.
+    // The header is 64 bytes, but only 40 bytes are used today.
     const HEADER_SIZE: u64 = 64;
 
     /// Helper to write the main MMAP header.
