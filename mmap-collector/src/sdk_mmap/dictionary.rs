@@ -70,10 +70,10 @@ impl RawDictionary {
     // Note: We need to do shenanigans for String to read properly.
     // Prost, by default, serializes "String" type as the google.proto.String message.
     fn try_read_string(&mut self, index: i64) -> Result<String, Error> {
-        let offset = (index as u64 - self.offset) as usize;
         if (index as u64) < self.offset {
             return Err(Error::NotFoundInDictionary("string".to_owned(), index));
         }
+        let offset = (index as u64 - self.offset) as usize;
         if let Some(mut buf) = self.data.get(offset..) {
             let mut result = String::new();
             let ctx = prost::encoding::DecodeContext::default();
@@ -128,4 +128,222 @@ pub(crate) struct RawDictionaryHeader {
     end: AtomicI64,
     /// Number of entries that have been written to the dictionary.
     num_entries: AtomicI64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sdk_mmap::data;
+    use prost::Message;
+    use std::fs::OpenOptions;
+    use std::io::{Seek, Write};
+    use std::sync::atomic::Ordering;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_new_resizes_file() -> Result<(), Error> {
+        let file = NamedTempFile::new()?;
+        let f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let offset = 64;
+        f.set_len(offset)?; // Set file size to be smaller than min_size
+        let dict = RawDictionary::try_new(f, offset)?;
+        let new_size = dict.f.metadata()?.len();
+        assert_eq!(new_size, offset + 1024);
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_header() -> Result<(), Error> {
+        let file = NamedTempFile::new()?;
+        let mut f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let offset = 0;
+        f.set_len(1024)?;
+
+        // Manually write a header
+        let end_val: i64 = 123;
+        let num_entries_val: i64 = 456;
+        f.write_all(&end_val.to_ne_bytes())?;
+        f.write_all(&num_entries_val.to_ne_bytes())?;
+        f.flush()?;
+
+        let dict_file = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let dict = RawDictionary::try_new(dict_file, offset)?;
+        let header = dict.header();
+
+        assert_eq!(header.end.load(Ordering::Relaxed), end_val);
+        assert_eq!(header.num_entries.load(Ordering::Relaxed), num_entries_val);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_read_string_ok() -> Result<(), Error> {
+        let file = NamedTempFile::new()?;
+        let mut f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let offset = 64;
+        f.set_len(offset + 1024)?;
+
+        // Write a prost-encoded string to the file
+        let test_string = "hello world".to_string();
+        let mut buf = Vec::new();
+        // Prost encodes strings as length-delimited
+        prost::encoding::string::encode(1, &test_string, &mut buf);
+        // We need to strip the tag, try_read_string doesn't expect it
+        let encoded_string = &buf[1..];
+        f.seek(std::io::SeekFrom::Start(offset + 100))?;
+        f.write_all(encoded_string)?;
+        f.flush()?;
+
+        let dict_file = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let dict = Dictionary::try_new(dict_file, offset)?;
+
+        let result = dict.try_read_string((offset + 100) as i64).await?;
+        assert_eq!(result, test_string);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_read_string_invalid_index() -> Result<(), Error> {
+        let file = NamedTempFile::new()?;
+        let f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let offset = 64;
+        f.set_len(offset + 1024)?;
+        let dict = Dictionary::try_new(f, offset)?;
+
+        let result = dict.try_read_string(offset as i64 - 10).await;
+        assert!(matches!(result, Err(Error::NotFoundInDictionary(_, _))));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_read_message_ok() -> Result<(), Error> {
+        let file = NamedTempFile::new()?;
+        let mut f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let offset = 128;
+        f.set_len(offset + 1024)?;
+
+        let resource = data::Resource {
+            attributes: vec![],
+            dropped_attributes_count: 42,
+        };
+
+        let mut buf = Vec::new();
+        resource.encode_length_delimited(&mut buf)?;
+        f.seek(std::io::SeekFrom::Start(offset + 200))?;
+        f.write_all(&buf)?;
+        f.flush()?;
+
+        let dict_file = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let dict = Dictionary::try_new(dict_file, offset)?;
+        let result: data::Resource = dict.try_read((offset + 200) as i64).await?;
+
+        assert_eq!(result.dropped_attributes_count, 42);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_read_message_invalid_index() -> Result<(), Error> {
+        let file = NamedTempFile::new()?;
+        let f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let offset = 64;
+        f.set_len(offset + 1024)?;
+        let dict = Dictionary::try_new(f, offset)?;
+
+        let result: Result<data::Resource, Error> = dict.try_read(10).await;
+        assert!(matches!(result, Err(Error::NotFoundInDictionary(_, 10))));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_read_message_corrupted_data() -> Result<(), Error> {
+        let file = NamedTempFile::new()?;
+        let mut f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let offset = 0;
+        f.set_len(1024)?;
+        f.write_all(&[0xDE, 0xAD, 0xBE, 0xEF])?; // Write garbage
+        f.flush()?;
+
+        let dict_file = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let dict = Dictionary::try_new(dict_file, offset)?;
+
+        let result: Result<data::Resource, Error> = dict.try_read(offset as i64).await;
+        assert!(matches!(result, Err(Error::ProtobufDecodeError(_))));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_read_beyond_file_bounds() -> Result<(), Error> {
+        let file = NamedTempFile::new()?;
+        let f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let offset = 0;
+        // The mmap size is 1024.
+        f.set_len(offset + 1024)?;
+
+        let dict = Dictionary::try_new(f, offset)?;
+
+        // Try to read from an index far beyond the end of the mmap.
+        let result: Result<data::Resource, Error> = dict.try_read(2048).await;
+        assert!(matches!(result, Err(Error::NotFoundInDictionary(_, 2048))));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_read_malformed_message_fails() -> Result<(), Error> {
+        let file = NamedTempFile::new()?;
+        let mut f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let offset = 0;
+        f.set_len(1024)?;
+
+        // Write a malformed length-delimited message: a length of 100, but only 3 bytes of data.
+        let malformed_buf = &[
+            100, // varint-encoded length of 100
+            1, 2, 3 // Not enough data
+        ];
+        f.seek(std::io::SeekFrom::Start(offset as u64))?;
+        f.write_all(malformed_buf)?;
+        f.flush()?;
+
+        let dict_file = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let dict = Dictionary::try_new(dict_file, offset)?;
+
+        // Try to decode it. This should fail because the buffer is unexpectedly short.
+        let result: Result<data::Resource, Error> = dict.try_read(offset as i64).await;
+        assert!(matches!(result, Err(Error::ProtobufDecodeError(_))));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_read_entry_exceeding_mmap_bounds_edge() -> Result<(), Error> {
+        let file = NamedTempFile::new()?;
+        let mut f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let offset = 0;
+        let mmap_size = 1024;
+        f.set_len(offset + mmap_size)?;
+
+        // Position the entry near the end of the mmap
+        let entry_offset = offset + mmap_size - 4; // 4 bytes from the end
+
+        // Write a malformed entry. The length prefix is 10, but only 4 bytes are
+        // available in the mmap from this position.
+        let malformed_buf = &[
+            10, // varint-encoded length of 10
+            1, 2, 3 // Only 3 bytes of payload, total of 4 bytes with length
+        ];
+        f.seek(std::io::SeekFrom::Start(entry_offset))?;
+        f.write_all(malformed_buf)?;
+        f.flush()?;
+
+        let dict_file = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let dict = Dictionary::try_new(dict_file, offset)?;
+
+        // Try to decode it. This should fail as it tries to read past the mmap boundary.
+        let result: Result<data::Resource, Error> = dict.try_read(entry_offset as i64).await;
+        assert!(matches!(result, Err(Error::ProtobufDecodeError(_))));
+
+        Ok(())
+    }
 }
