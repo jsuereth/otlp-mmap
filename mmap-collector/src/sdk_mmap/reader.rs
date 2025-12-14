@@ -194,7 +194,12 @@ mod tests {
     }
 
     /// Helper to write a ring buffer header at a specific offset.
-    fn write_rb_header(file: &mut File, offset: u64, num_buffers: i64, buffer_size: i64) -> std::io::Result<()> {
+    fn write_rb_header(
+        file: &mut File,
+        offset: u64,
+        num_buffers: i64,
+        buffer_size: i64,
+    ) -> std::io::Result<()> {
         file.seek(std::io::SeekFrom::Start(offset))?;
         file.write_all(&num_buffers.to_ne_bytes())?;
         file.write_all(&buffer_size.to_ne_bytes())?;
@@ -232,11 +237,13 @@ mod tests {
         Ok(())
     }
 
-
     #[test]
     fn test_mmap_header_accessors() -> Result<(), Error> {
         let file = NamedTempFile::new()?;
-        let mut f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let mut f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         f.set_len(1024)?;
 
         write_main_header(&mut f, 1, 100, 200, 300, 400, 12345)?;
@@ -279,12 +286,8 @@ mod tests {
         write_main_header(&mut f, 99, HEADER_SIZE as i64, 200, 300, 400, 0).unwrap();
         write_rb_header(&mut f, HEADER_SIZE, 8, 128).unwrap();
 
-
         let reader_result = MmapReader::new(file.path());
-        assert!(matches!(
-            reader_result,
-            Err(Error::VersionMismatch(99, _))
-        ));
+        assert!(matches!(reader_result, Err(Error::VersionMismatch(99, _))));
     }
 
     #[test]
@@ -325,7 +328,10 @@ mod tests {
     #[test]
     fn test_mmap_reader_has_file_changed() -> Result<(), Error> {
         let file = NamedTempFile::new()?;
-        let mut f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let mut f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         setup_test_mmap_file(&mut f)?;
 
         let reader = MmapReader::new(file.path())?;
@@ -336,7 +342,7 @@ mod tests {
             reader.header.events_offset(),
             reader.header.spans_offset(),
             reader.header.measurements_offset(),
-            reader.header.dictionary_offset()
+            reader.header.dictionary_offset(),
         );
         let new_time = 67890;
         write_main_header(

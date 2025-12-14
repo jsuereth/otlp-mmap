@@ -143,7 +143,10 @@ mod tests {
     #[test]
     fn test_new_resizes_file() -> Result<(), Error> {
         let file = NamedTempFile::new()?;
-        let f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let offset = 64;
         f.set_len(offset)?; // Set file size to be smaller than min_size
         let dict = RawDictionary::try_new(f, offset)?;
@@ -155,7 +158,10 @@ mod tests {
     #[test]
     fn test_read_header() -> Result<(), Error> {
         let file = NamedTempFile::new()?;
-        let mut f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let mut f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let offset = 0;
         f.set_len(1024)?;
 
@@ -166,7 +172,10 @@ mod tests {
         f.write_all(&num_entries_val.to_ne_bytes())?;
         f.flush()?;
 
-        let dict_file = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let dict_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let dict = RawDictionary::try_new(dict_file, offset)?;
         let header = dict.header();
 
@@ -178,7 +187,10 @@ mod tests {
     #[tokio::test]
     async fn test_read_string_ok() -> Result<(), Error> {
         let file = NamedTempFile::new()?;
-        let mut f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let mut f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let offset = 64;
         f.set_len(offset + 1024)?;
 
@@ -193,7 +205,10 @@ mod tests {
         f.write_all(encoded_string)?;
         f.flush()?;
 
-        let dict_file = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let dict_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let dict = Dictionary::try_new(dict_file, offset)?;
 
         let result = dict.try_read_string((offset + 100) as i64).await?;
@@ -205,7 +220,10 @@ mod tests {
     #[tokio::test]
     async fn test_read_string_invalid_index() -> Result<(), Error> {
         let file = NamedTempFile::new()?;
-        let f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let offset = 64;
         f.set_len(offset + 1024)?;
         let dict = Dictionary::try_new(f, offset)?;
@@ -219,7 +237,10 @@ mod tests {
     #[tokio::test]
     async fn test_read_message_ok() -> Result<(), Error> {
         let file = NamedTempFile::new()?;
-        let mut f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let mut f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let offset = 128;
         f.set_len(offset + 1024)?;
 
@@ -234,7 +255,10 @@ mod tests {
         f.write_all(&buf)?;
         f.flush()?;
 
-        let dict_file = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let dict_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let dict = Dictionary::try_new(dict_file, offset)?;
         let result: data::Resource = dict.try_read((offset + 200) as i64).await?;
 
@@ -246,7 +270,10 @@ mod tests {
     #[tokio::test]
     async fn test_read_message_invalid_index() -> Result<(), Error> {
         let file = NamedTempFile::new()?;
-        let f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let offset = 64;
         f.set_len(offset + 1024)?;
         let dict = Dictionary::try_new(f, offset)?;
@@ -260,13 +287,19 @@ mod tests {
     #[tokio::test]
     async fn test_read_message_corrupted_data() -> Result<(), Error> {
         let file = NamedTempFile::new()?;
-        let mut f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let mut f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let offset = 0;
         f.set_len(1024)?;
         f.write_all(&[0xDE, 0xAD, 0xBE, 0xEF])?; // Write garbage
         f.flush()?;
 
-        let dict_file = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let dict_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let dict = Dictionary::try_new(dict_file, offset)?;
 
         let result: Result<data::Resource, Error> = dict.try_read(offset as i64).await;
@@ -277,7 +310,10 @@ mod tests {
     #[tokio::test]
     async fn test_read_beyond_file_bounds() -> Result<(), Error> {
         let file = NamedTempFile::new()?;
-        let f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let offset = 0;
         // The mmap size is 1024.
         f.set_len(offset + 1024)?;
@@ -293,20 +329,26 @@ mod tests {
     #[tokio::test]
     async fn test_read_malformed_message_fails() -> Result<(), Error> {
         let file = NamedTempFile::new()?;
-        let mut f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let mut f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let offset = 0;
         f.set_len(1024)?;
 
         // Write a malformed length-delimited message: a length of 100, but only 3 bytes of data.
         let malformed_buf = &[
             100, // varint-encoded length of 100
-            1, 2, 3 // Not enough data
+            1, 2, 3, // Not enough data
         ];
         f.seek(std::io::SeekFrom::Start(offset as u64))?;
         f.write_all(malformed_buf)?;
         f.flush()?;
 
-        let dict_file = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let dict_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let dict = Dictionary::try_new(dict_file, offset)?;
 
         // Try to decode it. This should fail because the buffer is unexpectedly short.
@@ -319,7 +361,10 @@ mod tests {
     #[tokio::test]
     async fn test_read_entry_exceeding_mmap_bounds_edge() -> Result<(), Error> {
         let file = NamedTempFile::new()?;
-        let mut f = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let mut f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let offset = 0;
         let mmap_size = 1024;
         f.set_len(offset + mmap_size)?;
@@ -331,13 +376,16 @@ mod tests {
         // available in the mmap from this position.
         let malformed_buf = &[
             10, // varint-encoded length of 10
-            1, 2, 3 // Only 3 bytes of payload, total of 4 bytes with length
+            1, 2, 3, // Only 3 bytes of payload, total of 4 bytes with length
         ];
         f.seek(std::io::SeekFrom::Start(entry_offset))?;
         f.write_all(malformed_buf)?;
         f.flush()?;
 
-        let dict_file = OpenOptions::new().read(true).write(true).open(file.path())?;
+        let dict_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(file.path())?;
         let dict = Dictionary::try_new(dict_file, offset)?;
 
         // Try to decode it. This should fail as it tries to read past the mmap boundary.
