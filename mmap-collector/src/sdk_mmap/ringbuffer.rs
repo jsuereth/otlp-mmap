@@ -328,23 +328,73 @@ mod test {
     use crate::sdk_mmap::data::AnyValue;
     use crate::sdk_mmap::{ringbuffer::RawRingBuffer, Error};
     use memmap2::MmapOptions;
+    use std::sync::atomic::Ordering;
     use std::{fs::OpenOptions, sync::Arc};
     use tokio::{sync::RwLock, task::JoinHandle};
 
+
+    /// A helper to create a RawRingBuffer for testing with a specific state.
+    struct TestRingBuffer {
+        // Keep file alive for the duration of the test
+        _file: tempfile::NamedTempFile,
+        pub buffer: RawRingBuffer,
+    }
+
+    #[derive(Clone, Copy)]
+    struct TestRingBufferOptions {
+        num_buffers: usize,
+        buffer_size: usize,
+        reader_idx: i64,
+        writer_idx: i64,
+    }
+    impl Default for TestRingBufferOptions {
+        fn default() -> Self {
+            Self { 
+                num_buffers: 8,
+                buffer_size: 64,
+                reader_idx: -1,
+                writer_idx: -1, 
+            }
+        }
+    }
+
+    impl TestRingBuffer {
+        fn new(
+            opts: TestRingBufferOptions,
+        ) -> TestRingBuffer {
+            let file = tempfile::NamedTempFile::new().unwrap();
+            let f = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(file.path())
+                .unwrap();
+            // Calculate required size. Header + availability array + buffers
+            let header_size = 32;
+            let availability_array_size = opts.num_buffers * 4;
+            let buffers_size = opts.num_buffers * opts.buffer_size;
+            let total_size = header_size + availability_array_size + buffers_size;
+            f.set_len(total_size as u64).unwrap();
+            let data = unsafe { MmapOptions::new().map_mut(&f).unwrap() };
+
+            let buffer = RawRingBuffer::new_for_write(data, 0, opts.buffer_size, opts.num_buffers);
+            buffer.header().reader_index.store(opts.reader_idx, Ordering::SeqCst);
+            buffer.header().writer_index.store(opts.writer_idx, Ordering::SeqCst);
+
+            TestRingBuffer {
+                _file: file,
+                buffer,
+            }
+        }
+    }
+
     #[tokio::test]
     async fn test_read_and_write() -> Result<(), Error> {
-        // TODO - Make sure tempfile works appropriately.
-        let path = tempfile::NamedTempFile::new()?;
-        let f = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(path.path())?;
-        let desired_len = 512 * 8 + 64 + 128;
-        f.set_len(desired_len)?;
-        let data = unsafe { MmapOptions::new().map_mut(&f)? };
-        let buffer = Arc::new(RwLock::new(RawRingBuffer::new_for_write(data, 0, 512, 8)));
+        let options = TestRingBufferOptions {
+            num_buffers: 8,
+            buffer_size: 512,            
+            ..Default::default()
+        };
+        let buffer = Arc::new(RwLock::new(TestRingBuffer::new(options.clone())));
         let read_buffer = buffer.clone();
         let publish: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
             for i in 0..1000 {
@@ -355,7 +405,7 @@ mod test {
                         let value = AnyValue {
                             value: Some(Value::StringValue(format!("{i}"))),
                         };
-                        done = ring.try_write(&value)?;
+                        done = ring.buffer.try_write(&value)?;
                     }
                     tokio::task::yield_now().await;
                 }
@@ -368,7 +418,7 @@ mod test {
                 while !done {
                     {
                         let ring = read_buffer.read().await;
-                        if let Some(value) = ring.try_read::<AnyValue>()? {
+                        if let Some(value) = ring.buffer.try_read::<AnyValue>()? {
                             if let AnyValue {
                                 value: Some(Value::StringValue(sv)),
                             } = value
@@ -390,5 +440,80 @@ mod test {
         r1?;
         r2?;
         Ok(())
+    }
+
+
+    #[test]
+    fn test_ring_buffer_index() {
+        let test_buffer = TestRingBuffer::new(TestRingBufferOptions::default());
+        let ring = &test_buffer.buffer;
+
+        assert_eq!(ring.ring_buffer_index(0), 0);
+        assert_eq!(ring.ring_buffer_index(7), 7);
+        assert_eq!(ring.ring_buffer_index(8), 0, "should wrap around");
+        assert_eq!(ring.ring_buffer_index(15), 7, "should wrap around");
+    }
+
+    #[test]
+    fn test_is_and_set_read_available() {
+        // The number of buffers must be a power of two for the shift logic to be correct.
+        let test_buffer = TestRingBuffer::new(TestRingBufferOptions::default());
+        let ring = &test_buffer.buffer;
+        assert_eq!(ring.shift, 3);
+
+        let idx = 10; // ring index 2
+        let flag = (idx as u32 >> ring.shift) as i32; // 10 >> 3 = 1
+        assert_eq!(flag, 1);
+
+        assert!(!ring.is_read_available(idx), "should not be available initially");
+        ring.set_read_available(idx);
+        assert!(ring.is_read_available(idx), "should be available after set");
+
+        // Check another index that maps to the same ring slot but needs a different flag
+        let idx2 = idx + (1 << ring.shift); // 10 + 8 = 18, ring index 2
+        let flag2 = (idx2 as u32 >> ring.shift) as i32; // 18 >> 3 = 2
+        assert_eq!(flag2, 2);
+        assert!(!ring.is_read_available(idx2), "should not be available, as flag is different");
+    }
+
+    #[test]
+    fn test_try_obtain_write_idx() {
+        // Buffer with space
+        let test_buffer_space = TestRingBuffer::new(
+            TestRingBufferOptions { writer_idx: 4, ..Default::default() });
+        let ring_space = &test_buffer_space.buffer;
+        assert_eq!(ring_space.try_obtain_write_idx(), Some(5));
+        assert_eq!(ring_space.header().writer_index.load(Ordering::SeqCst), 5);
+
+        // Buffer full condition
+        // Writer is at 7, reader is at 0. `has_capacity` is `(7 + 1 - 8) < 0` which is `0 < 0` -> false.
+        // So the buffer is considered full when writer_index == reader_index + num_buffers - 1
+        let test_buffer_full = TestRingBuffer::new(
+            TestRingBufferOptions { writer_idx: 7, reader_idx: 0, ..Default::default() });
+        let ring_full = &test_buffer_full.buffer;
+        assert_eq!(ring_full.try_obtain_write_idx(), None, "buffer should be full");
+    }
+
+    #[test]
+    fn test_try_obtain_read_idx() {
+        // Happy path
+        let test_buffer_happy = TestRingBuffer::new(
+            TestRingBufferOptions { reader_idx: 4, writer_idx: 5, ..Default::default() });
+        let ring_happy = &test_buffer_happy.buffer;
+        ring_happy.set_read_available(5);
+        assert_eq!(ring_happy.try_obtain_read_idx(), Some(5));
+
+        // Empty (reader has caught up to writer)
+        let test_buffer_empty = TestRingBuffer::new(
+            TestRingBufferOptions { reader_idx: 4, writer_idx: 4, ..Default::default() });
+        let ring_empty = &test_buffer_empty.buffer;
+        assert_eq!(ring_empty.try_obtain_read_idx(), None);
+
+        // Not yet available
+        let test_buffer_not_ready = TestRingBuffer::new(TestRingBufferOptions { reader_idx: 4, writer_idx: 5, ..Default::default() });
+        let ring_not_ready = &test_buffer_not_ready.buffer;
+        // writer is at 5, but `set_read_available(5)` has not been called
+        assert!(!ring_not_ready.is_read_available(5));
+        assert_eq!(ring_not_ready.try_obtain_read_idx(), None);
     }
 }
