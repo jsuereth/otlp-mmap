@@ -190,7 +190,7 @@ impl CollectorSdk {
             // TODO - Config
             // println!("Batching spans");
             let span_batch = spans
-                .try_buffer_spans(self, self, 1000, Duration::from_secs(60))
+                .try_buffer_spans(&self.reader.spans, self, 1000, Duration::from_secs(60))
                 .await?;
             let next_batch = self.try_create_span_batch(span_batch).await?;
             if !next_batch.resource_spans.is_empty() {
@@ -413,19 +413,5 @@ impl AttributeLookup for CollectorSdk {
         kv: KeyValueRef,
     ) -> Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error> {
         self.try_convert_attribute(kv).await
-    }
-}
-
-impl trace::SpanEventQueue for CollectorSdk {
-    fn try_read_next<'a>(
-        &'a self,
-    ) -> std::pin::Pin<
-        Box<
-            dyn core::future::Future<Output = Result<crate::sdk_mmap::data::SpanEvent, Error>>
-                + Send
-                + 'a,
-        >,
-    > {
-        Box::pin(async { self.reader.spans.next().await })
     }
 }

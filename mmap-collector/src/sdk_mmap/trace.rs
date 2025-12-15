@@ -6,6 +6,7 @@
 
 use crate::sdk_mmap::{
     data::{span_event::Event, SpanEvent},
+    ringbuffer::AsyncEventQueue,
     AttributeLookup, Error,
 };
 use std::collections::HashMap;
@@ -74,7 +75,10 @@ impl ActiveSpans {
     /// Reads events, tracking spans and attempts to construct a buffer.
     ///
     /// If timeout is met before buffer is filled, the buffer is returned.
-    pub async fn try_buffer_spans<Q: SpanEventQueue + Sync, L: AttributeLookup + Sync>(
+    pub async fn try_buffer_spans<
+        Q: AsyncEventQueue<SpanEvent> + Sync,
+        L: AttributeLookup + Sync,
+    >(
         &mut self,
         event_queue: &Q,
         lookup: &L,
@@ -190,30 +194,16 @@ impl ActiveSpans {
     }
 }
 
-/// Trait to read span events from the queue.
-/// Uses so we can write tests without a full MMAP file.
-pub trait SpanEventQueue {
-    /// Reads the next span event.
-    fn try_read_next<'a>(
-        &'a self,
-    ) -> std::pin::Pin<
-        Box<
-            dyn core::future::Future<Output = Result<crate::sdk_mmap::data::SpanEvent, Error>>
-                + Send
-                + 'a,
-        >,
-    >;
-}
-
 #[cfg(test)]
 mod test {
     use crate::sdk_mmap::data::any_value::Value;
     use crate::sdk_mmap::data::span_event::{EndSpan, Event, StartSpan};
+    use crate::sdk_mmap::data::SpanEvent;
     use crate::sdk_mmap::data::{AnyValue, KeyValueRef, Status};
+    use crate::sdk_mmap::ringbuffer::AsyncEventQueue;
     use crate::sdk_mmap::trace::ActiveSpans;
     use crate::sdk_mmap::AttributeLookup;
     use crate::sdk_mmap::Error;
-    use crate::sdk_mmap::{data::SpanEvent, trace::SpanEventQueue};
     use std::collections::HashMap;
     use tokio::sync::Mutex;
 
@@ -230,30 +220,20 @@ mod test {
             }
         }
     }
-    impl SpanEventQueue for TestSpanEventQueue {
-        fn try_read_next<'a>(
-            &'a self,
-        ) -> std::pin::Pin<
-            Box<
-                dyn core::future::Future<Output = Result<crate::sdk_mmap::data::SpanEvent, Error>>
-                    + Send
-                    + 'a,
-            >,
-        > {
-            Box::pin(async {
-                let mut idx = self.index.lock().await;
-                if *idx < self.events.len() {
-                    let real_idx: usize = *idx;
-                    *idx += 1;
-                    Ok(self.events[real_idx].to_owned())
-                } else {
-                    // TODO - real error
-                    Err(Error::NotFoundInDictionary(
-                        "Index is too large".to_owned(),
-                        *idx as i64,
-                    ))
-                }
-            })
+    impl AsyncEventQueue<SpanEvent> for TestSpanEventQueue {
+        async fn try_read_next(&self) -> Result<crate::sdk_mmap::data::SpanEvent, Error> {
+            let mut idx = self.index.lock().await;
+            if *idx < self.events.len() {
+                let real_idx: usize = *idx;
+                *idx += 1;
+                Ok(self.events[real_idx].to_owned())
+            } else {
+                // TODO - real error
+                Err(Error::NotFoundInDictionary(
+                    "Index is too large".to_owned(),
+                    *idx as i64,
+                ))
+            }
         }
     }
     // TODO - move this into some helper location for all SDK pieces.

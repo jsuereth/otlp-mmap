@@ -30,6 +30,24 @@ use tokio::sync::Mutex;
 
 use crate::sdk_mmap::Error;
 
+/// Abstract trait to interact with ring buffers.
+pub trait AsyncEventQueue<T>
+where
+    T: prost::Message + std::default::Default + 'static,
+{
+    /// Asynchronously read next value.  THis will not return until a value is available.
+    async fn try_read_next(&self) -> Result<T, Error>;
+}
+
+impl<T> AsyncEventQueue<T> for RingBufferReader<T>
+where
+    T: prost::Message + std::default::Default + 'static,
+{
+    async fn try_read_next(&self) -> Result<T, Error> {
+        self.next().await
+    }
+}
+
 /// Async access to RingBuffer inputs.
 ///
 /// Thread-safe across threads.

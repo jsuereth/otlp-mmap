@@ -6,13 +6,47 @@ use std::{
     sync::atomic::{AtomicI64, AtomicU64, Ordering},
 };
 
-use crate::sdk_mmap::data::{Event, Measurement, SpanEvent};
 use crate::sdk_mmap::ringbuffer::RingBufferReader;
+use crate::sdk_mmap::{
+    data::{Event, Measurement, SpanEvent},
+    dictionary::AsyncDictionary,
+    ringbuffer::AsyncEventQueue,
+};
 use memmap2::{MmapMut, MmapOptions};
 
 use crate::{sdk_mmap::dictionary::Dictionary, sdk_mmap::Error};
 
 const SUPPORTED_MMAP_VERSION: &[i64] = &[1];
+
+/// Trait used to stub out the behavior of reading MMap files
+pub trait AsyncMmapReader {
+    /// The queue for reading spans.
+    fn spans_queue<'a>(&'a self) -> &'a impl AsyncEventQueue<SpanEvent>;
+    /// The queue for reading measurements.
+    fn measurement_queue<'a>(&'a self) -> &'a impl AsyncEventQueue<Measurement>;
+    /// The queue for reading events.
+    fn event_queue<'a>(&'a self) -> &'a impl AsyncEventQueue<Event>;
+    /// The queue for reading dictionary entries.
+    fn dictionary<'a>(&'a self) -> &'a impl AsyncDictionary;
+}
+
+impl AsyncMmapReader for MmapReader {
+    fn spans_queue<'a>(&'a self) -> &'a impl AsyncEventQueue<SpanEvent> {
+        &self.spans
+    }
+
+    fn measurement_queue<'a>(&'a self) -> &'a impl AsyncEventQueue<Measurement> {
+        &self.metrics
+    }
+
+    fn event_queue<'a>(&'a self) -> &'a impl AsyncEventQueue<Event> {
+        &self.events
+    }
+
+    fn dictionary<'a>(&'a self) -> &'a impl AsyncDictionary {
+        &self.dictionary
+    }
+}
 
 /// Raw reader of mmap files.
 pub struct MmapReader {
