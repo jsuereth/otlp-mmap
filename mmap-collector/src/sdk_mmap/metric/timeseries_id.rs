@@ -1,21 +1,25 @@
 //! Timeseries identity helpers.
 
-use crate::sdk_mmap::{AttributeLookup, Error, data::KeyValueRef};
+use crate::sdk_mmap::{data::KeyValueRef, AttributeLookup, Error};
 
 /// A hashable time series identity.
+#[derive(Debug)]
 pub struct TimeSeriesIdentity {
     attributes: Vec<opentelemetry_proto::tonic::common::v1::KeyValue>,
 }
 impl TimeSeriesIdentity {
-
     /// Constructs a new timeseries identity.
-    /// 
+    ///
     /// Key values MUST be sorted and avoid duplicates.
-    /// 
+    ///
     /// For testing.
     #[cfg(test)]
-    pub fn new<T: Into<Vec<opentelemetry_proto::tonic::common::v1::KeyValue>>>(attributes: T) -> TimeSeriesIdentity {
-        TimeSeriesIdentity { attributes: attributes.into() }
+    pub fn new<T: Into<Vec<opentelemetry_proto::tonic::common::v1::KeyValue>>>(
+        attributes: T,
+    ) -> TimeSeriesIdentity {
+        TimeSeriesIdentity {
+            attributes: attributes.into(),
+        }
     }
     /// Constructs a new timeseries identifier from the given attribute key value refs.
     pub async fn from_keyvalue_refs<T: AttributeLookup + Sync>(
@@ -25,7 +29,7 @@ impl TimeSeriesIdentity {
         let mut kvs = Vec::new();
         for kv in attributes {
             // TODO - avoid copying kv here.
-            kvs.push(sdk.try_convert_attribute(kv.to_owned()).await?);
+            kvs.push(sdk.try_convert_attribute(kv.clone()).await?);
         }
         // Sort by key name for faster comparisons later.
         kvs.sort_by(|l, r| l.key.cmp(&r.key));
@@ -140,5 +144,308 @@ fn compare_values(
         (Value::BytesValue(_), Value::ArrayValue(_)) => todo!(),
         (Value::BytesValue(_), Value::KvlistValue(_)) => todo!(),
         (Value::BytesValue(_), Value::BytesValue(_)) => todo!(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sdk_mmap::{
+        data::{any_value::Value, AnyValue, KeyValueRef},
+        AttributeLookup,
+    };
+    use opentelemetry_proto::tonic::common::v1::{
+        any_value::Value as OTLPValue, AnyValue as OTLPAnyValue, KeyValue,
+    };
+    use std::future::Future;
+    use std::pin::Pin;
+
+    fn kv(key: &str, value: OTLPValue) -> KeyValue {
+        KeyValue {
+            key: key.to_string(),
+            value: Some(OTLPAnyValue { value: Some(value) }),
+        }
+    }
+
+    // Mock implementation of `AttributeLookup` for testing `from_keyvalue_refs`
+    struct MockAttributeLookup;
+
+    impl AttributeLookup for MockAttributeLookup {
+        fn try_convert_attribute<'a>(
+            &'a self,
+            kv_ref: KeyValueRef,
+        ) -> Pin<
+            Box<
+                dyn Future<Output = Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error>>
+                    + Send
+                    + 'a,
+            >,
+        >
+        where
+            Self: Sync + 'a,
+        {
+            Box::pin(async move {
+                let key_string = format!("key_{}", kv_ref.key_ref); // Simplified key lookup
+
+                let otlp_value = if let Some(any_value) = kv_ref.value {
+                    any_value.value.map(|v| {
+                        let new_val = match v {
+                            Value::StringValue(s) => OTLPValue::StringValue(s),
+                            Value::BoolValue(b) => OTLPValue::BoolValue(b),
+                            Value::IntValue(i) => OTLPValue::IntValue(i),
+                            Value::DoubleValue(d) => OTLPValue::DoubleValue(d),
+                            Value::BytesValue(b) => OTLPValue::BytesValue(b),
+                            _ => todo!(), // For ArrayValue, KvlistValue, ValueRef
+                        };
+                        OTLPAnyValue {
+                            value: Some(new_val),
+                        }
+                    })
+                } else {
+                    None
+                };
+
+                Ok(opentelemetry_proto::tonic::common::v1::KeyValue {
+                    key: key_string,
+                    value: otlp_value,
+                })
+            })
+        }
+    }
+
+    #[test]
+    fn test_new_timeseries_identity() {
+        let attributes = vec![kv("key1", OTLPValue::StringValue("value1".to_string()))];
+        let id = TimeSeriesIdentity::new(attributes.clone());
+        assert_eq!(id.attributes, attributes);
+    }
+
+    #[test]
+    fn test_to_otlp_attributes() {
+        let attributes = vec![kv("key1", OTLPValue::StringValue("value1".to_string()))];
+        let id = TimeSeriesIdentity::new(attributes.clone());
+        assert_eq!(id.to_otlp_attributes(), attributes);
+    }
+
+    #[test]
+    fn test_partial_eq_timeseries_identity() {
+        let id1 = TimeSeriesIdentity::new(vec![kv(
+            "key1",
+            OTLPValue::StringValue("value1".to_string()),
+        )]);
+        let id2 = TimeSeriesIdentity::new(vec![kv(
+            "key1",
+            OTLPValue::StringValue("value1".to_string()),
+        )]);
+        let id3 = TimeSeriesIdentity::new(vec![kv(
+            "key2",
+            OTLPValue::StringValue("value2".to_string()),
+        )]);
+
+        assert_eq!(id1, id2);
+        assert_ne!(id1, id3);
+    }
+
+    #[tokio::test]
+    async fn test_from_keyvalue_refs_sorts_keys() {
+        let sdk = MockAttributeLookup;
+        let attributes_unsorted = vec![
+            KeyValueRef {
+                key_ref: 2,
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue("valueB".to_string())),
+                }),
+            },
+            KeyValueRef {
+                key_ref: 1,
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue("valueA".to_string())),
+                }),
+            },
+        ];
+        let id = TimeSeriesIdentity::from_keyvalue_refs(&attributes_unsorted, &sdk)
+            .await
+            .unwrap();
+
+        assert_eq!(id.attributes[0].key, "key_1");
+        assert_eq!(id.attributes[1].key, "key_2");
+    }
+
+    #[test]
+    fn test_ord_timeseries_identity_string_values() {
+        let id1 =
+            TimeSeriesIdentity::new(vec![kv("key", OTLPValue::StringValue("apple".to_string()))]);
+        let id2 = TimeSeriesIdentity::new(vec![kv(
+            "key",
+            OTLPValue::StringValue("banana".to_string()),
+        )]);
+        let id3 =
+            TimeSeriesIdentity::new(vec![kv("key", OTLPValue::StringValue("apple".to_string()))]);
+
+        assert!(id1 < id2);
+        assert!(id2 > id1);
+        assert!(id1 <= id2);
+        assert!(id2 >= id1);
+        assert_eq!(id1, id3);
+        assert!(id1 <= id3);
+        assert!(id1 >= id3);
+    }
+
+    #[test]
+    fn test_ord_timeseries_identity_int_values() {
+        let id1 = TimeSeriesIdentity::new(vec![kv("key", OTLPValue::IntValue(1))]);
+        let id2 = TimeSeriesIdentity::new(vec![kv("key", OTLPValue::IntValue(2))]);
+        let id3 = TimeSeriesIdentity::new(vec![kv("key", OTLPValue::IntValue(1))]);
+
+        assert!(id1 < id2);
+        assert!(id2 > id1);
+        assert!(id1 <= id2);
+        assert!(id2 >= id1);
+        assert_eq!(id1, id3);
+        assert!(id1 <= id3);
+        assert!(id1 >= id3);
+    }
+
+    #[test]
+    fn test_ord_timeseries_identity_bool_values() {
+        let id1 = TimeSeriesIdentity::new(vec![kv("key", OTLPValue::BoolValue(false))]);
+        let id2 = TimeSeriesIdentity::new(vec![kv("key", OTLPValue::BoolValue(true))]);
+        let id3 = TimeSeriesIdentity::new(vec![kv("key", OTLPValue::BoolValue(false))]);
+
+        assert!(id1 < id2);
+        assert!(id2 > id1);
+        assert!(id1 <= id2);
+        assert!(id2 >= id1);
+        assert_eq!(id1, id3);
+        assert!(id1 <= id3);
+        assert!(id1 >= id3);
+    }
+
+    #[test]
+    fn test_ord_timeseries_identity_double_values() {
+        let id1 = TimeSeriesIdentity::new(vec![kv("key", OTLPValue::DoubleValue(1.0))]);
+        let id2 = TimeSeriesIdentity::new(vec![kv("key", OTLPValue::DoubleValue(2.0))]);
+        let id3 = TimeSeriesIdentity::new(vec![kv("key", OTLPValue::DoubleValue(1.0))]);
+
+        assert!(id1 < id2);
+        assert!(id2 > id1);
+        assert!(id1 <= id2);
+        assert!(id2 >= id1);
+        assert_eq!(id1, id3);
+        assert!(id1 <= id3);
+        assert!(id1 >= id3);
+    }
+
+    #[test]
+    fn test_ord_timeseries_identity_multiple_attributes() {
+        let id1 = TimeSeriesIdentity::new(vec![
+            kv("key1", OTLPValue::StringValue("value1".to_string())),
+            kv("key2", OTLPValue::IntValue(1)),
+        ]);
+        let id2 = TimeSeriesIdentity::new(vec![
+            kv("key1", OTLPValue::StringValue("value1".to_string())),
+            kv("key2", OTLPValue::IntValue(2)),
+        ]);
+        let id3 = TimeSeriesIdentity::new(vec![
+            kv("key1", OTLPValue::StringValue("value1".to_string())),
+            kv("key2", OTLPValue::IntValue(1)),
+        ]);
+        let id4 = TimeSeriesIdentity::new(vec![
+            kv("key1", OTLPValue::StringValue("valueA".to_string())),
+            kv("key2", OTLPValue::IntValue(1)),
+        ]);
+
+        assert!(id1 < id2);
+        assert!(id2 > id1);
+        assert!(id1 <= id2);
+        assert!(id2 >= id1);
+        assert_eq!(id1, id3);
+        assert!(id1 <= id3);
+        assert!(id1 >= id3);
+        assert!(id1 < id4); // "value1" < "valueA"
+    }
+
+    #[test]
+    #[ignore = "Unimplemented: Handle different key ID but different types"]
+    fn test_compare_values_string_bool() {
+        // TODO: Add test when `compare_values` handles this case
+        todo!()
+    }
+
+    #[test]
+    #[ignore = "Unimplemented: Handle different key ID but different types"]
+    fn test_compare_values_string_int() {
+        // TODO: Add test when `compare_values` handles this case
+        todo!()
+    }
+
+    #[test]
+    #[ignore = "Unimplemented: Handle different key ID but different types"]
+    fn test_compare_values_string_double() {
+        // TODO: Add test when `compare_values` handles this case
+        todo!()
+    }
+
+    #[test]
+    #[ignore = "Unimplemented: Handle different key ID but different types"]
+    fn test_compare_values_bool_string() {
+        // TODO: Add test when `compare_values` handles this case
+        todo!()
+    }
+
+    #[test]
+    #[ignore = "Unimplemented: Handle different key ID but different types"]
+    fn test_compare_values_bool_int() {
+        // TODO: Add test when `compare_values` handles this case
+        todo!()
+    }
+
+    #[test]
+    #[ignore = "Unimplemented: Handle different key ID but different types"]
+    fn test_compare_values_bool_double() {
+        // TODO: Add test when `compare_values` handles this case
+        todo!()
+    }
+
+    #[test]
+    #[ignore = "Unimplemented: Handle different key ID but different types"]
+    fn test_compare_values_int_string() {
+        // TODO: Add test when `compare_values` handles this case
+        todo!()
+    }
+
+    #[test]
+    #[ignore = "Unimplemented: Handle different key ID but different types"]
+    fn test_compare_values_int_bool() {
+        // TODO: Add test when `compare_values` handles this case
+        todo!()
+    }
+
+    #[test]
+    #[ignore = "Unimplemented: Handle different key ID but different types"]
+    fn test_compare_values_int_double() {
+        // TODO: Add test when `compare_values` handles this case
+        todo!()
+    }
+
+    #[test]
+    #[ignore = "Unimplemented: Handle different key ID but different types"]
+    fn test_compare_values_double_string() {
+        // TODO: Add test when `compare_values` handles this case
+        todo!()
+    }
+
+    #[test]
+    #[ignore = "Unimplemented: Handle different key ID but different types"]
+    fn test_compare_values_double_bool() {
+        // TODO: Add test when `compare_values` handles this case
+        todo!()
+    }
+
+    #[test]
+    #[ignore = "Unimplemented: Handle different key ID but different types"]
+    fn test_compare_values_double_int() {
+        // TODO: Add test when `compare_values` handles this case
+        todo!()
     }
 }
