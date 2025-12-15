@@ -1,19 +1,26 @@
 //! Timeseries identity helpers.
 
-use crate::{
-    sdk_mmap::Error,
-    sdk_mmap::{data::KeyValueRef, CollectorSdk},
-};
+use crate::sdk_mmap::{AttributeLookup, Error, data::KeyValueRef};
 
 /// A hashable time series identity.
 pub struct TimeSeriesIdentity {
     attributes: Vec<opentelemetry_proto::tonic::common::v1::KeyValue>,
 }
 impl TimeSeriesIdentity {
+
+    /// Constructs a new timeseries identity.
+    /// 
+    /// Key values MUST be sorted and avoid duplicates.
+    /// 
+    /// For testing.
+    #[cfg(test)]
+    pub fn new<T: Into<Vec<opentelemetry_proto::tonic::common::v1::KeyValue>>>(attributes: T) -> TimeSeriesIdentity {
+        TimeSeriesIdentity { attributes: attributes.into() }
+    }
     /// Constructs a new timeseries identifier from the given attribute key value refs.
-    pub async fn new(
+    pub async fn from_keyvalue_refs<T: AttributeLookup + Sync>(
         attributes: &[KeyValueRef],
-        sdk: &CollectorSdk,
+        sdk: &T,
     ) -> Result<TimeSeriesIdentity, Error> {
         let mut kvs = Vec::new();
         for kv in attributes {
@@ -22,6 +29,7 @@ impl TimeSeriesIdentity {
         }
         // Sort by key name for faster comparisons later.
         kvs.sort_by(|l, r| l.key.cmp(&r.key));
+        // TODO - remove duplicate keys.
         Ok(TimeSeriesIdentity { attributes: kvs })
     }
 

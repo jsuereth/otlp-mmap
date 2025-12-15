@@ -117,7 +117,7 @@ impl MetricAggregator {
     async fn handle(&mut self, sdk: &CollectorSdk, measurement: Measurement) -> Result<(), Error> {
         // TODO - do we need to convert name_ref into name to deal with possible duplicates in dictionary?
         // TODO - figure out which attributes are NOT kept in timeseries for this.
-        let id = TimeSeriesIdentity::new(&measurement.attributes, sdk).await?;
+        let id = TimeSeriesIdentity::from_keyvalue_refs(&measurement.attributes, sdk).await?;
         self.timeseries
             .entry(id)
             .or_insert(self.aggregation.new_aggregation())
