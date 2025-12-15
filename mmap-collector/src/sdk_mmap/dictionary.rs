@@ -7,29 +7,41 @@ use tokio::sync::Mutex;
 
 use crate::sdk_mmap::Error;
 
+/// A dictionary implementation that allows async access to read entries.
+pub trait AsyncDictionary {
+    /// Reads a string from the dictionary.
+    ///
+    /// Note: "String" type in `prost::Message` records a protobuf message,
+    /// not a raw string.
+    async fn try_read_string(&self, index: i64) -> Result<String, Error>;
+    /// Reads a protobuf encoded value from the dictionary.
+    async fn try_read<T: prost::Message + std::default::Default>(
+        &self,
+        index: i64,
+    ) -> Result<T, Error>;
+}
+
 /// A thread-safe version of the mmap dictionary
 pub struct Dictionary {
     input: Mutex<RawDictionary>,
 }
+impl AsyncDictionary for Dictionary {
+    async fn try_read_string(&self, index: i64) -> Result<String, Error> {
+        self.input.lock().await.try_read_string(index)
+    }
 
+    async fn try_read<T: prost::Message + std::default::Default>(
+        &self,
+        index: i64,
+    ) -> Result<T, Error> {
+        self.input.lock().await.try_read(index)
+    }
+}
 impl Dictionary {
     pub(crate) fn try_new(f: File, offset: u64) -> Result<Dictionary, Error> {
         Ok(Dictionary {
             input: Mutex::new(RawDictionary::try_new(f, offset)?),
         })
-    }
-
-    /// Attempts to read a string from the dictionary.
-    pub async fn try_read_string(&self, index: i64) -> Result<String, Error> {
-        self.input.lock().await.try_read_string(index)
-    }
-
-    /// Attempts to read a proto dictionary entry with a given type.
-    pub async fn try_read<T: prost::Message + std::default::Default>(
-        &self,
-        index: i64,
-    ) -> Result<T, Error> {
-        self.input.lock().await.try_read(index)
     }
 }
 

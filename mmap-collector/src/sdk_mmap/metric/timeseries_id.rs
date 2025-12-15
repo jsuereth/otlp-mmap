@@ -157,9 +157,6 @@ mod tests {
     use opentelemetry_proto::tonic::common::v1::{
         any_value::Value as OTLPValue, AnyValue as OTLPAnyValue, KeyValue,
     };
-    use std::future::Future;
-    use std::pin::Pin;
-
     fn kv(key: &str, value: OTLPValue) -> KeyValue {
         KeyValue {
             key: key.to_string(),
@@ -171,44 +168,33 @@ mod tests {
     struct MockAttributeLookup;
 
     impl AttributeLookup for MockAttributeLookup {
-        fn try_convert_attribute<'a>(
-            &'a self,
+        async fn try_convert_attribute(
+            &self,
             kv_ref: KeyValueRef,
-        ) -> Pin<
-            Box<
-                dyn Future<Output = Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error>>
-                    + Send
-                    + 'a,
-            >,
-        >
-        where
-            Self: Sync + 'a,
-        {
-            Box::pin(async move {
-                let key_string = format!("key_{}", kv_ref.key_ref); // Simplified key lookup
+        ) -> Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error> {
+            let key_string = format!("key_{}", kv_ref.key_ref); // Simplified key lookup
 
-                let otlp_value = if let Some(any_value) = kv_ref.value {
-                    any_value.value.map(|v| {
-                        let new_val = match v {
-                            Value::StringValue(s) => OTLPValue::StringValue(s),
-                            Value::BoolValue(b) => OTLPValue::BoolValue(b),
-                            Value::IntValue(i) => OTLPValue::IntValue(i),
-                            Value::DoubleValue(d) => OTLPValue::DoubleValue(d),
-                            Value::BytesValue(b) => OTLPValue::BytesValue(b),
-                            _ => todo!(), // For ArrayValue, KvlistValue, ValueRef
-                        };
-                        OTLPAnyValue {
-                            value: Some(new_val),
-                        }
-                    })
-                } else {
-                    None
-                };
-
-                Ok(opentelemetry_proto::tonic::common::v1::KeyValue {
-                    key: key_string,
-                    value: otlp_value,
+            let otlp_value = if let Some(any_value) = kv_ref.value {
+                any_value.value.map(|v| {
+                    let new_val = match v {
+                        Value::StringValue(s) => OTLPValue::StringValue(s),
+                        Value::BoolValue(b) => OTLPValue::BoolValue(b),
+                        Value::IntValue(i) => OTLPValue::IntValue(i),
+                        Value::DoubleValue(d) => OTLPValue::DoubleValue(d),
+                        Value::BytesValue(b) => OTLPValue::BytesValue(b),
+                        _ => todo!(), // For ArrayValue, KvlistValue, ValueRef
+                    };
+                    OTLPAnyValue {
+                        value: Some(new_val),
+                    }
                 })
+            } else {
+                None
+            };
+
+            Ok(opentelemetry_proto::tonic::common::v1::KeyValue {
+                key: key_string,
+                value: otlp_value,
             })
         }
     }

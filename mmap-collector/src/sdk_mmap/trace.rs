@@ -267,44 +267,34 @@ mod test {
     }
 
     impl AttributeLookup for TestAttributeLookup {
-        fn try_convert_attribute<'a>(
-            &'a self,
+        async fn try_convert_attribute(
+            &self,
             kv: crate::sdk_mmap::data::KeyValueRef,
-        ) -> std::pin::Pin<
-            Box<
-                dyn core::future::Future<
-                        Output = Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error>,
-                    > + Send
-                    + 'a,
-            >,
-        >
-        where
-            Self: Sync + 'a,
-        {
-            Box::pin(async move {
-                // TODO - share this definition with actual algorithm.
-                let key = self
-                    .string_lookup
-                    .get(&kv.key_ref)
-                    .cloned()
-                    .unwrap_or("<not found>".to_owned());
-                // TODO - handle real conversions.
-                let value = match kv.value {
+        ) -> Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error> {
+            // TODO - share this definition with actual algorithm.
+            let key = self
+                .string_lookup
+                .get(&kv.key_ref)
+                .cloned()
+                .unwrap_or("<not found>".to_owned());
+            // TODO - handle real conversions.
+            let value = match kv.value {
+                None => None,
+                Some(v) => match v.value {
                     None => None,
-                    Some(v) => match v.value {
-                        None => None,
-                        Some(Value::IntValue(v)) => Some(
-                            opentelemetry_proto::tonic::common::v1::AnyValue {
-                                value: Some(
-                                    opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(v)
+                    Some(Value::IntValue(v)) => {
+                        Some(opentelemetry_proto::tonic::common::v1::AnyValue {
+                            value: Some(
+                                opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(
+                                    v,
                                 ),
-                            }
-                        ),
-                        Some(v) => todo!("Support value {v:?}"),
-                    },
-                };
-                Ok(opentelemetry_proto::tonic::common::v1::KeyValue { key, value })
-            })
+                            ),
+                        })
+                    }
+                    Some(v) => todo!("Support value {v:?}"),
+                },
+            };
+            Ok(opentelemetry_proto::tonic::common::v1::KeyValue { key, value })
         }
     }
 

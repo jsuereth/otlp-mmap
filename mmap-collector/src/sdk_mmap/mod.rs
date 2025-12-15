@@ -18,6 +18,7 @@ mod trace;
 pub use crate::sdk_mmap::error::Error;
 use crate::sdk_mmap::{
     data::KeyValueRef,
+    dictionary::AsyncDictionary,
     log::EventCollector,
     metric::{CollectedMetric, MetricStorage},
 };
@@ -398,40 +399,20 @@ struct PartialScope {
     pub resource_ref: i64,
 }
 
-// TODO - maybe just use async trait crate...
 /// Attribute lookup trait used so we can write tests without creating an mmap file.
 pub trait AttributeLookup {
-    fn try_convert_attribute<'a>(
-        &'a self,
+    async fn try_convert_attribute(
+        &self,
         kv: KeyValueRef,
-    ) -> std::pin::Pin<
-        Box<
-            dyn core::future::Future<
-                    Output = Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error>,
-                > + Send
-                + 'a,
-        >,
-    >
-    where
-        Self: Sync + 'a;
+    ) -> Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error>;
 }
 
 impl AttributeLookup for CollectorSdk {
-    fn try_convert_attribute<'a>(
-        &'a self,
+    async fn try_convert_attribute(
+        &self,
         kv: KeyValueRef,
-    ) -> std::pin::Pin<
-        Box<
-            dyn core::future::Future<
-                    Output = Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error>,
-                > + Send
-                + 'a,
-        >,
-    >
-    where
-        Self: Sync + 'a,
-    {
-        Box::pin(async { self.try_convert_attribute(kv).await })
+    ) -> Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error> {
+        self.try_convert_attribute(kv).await
     }
 }
 
