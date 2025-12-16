@@ -278,13 +278,17 @@ impl<T: AsyncMmapReader> CollectorSdk<T> {
     }
 }
 
+/// A scope with reference to its resource in the dictionary.
 struct PartialScope {
+    /// The instrumentation scope.
     pub scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope,
+    /// Reference to a resource in the dictionary.
     pub resource_ref: i64,
 }
 
 /// Attribute lookup trait used so we can write tests without creating an mmap file.
 pub trait AttributeLookup {
+    // TODO - do we still need this?
     async fn try_convert_attribute(
         &self,
         kv: KeyValueRef,
@@ -309,6 +313,7 @@ async fn try_convert_attribute<T: AsyncDictionary>(
     Ok(opentelemetry_proto::tonic::common::v1::KeyValue { key, value })
 }
 
+/// Convert an anyvalue that may have references to dictionary entries into a full anyvalue.
 async fn try_convert_anyvalue<T: AsyncDictionary>(
     lookup: &T,
     value: data::AnyValue,
@@ -367,6 +372,7 @@ async fn try_convert_anyvalue<T: AsyncDictionary>(
     Ok(result.map(|value| opentelemetry_proto::tonic::common::v1::AnyValue { value: Some(value) }))
 }
 
+/// Perform a resource lookup, including attribute lookups / conversion, for a resource.
 pub async fn try_lookup_resource<T: AsyncDictionary>(
     lookup: &T,
     resource_ref: i64,

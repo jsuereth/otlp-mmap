@@ -29,7 +29,7 @@ impl EventCollector {
         let buf = self.try_buffer_events(reader, lookup, len, timeout).await?;
         if !buf.is_empty() {
             return Ok(Some(
-                self.try_create_event_batch(reader, lookup, buf).await?,
+                self.try_create_event_batch(lookup, buf).await?,
             ));
         }
         Ok(None)
@@ -37,7 +37,6 @@ impl EventCollector {
 
     async fn try_create_event_batch(
         &self,
-        reader: &impl AsyncEventQueue<Event>,
         lookup: &impl AsyncDictionary,
         batch: Vec<TrackedEvent>,
     ) -> Result<opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest, Error>
