@@ -2,7 +2,10 @@
 
 use std::{collections::HashMap, time::Duration};
 
-use crate::sdk_mmap::{data::Event, CollectorSdk, Error};
+use crate::sdk_mmap::{
+    data::Event, dictionary::AsyncDictionary, ringbuffer::AsyncEventQueue, try_convert_anyvalue,
+    try_lookup_resource, try_lookup_scope, AttributeLookup, Error,
+};
 
 /// A collector of events.
 pub(crate) struct EventCollector {}
@@ -15,23 +18,27 @@ impl EventCollector {
     /// Batches log events and returns a new protocol request object if we have any by timeout.
     pub async fn try_create_next_batch(
         &mut self,
-        sdk: &CollectorSdk,
+        reader: &impl AsyncEventQueue<Event>,
+        lookup: &impl AsyncDictionary,
         len: usize,
         timeout: Duration,
     ) -> Result<
         Option<opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest>,
         Error,
     > {
-        let buf = self.try_buffer_events(sdk, len, timeout).await?;
+        let buf = self.try_buffer_events(reader, lookup, len, timeout).await?;
         if !buf.is_empty() {
-            return Ok(Some(self.try_create_event_batch(sdk, buf).await?));
+            return Ok(Some(
+                self.try_create_event_batch(reader, lookup, buf).await?,
+            ));
         }
         Ok(None)
     }
 
     async fn try_create_event_batch(
         &self,
-        sdk: &CollectorSdk,
+        reader: &impl AsyncEventQueue<Event>,
+        lookup: &impl AsyncDictionary,
         batch: Vec<TrackedEvent>,
     ) -> Result<opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest, Error>
     {
@@ -48,7 +55,7 @@ impl EventCollector {
             )>,
         > = HashMap::new();
         for scope_ref in scope_map.keys() {
-            let scope = sdk.try_lookup_scope(*scope_ref).await?;
+            let scope = try_lookup_scope(lookup, *scope_ref).await?;
             resource_map
                 .entry(scope.resource_ref)
                 .or_default()
@@ -59,7 +66,7 @@ impl EventCollector {
                 resource_logs: Default::default(),
             };
         for (resource_ref, scopes) in resource_map.into_iter() {
-            let resource = sdk.try_lookup_resource(resource_ref).await?;
+            let resource = try_lookup_resource(lookup, resource_ref).await?;
             let mut resource_logs = opentelemetry_proto::tonic::logs::v1::ResourceLogs {
                 resource: Some(resource),
                 scope_logs: Default::default(),
@@ -86,7 +93,8 @@ impl EventCollector {
     /// Pulls in log events and buffers them for export.
     async fn try_buffer_events(
         &mut self,
-        sdk: &CollectorSdk,
+        reader: &impl AsyncEventQueue<Event>,
+        lookup: &impl AsyncDictionary,
         len: usize,
         timeout: tokio::time::Duration,
     ) -> Result<Vec<TrackedEvent>, Error> {
@@ -98,9 +106,9 @@ impl EventCollector {
         tokio::pin!(send_by_time);
         loop {
             tokio::select! {
-                event = sdk.reader.events.next() => {
+                event = reader.try_read_next() => {
                     // println!("Received log event");
-                    let e = self.try_handle_log_event(event?, sdk).await?;
+                    let e = self.try_handle_log_event(event?, lookup).await?;
                     buf.push(e);
                     // TODO - configure the size of this.
                     if buf.len() >= len {
@@ -117,25 +125,25 @@ impl EventCollector {
     async fn try_handle_log_event(
         &mut self,
         e: Event,
-        attr_lookup: &CollectorSdk,
+        lookup: &impl AsyncDictionary,
     ) -> Result<TrackedEvent, Error> {
         let event_name = if e.event_name_ref == 0 {
             "".to_owned()
         } else {
-            attr_lookup.try_lookup_string(e.event_name_ref).await?
+            lookup.try_read_string(e.event_name_ref).await?
         };
         let (flags, trace_id, span_id) = match e.span_context {
             Some(ctx) => (ctx.flags, ctx.trace_id, ctx.span_id),
             _ => (0, Vec::new(), Vec::new()),
         };
         let body = if let Some(v) = e.body {
-            attr_lookup.try_convert_anyvalue(v).await?
+            try_convert_anyvalue(lookup, v).await?
         } else {
             None
         };
         let mut attributes = Vec::new();
         for kv in e.attributes {
-            attributes.push(attr_lookup.try_convert_attribute(kv).await?);
+            attributes.push(lookup.try_convert_attribute(kv).await?);
         }
         Ok(TrackedEvent {
             scope_ref: e.scope_ref,

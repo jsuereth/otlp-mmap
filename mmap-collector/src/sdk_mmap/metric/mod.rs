@@ -4,6 +4,7 @@ mod aggregation;
 mod timeseries_id;
 
 use crate::sdk_mmap::data::{self};
+use crate::sdk_mmap::dictionary::AsyncDictionary;
 use crate::sdk_mmap::Error;
 use crate::sdk_mmap::{data::Measurement, CollectorSdk};
 use aggregation::Aggregation;
@@ -51,17 +52,19 @@ impl MetricStorage {
     /// Handles an incoming measurement.
     pub async fn handle_measurement(
         &mut self,
-        sdk: &CollectorSdk,
+        lookup: &(impl AsyncDictionary + Sync),
         measurement: Measurement,
     ) -> Result<(), Error> {
         match self.metrics.entry(measurement.metric_ref) {
             Entry::Vacant(entry) => {
                 entry
-                    .insert(MetricAggregator::new(measurement.metric_ref, sdk).await?)
-                    .handle(sdk, measurement)
+                    .insert(MetricAggregator::new(measurement.metric_ref, lookup).await?)
+                    .handle(lookup, measurement)
                     .await
             }
-            Entry::Occupied(mut aggregator) => aggregator.get_mut().handle(sdk, measurement).await,
+            Entry::Occupied(mut aggregator) => {
+                aggregator.get_mut().handle(lookup, measurement).await
+            }
         }
     }
 
@@ -94,8 +97,11 @@ struct MetricAggregator {
 
 impl MetricAggregator {
     /// Constructs a new metric aggregator.
-    async fn new(metric_ref: i64, sdk: &CollectorSdk) -> Result<MetricAggregator, Error> {
-        let definition = sdk.try_lookup_metric(metric_ref).await?;
+    async fn new(
+        metric_ref: i64,
+        dictionary: &impl AsyncDictionary,
+    ) -> Result<MetricAggregator, Error> {
+        let definition: data::MetricRef = dictionary.try_read(metric_ref).await?;
         println!(
             "Discovered metric <{} on scope:{}>",
             definition.name, definition.instrumentation_scope_ref
@@ -114,10 +120,14 @@ impl MetricAggregator {
     }
 
     /// Takes a measurement and passes it into the appropriate aggregation.
-    async fn handle(&mut self, sdk: &CollectorSdk, measurement: Measurement) -> Result<(), Error> {
+    async fn handle(
+        &mut self,
+        lookup: &(impl AsyncDictionary + Sync),
+        measurement: Measurement,
+    ) -> Result<(), Error> {
         // TODO - do we need to convert name_ref into name to deal with possible duplicates in dictionary?
         // TODO - figure out which attributes are NOT kept in timeseries for this.
-        let id = TimeSeriesIdentity::from_keyvalue_refs(&measurement.attributes, sdk).await?;
+        let id = TimeSeriesIdentity::from_keyvalue_refs(&measurement.attributes, lookup).await?;
         self.timeseries
             .entry(id)
             .or_insert(self.aggregation.new_aggregation())

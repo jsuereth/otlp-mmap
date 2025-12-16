@@ -33,7 +33,7 @@ use crate::sdk_mmap::Error;
 /// Abstract trait to interact with ring buffers.
 pub trait AsyncEventQueue<T>
 where
-    T: prost::Message + std::default::Default + 'static,
+    T: prost::Message + std::default::Default + 'static + Sync,
 {
     /// Asynchronously read next value.  THis will not return until a value is available.
     async fn try_read_next(&self) -> Result<T, Error>;
@@ -41,7 +41,7 @@ where
 
 impl<T> AsyncEventQueue<T> for RingBufferReader<T>
 where
-    T: prost::Message + std::default::Default + 'static,
+    T: prost::Message + std::default::Default + 'static + Sync,
 {
     async fn try_read_next(&self) -> Result<T, Error> {
         self.next().await

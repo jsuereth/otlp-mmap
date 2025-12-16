@@ -1,6 +1,6 @@
 mod sdk_mmap;
 
-use crate::sdk_mmap::CollectorSdk;
+use crate::sdk_mmap::new_collector_sdk;
 use clap::Parser;
 use sdk_mmap::Error;
 use std::{
@@ -42,7 +42,7 @@ async fn main() -> Result<(), Error> {
 }
 
 async fn run_sdk_mmap(otlp_url: &str, export_file: PathBuf) -> Result<(), Error> {
-    let sdk = Arc::new(CollectorSdk::new(&export_file)?);
+    let sdk = Arc::new(new_collector_sdk(&export_file)?);
     // Note: We do NOT put the different pipelines on different tasks.  We do NOT want different CPUs causing
     // cache coherency problems as this may actually slow down performance.
     let log_otlp = otlp_url.to_owned();

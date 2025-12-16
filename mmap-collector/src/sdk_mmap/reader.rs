@@ -21,13 +21,18 @@ const SUPPORTED_MMAP_VERSION: &[i64] = &[1];
 /// Trait used to stub out the behavior of reading MMap files
 pub trait AsyncMmapReader {
     /// The queue for reading spans.
-    fn spans_queue<'a>(&'a self) -> &'a impl AsyncEventQueue<SpanEvent>;
+    fn spans_queue<'a>(&'a self) -> &'a (impl AsyncEventQueue<SpanEvent> + Sync);
     /// The queue for reading measurements.
     fn measurement_queue<'a>(&'a self) -> &'a impl AsyncEventQueue<Measurement>;
     /// The queue for reading events.
     fn event_queue<'a>(&'a self) -> &'a impl AsyncEventQueue<Event>;
     /// The queue for reading dictionary entries.
-    fn dictionary<'a>(&'a self) -> &'a impl AsyncDictionary;
+    fn dictionary<'a>(&'a self) -> &'a (impl AsyncDictionary + Sync);
+    /// Start time when we created this MmapReader.
+    fn start_time(&self) -> u64;
+    /// Checks if the start time of the MMap file is the same.
+    /// If not, the MMAP file was likely restarted.
+    fn has_file_changed(&self) -> bool;
 }
 
 impl AsyncMmapReader for MmapReader {
@@ -45,6 +50,14 @@ impl AsyncMmapReader for MmapReader {
 
     fn dictionary<'a>(&'a self) -> &'a impl AsyncDictionary {
         &self.dictionary
+    }
+
+    fn start_time(&self) -> u64 {
+        self.start_time
+    }
+
+    fn has_file_changed(&self) -> bool {
+        self.start_time != self.header.start_time()
     }
 }
 
@@ -121,17 +134,6 @@ impl MmapReader {
             dictionary,
             start_time,
         })
-    }
-
-    /// Start time when we created this MmapReader.
-    pub fn start_time(&self) -> u64 {
-        self.start_time
-    }
-
-    /// Checks if the start time of the MMap file is the same.
-    /// If not, the MMAP file was likely restarted.
-    pub fn has_file_changed(&self) -> bool {
-        self.start_time != self.header.start_time()
     }
 }
 

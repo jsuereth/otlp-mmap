@@ -21,6 +21,8 @@ use crate::sdk_mmap::{
     dictionary::AsyncDictionary,
     log::EventCollector,
     metric::{CollectedMetric, MetricStorage},
+    reader::AsyncMmapReader,
+    ringbuffer::AsyncEventQueue,
 };
 use opentelemetry_proto::tonic::collector::{
     logs::v1::logs_service_client::LogsServiceClient,
@@ -32,16 +34,18 @@ use std::{collections::HashMap, path::Path, time::Duration};
 use trace::{ActiveSpans, TrackedSpan};
 
 /// Implementation of an OpenTelemetry SDK that pulls in events from an MMap file.
-pub struct CollectorSdk {
-    reader: MmapReader,
+pub struct CollectorSdk<T: AsyncMmapReader> {
+    reader: T,
 }
-impl CollectorSdk {
-    pub fn new(path: &Path) -> Result<CollectorSdk, Error> {
-        Ok(CollectorSdk {
-            reader: MmapReader::new(path)?,
-        })
-    }
 
+/// Creates a new collector sdk.
+pub fn new_collector_sdk(path: &Path) -> Result<CollectorSdk<MmapReader>, Error> {
+    Ok(CollectorSdk {
+        reader: MmapReader::new(path)?,
+    })
+}
+
+impl<T: AsyncMmapReader> CollectorSdk<T> {
     /// Records metrics from the ringbuffer and repor them at an interval.
     pub async fn record_metrics(&self, metric_endpoint: &str) -> Result<(), Error> {
         // TODO - we need to set up a timer to export metrics periodically.
@@ -60,8 +64,8 @@ impl CollectorSdk {
             tokio::pin!(send_by_time);
             loop {
                 tokio::select! {
-                    m = self.reader.metrics.next() => {
-                        metric_storage.handle_measurement(self, m?).await?
+                    m = self.reader.measurement_queue().try_read_next() => {
+                        metric_storage.handle_measurement(self.reader.dictionary(), m?).await?
                     },
                     _ = &mut send_by_time => {
                         let metrics = metric_storage.collect(&metric::CollectionContext::new(self.reader.start_time(), 0)).await;
@@ -101,7 +105,7 @@ impl CollectorSdk {
             )>,
         > = HashMap::new();
         for scope_ref in scope_map.keys() {
-            let scope = self.try_lookup_scope(*scope_ref).await?;
+            let scope = try_lookup_scope(self.reader.dictionary(), *scope_ref).await?;
             resource_map
                 .entry(scope.resource_ref)
                 .or_default()
@@ -113,7 +117,7 @@ impl CollectorSdk {
                 resource_metrics: Default::default(),
             };
         for (resource_ref, scopes) in resource_map.into_iter() {
-            let resource = self.try_lookup_resource(resource_ref).await?;
+            let resource = try_lookup_resource(self.reader.dictionary(), resource_ref).await?;
             let mut resource_metrics = opentelemetry_proto::tonic::metrics::v1::ResourceMetrics {
                 resource: Some(resource),
                 scope_metrics: Default::default(),
@@ -157,7 +161,12 @@ impl CollectorSdk {
             }
             // println!("Batching logs");
             if let Some(log_batch) = collector
-                .try_create_next_batch(self, 1000, Duration::from_secs(60))
+                .try_create_next_batch(
+                    self.reader.event_queue(),
+                    self.reader.dictionary(),
+                    1000,
+                    Duration::from_secs(60),
+                )
                 .await?
             {
                 // println!("Sending log batch #{batch_idx}");
@@ -190,7 +199,12 @@ impl CollectorSdk {
             // TODO - Config
             // println!("Batching spans");
             let span_batch = spans
-                .try_buffer_spans(&self.reader.spans, self, 1000, Duration::from_secs(60))
+                .try_buffer_spans(
+                    self.reader.spans_queue(),
+                    self.reader.dictionary(),
+                    1000,
+                    Duration::from_secs(60),
+                )
                 .await?;
             let next_batch = self.try_create_span_batch(span_batch).await?;
             if !next_batch.resource_spans.is_empty() {
@@ -227,7 +241,7 @@ impl CollectorSdk {
             )>,
         > = HashMap::new();
         for scope_ref in scope_map.keys() {
-            let scope = self.try_lookup_scope(*scope_ref).await?;
+            let scope = try_lookup_scope(self.reader.dictionary(), *scope_ref).await?;
             resource_map
                 .entry(scope.resource_ref)
                 .or_default()
@@ -239,7 +253,7 @@ impl CollectorSdk {
                 resource_spans: Default::default(),
             };
         for (resource_ref, scopes) in resource_map.into_iter() {
-            let resource = self.try_lookup_resource(resource_ref).await?;
+            let resource = try_lookup_resource(self.reader.dictionary(), resource_ref).await?;
             let mut resource_spans = opentelemetry_proto::tonic::trace::v1::ResourceSpans {
                 resource: Some(resource),
                 scope_spans: Default::default(),
@@ -262,136 +276,6 @@ impl CollectorSdk {
         }
         Ok(result)
     }
-
-    async fn try_lookup_resource(
-        &self,
-        resource_ref: i64,
-    ) -> Result<opentelemetry_proto::tonic::resource::v1::Resource, Error> {
-        let resource: data::Resource = self.reader.dictionary.try_read(resource_ref).await?;
-        let mut attributes = Vec::new();
-        for kv in resource.attributes {
-            attributes.push(self.try_convert_attribute(kv).await?);
-        }
-        Ok(opentelemetry_proto::tonic::resource::v1::Resource {
-            attributes,
-            dropped_attributes_count: resource.dropped_attributes_count,
-            // TODO - support entities.
-            entity_refs: Vec::new(),
-        })
-    }
-
-    // Looks up the scope from the dictionary (note: expensive).
-    async fn try_lookup_scope(&self, scope_ref: i64) -> Result<PartialScope, Error> {
-        let scope: data::InstrumentationScope = self.reader.dictionary.try_read(scope_ref).await?;
-        let mut attributes = Vec::new();
-        for kv in scope.attributes {
-            attributes.push(self.try_convert_attribute(kv).await?);
-        }
-        let name: String = self
-            .reader
-            .dictionary
-            .try_read_string(scope.name_ref)
-            .await?;
-        let version: String = self
-            .reader
-            .dictionary
-            .try_read_string(scope.version_ref)
-            .await?;
-        Ok(PartialScope {
-            scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
-                name,
-                version,
-                attributes,
-                dropped_attributes_count: scope.dropped_attributes_count,
-            },
-            resource_ref: scope.resource_ref,
-        })
-    }
-
-    async fn try_lookup_metric(&self, metric_ref: i64) -> Result<data::MetricRef, Error> {
-        let description: data::MetricRef = self.reader.dictionary.try_read(metric_ref).await?;
-        Ok(description)
-    }
-
-    /// Converts a key-value pair reference by looking up key strings in the dictionary.
-    async fn try_convert_attribute(
-        &self,
-        kv: KeyValueRef,
-    ) -> Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error> {
-        let key = match self.reader.dictionary.try_read_string(kv.key_ref).await {
-            Ok(value) => value,
-            // TODO - remove this, once we fix dictionary lookup.
-            Err(_) => "<not found>".to_owned(),
-        };
-        let value = if let Some(v) = kv.value {
-            Box::pin(self.try_convert_anyvalue(v)).await?
-        } else {
-            None
-        };
-        Ok(opentelemetry_proto::tonic::common::v1::KeyValue { key, value })
-    }
-
-    async fn try_convert_anyvalue(
-        &self,
-        value: data::AnyValue,
-    ) -> Result<Option<opentelemetry_proto::tonic::common::v1::AnyValue>, Error> {
-        let result = match value.value {
-            Some(data::any_value::Value::StringValue(v)) => {
-                Some(opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(v))
-            }
-            Some(data::any_value::Value::BoolValue(v)) => {
-                Some(opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(v))
-            }
-            Some(data::any_value::Value::IntValue(v)) => {
-                Some(opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(v))
-            }
-            Some(data::any_value::Value::DoubleValue(v)) => {
-                Some(opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(v))
-            }
-            Some(data::any_value::Value::BytesValue(v)) => {
-                Some(opentelemetry_proto::tonic::common::v1::any_value::Value::BytesValue(v))
-            }
-            Some(data::any_value::Value::ArrayValue(v)) => {
-                let mut values = Vec::new();
-
-                for av in v.values {
-                    if let Some(rav) = Box::pin(self.try_convert_anyvalue(av)).await? {
-                        values.push(rav);
-                    }
-                }
-                Some(
-                    opentelemetry_proto::tonic::common::v1::any_value::Value::ArrayValue(
-                        opentelemetry_proto::tonic::common::v1::ArrayValue { values },
-                    ),
-                )
-            }
-            Some(data::any_value::Value::KvlistValue(kvs)) => {
-                // TODO - implement.
-                let mut values = Vec::new();
-                for kv in kvs.values {
-                    values.push(self.try_convert_attribute(kv).await?);
-                }
-                Some(
-                    opentelemetry_proto::tonic::common::v1::any_value::Value::KvlistValue(
-                        opentelemetry_proto::tonic::common::v1::KeyValueList { values },
-                    ),
-                )
-            }
-            Some(data::any_value::Value::ValueRef(idx)) => {
-                // TODO - try to improve performance here.
-                let v: data::AnyValue = Box::pin(self.reader.dictionary.try_read(idx)).await?;
-                Box::pin(self.try_convert_anyvalue(v))
-                    .await?
-                    .and_then(|v| v.value)
-            }
-            None => None,
-        };
-        Ok(result
-            .map(|value| opentelemetry_proto::tonic::common::v1::AnyValue { value: Some(value) }))
-    }
-    async fn try_lookup_string(&self, index: i64) -> Result<String, Error> {
-        self.reader.dictionary.try_read_string(index).await
-    }
 }
 
 struct PartialScope {
@@ -407,11 +291,128 @@ pub trait AttributeLookup {
     ) -> Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error>;
 }
 
-impl AttributeLookup for CollectorSdk {
+/// Converts a key-value pair reference by looking up key strings in the dictionary.
+async fn try_convert_attribute<T: AsyncDictionary>(
+    lookup: &T,
+    kv: KeyValueRef,
+) -> Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error> {
+    let key = match lookup.try_read_string(kv.key_ref).await {
+        Ok(value) => value,
+        // TODO - remove this, once we fix dictionary lookup.
+        Err(_) => "<not found>".to_owned(),
+    };
+    let value = if let Some(v) = kv.value {
+        Box::pin(try_convert_anyvalue(lookup, v)).await?
+    } else {
+        None
+    };
+    Ok(opentelemetry_proto::tonic::common::v1::KeyValue { key, value })
+}
+
+async fn try_convert_anyvalue<T: AsyncDictionary>(
+    lookup: &T,
+    value: data::AnyValue,
+) -> Result<Option<opentelemetry_proto::tonic::common::v1::AnyValue>, Error> {
+    let result = match value.value {
+        Some(data::any_value::Value::StringValue(v)) => {
+            Some(opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(v))
+        }
+        Some(data::any_value::Value::BoolValue(v)) => {
+            Some(opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(v))
+        }
+        Some(data::any_value::Value::IntValue(v)) => {
+            Some(opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(v))
+        }
+        Some(data::any_value::Value::DoubleValue(v)) => {
+            Some(opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(v))
+        }
+        Some(data::any_value::Value::BytesValue(v)) => {
+            Some(opentelemetry_proto::tonic::common::v1::any_value::Value::BytesValue(v))
+        }
+        Some(data::any_value::Value::ArrayValue(v)) => {
+            let mut values = Vec::new();
+
+            for av in v.values {
+                if let Some(rav) = Box::pin(try_convert_anyvalue(lookup, av)).await? {
+                    values.push(rav);
+                }
+            }
+            Some(
+                opentelemetry_proto::tonic::common::v1::any_value::Value::ArrayValue(
+                    opentelemetry_proto::tonic::common::v1::ArrayValue { values },
+                ),
+            )
+        }
+        Some(data::any_value::Value::KvlistValue(kvs)) => {
+            // TODO - implement.
+            let mut values = Vec::new();
+            for kv in kvs.values {
+                values.push(lookup.try_convert_attribute(kv).await?);
+            }
+            Some(
+                opentelemetry_proto::tonic::common::v1::any_value::Value::KvlistValue(
+                    opentelemetry_proto::tonic::common::v1::KeyValueList { values },
+                ),
+            )
+        }
+        Some(data::any_value::Value::ValueRef(idx)) => {
+            // TODO - try to improve performance here.
+            let v: data::AnyValue = Box::pin(lookup.try_read(idx)).await?;
+            Box::pin(try_convert_anyvalue(lookup, v))
+                .await?
+                .and_then(|v| v.value)
+        }
+        None => None,
+    };
+    Ok(result.map(|value| opentelemetry_proto::tonic::common::v1::AnyValue { value: Some(value) }))
+}
+
+pub async fn try_lookup_resource<T: AsyncDictionary>(
+    lookup: &T,
+    resource_ref: i64,
+) -> Result<opentelemetry_proto::tonic::resource::v1::Resource, Error> {
+    let resource: data::Resource = lookup.try_read(resource_ref).await?;
+    let mut attributes = Vec::new();
+    for kv in resource.attributes {
+        attributes.push(try_convert_attribute(lookup, kv).await?);
+    }
+    Ok(opentelemetry_proto::tonic::resource::v1::Resource {
+        attributes,
+        dropped_attributes_count: resource.dropped_attributes_count,
+        // TODO - support entities.
+        entity_refs: Vec::new(),
+    })
+}
+
+// Looks up the scope from the dictionary (note: expensive).
+async fn try_lookup_scope<T: AsyncDictionary>(
+    lookup: &T,
+    scope_ref: i64,
+) -> Result<PartialScope, Error> {
+    let scope: data::InstrumentationScope = lookup.try_read(scope_ref).await?;
+    let mut attributes = Vec::new();
+    for kv in scope.attributes {
+        attributes.push(try_convert_attribute(lookup, kv).await?);
+    }
+    let name: String = lookup.try_read_string(scope.name_ref).await?;
+    let version: String = lookup.try_read_string(scope.version_ref).await?;
+    Ok(PartialScope {
+        scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
+            name,
+            version,
+            attributes,
+            dropped_attributes_count: scope.dropped_attributes_count,
+        },
+        resource_ref: scope.resource_ref,
+    })
+}
+
+impl<T: AsyncDictionary> AttributeLookup for T {
+    /// Converts a key-value pair reference by looking up key strings in the dictionary.
     async fn try_convert_attribute(
         &self,
         kv: KeyValueRef,
     ) -> Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error> {
-        self.try_convert_attribute(kv).await
+        try_convert_attribute(self, kv).await
     }
 }
