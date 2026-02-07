@@ -60,3 +60,37 @@ We expose the following low-level functions in Rust for Python:
   - `trace_id`: A 16-byte array
   - `span_id`: An 8-byte array
   - `end_time_unix_nano`: A 64-bit integer
+
+## Development
+
+This project uses a Rust extension for performance, integrated with Python using `maturin`. All development, building, and testing should be performed within a Docker environment to ensure consistent results and avoid local environment conflicts.
+
+### Prerequisites
+
+*   Docker installed and running.
+
+### Build and Test Workflow
+
+1.  **Build the Docker Development Image:**
+    Navigate to the root of the project and build the Docker image for the Python directory. This image includes Rust, Python, `maturin`, and `pytest`.
+
+    ```bash
+    docker build -t python-mmap-dev python/
+    ```
+
+2.  **Run Tests:**
+    Execute the tests within the Docker container. This command will first build the Rust extension using `maturin build`, then install the generated Python wheel, and finally run `pytest`.
+
+    ```bash
+    docker run --rm -v "$(pwd)/python:/app" -w /app python-mmap-dev bash -c "maturin build && pip install target/wheels/*.whl --force-reinstall && python -m pytest"
+    ```
+    *Note: `$(pwd)` will correctly resolve to your current project root directory on Linux/macOS. For Windows, you might need to adjust the volume mount path, e.g., `-v "C:\Users\YourUser\path\to\otlp-mmap\python:/app"` if running directly in cmd/PowerShell, or use MSYS-compatible tools like Git Bash.*
+
+3.  **Build Python Wheels (for distribution):**
+    To build distributable Python wheels, run:
+
+    ```bash
+    docker run --rm -v "$(pwd)/python:/app" -w /app python-mmap-dev maturin build --release
+    ```
+    The generated wheel files will be located in `python/target/wheels/` on your host machine.
+
