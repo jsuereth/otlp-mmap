@@ -9,9 +9,11 @@ from opentelemetry.metrics import (
     UpDownCounter,
     ObservableUpDownCounter,
     CallbackT,
-    NoOpMeter
+    NoOpMeter,
+    CallbackOptions
 )
 from .common import get_exporter, now_ns
+from .collector import Collector
 
 class MmapMeterProvider(MeterProvider):
     def __init__(self, file_path: str, resource_attributes: Optional[Dict[str, Any]] = None):
@@ -19,6 +21,8 @@ class MmapMeterProvider(MeterProvider):
         # Create resource
         # TODO: Handle standard resource attributes (service.name etc) if not provided?
         self._resource_ref = self._exporter.create_resource(resource_attributes or {}, None)
+        self._collector = Collector(interval=30.0)
+        self._collector.start()
 
     def get_meter(
         self,
@@ -27,11 +31,12 @@ class MmapMeterProvider(MeterProvider):
         schema_url: Optional[str] = None,
         attributes: Optional[Dict[str, Any]] = None,
     ) -> Meter:
-        return MmapMeter(self._exporter, self._resource_ref, name, version, schema_url, attributes)
+        return MmapMeter(self._exporter, self._resource_ref, name, version, schema_url, attributes, self._collector)
 
 class MmapMeter(Meter):
-    def __init__(self, exporter, resource_ref, name, version, schema_url, attributes=None):
+    def __init__(self, exporter, resource_ref, name, version, schema_url, attributes=None, collector=None):
         self._exporter = exporter
+        self._collector = collector
         # TODO: version and schema_url mapping?
         self._scope_ref = exporter.create_instrumentation_scope(resource_ref, name, version, attributes or {})
 
@@ -47,18 +52,17 @@ class MmapMeter(Meter):
     def create_observable_counter(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
     ) -> ObservableCounter:
-        # TODO: Handle callbacks. For now just create the stream.
-        return MmapObservableCounter(self._exporter, self._scope_ref, name, unit, description, callbacks)
+        return MmapObservableCounter(self._exporter, self._scope_ref, name, unit, description, callbacks, self._collector)
 
     def create_observable_gauge(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
     ) -> ObservableGauge:
-        return MmapObservableGauge(self._exporter, self._scope_ref, name, unit, description, callbacks)
+        return MmapObservableGauge(self._exporter, self._scope_ref, name, unit, description, callbacks, self._collector)
 
     def create_observable_up_down_counter(
         self, name: str, callbacks: Optional[Sequence[CallbackT]] = None, unit: str = "", description: str = ""
     ) -> ObservableUpDownCounter:
-        return MmapObservableUpDownCounter(self._exporter, self._scope_ref, name, unit, description, callbacks)
+        return MmapObservableUpDownCounter(self._exporter, self._scope_ref, name, unit, description, callbacks, self._collector)
 
 class MmapInstrument:
     def __init__(self, exporter, scope_ref, name, unit, description, aggregation):
@@ -97,27 +101,42 @@ class MmapHistogram(MmapInstrument, Histogram):
     def record(self, amount: Union[int, float], attributes: Optional[Dict[str, Any]] = None, context: Optional[Any] = None) -> None:
         self._record(amount, attributes)
 
-class MmapObservableCounter(MmapInstrument, ObservableCounter):
-    def __init__(self, exporter, scope_ref, name, unit, description, callbacks):
-        # Cumulative Sum? Observables usually report cumulative state?
-        # Or Delta? 
-        # API says: "Observable instruments are asynchronous...".
-        # If the callback returns the *current* value (e.g. CPU usage), it is effectively a Gauge or Cumulative Sum.
-        # But if it returns monotonic increment, it's cumulative.
-        # Let's assume Cumulative Sum for Counter.
+class MmapObservableInstrument(MmapInstrument):
+    def __init__(self, exporter, scope_ref, name, unit, description, aggregation, callbacks, collector):
+        super().__init__(exporter, scope_ref, name, unit, description, aggregation)
+        self._callbacks = callbacks or []
+        if collector and self._callbacks:
+            collector.register_callback(self._collect)
+
+    def _collect(self):
+        options = CallbackOptions()
+        for callback in self._callbacks:
+            try:
+                try:
+                    result = callback(options)
+                except TypeError:
+                    result = callback()
+                
+                if result is None:
+                    continue
+                
+                for obs in result:
+                    self._record(obs.value, obs.attributes)
+            except Exception:
+                pass
+
+class MmapObservableCounter(MmapObservableInstrument, ObservableCounter):
+    def __init__(self, exporter, scope_ref, name, unit, description, callbacks, collector):
+        # Cumulative Sum for Observable Counter
         agg = {"sum": {"aggregation_temporality": 2, "is_monotonic": True}} # 2=Cumulative
-        super().__init__(exporter, scope_ref, name, unit, description, agg)
-        self._callbacks = callbacks
-        # TODO: Register callbacks execution mechanism.
+        super().__init__(exporter, scope_ref, name, unit, description, agg, callbacks, collector)
 
-class MmapObservableGauge(MmapInstrument, ObservableGauge):
-    def __init__(self, exporter, scope_ref, name, unit, description, callbacks):
+class MmapObservableGauge(MmapObservableInstrument, ObservableGauge):
+    def __init__(self, exporter, scope_ref, name, unit, description, callbacks, collector):
         agg = {"gauge": {}}
-        super().__init__(exporter, scope_ref, name, unit, description, agg)
-        self._callbacks = callbacks
+        super().__init__(exporter, scope_ref, name, unit, description, agg, callbacks, collector)
 
-class MmapObservableUpDownCounter(MmapInstrument, ObservableUpDownCounter):
-    def __init__(self, exporter, scope_ref, name, unit, description, callbacks):
+class MmapObservableUpDownCounter(MmapObservableInstrument, ObservableUpDownCounter):
+    def __init__(self, exporter, scope_ref, name, unit, description, callbacks, collector):
         agg = {"sum": {"aggregation_temporality": 2, "is_monotonic": False}} # Cumulative
-        super().__init__(exporter, scope_ref, name, unit, description, agg)
-        self._callbacks = callbacks
+        super().__init__(exporter, scope_ref, name, unit, description, agg, callbacks, collector)

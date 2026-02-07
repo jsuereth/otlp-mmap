@@ -18,8 +18,11 @@ def mmap_file():
 
 @pytest.fixture(scope="module")
 def flask_app(mmap_file):
-    # Pass mmap_file_path directly to create_app
-    app = create_app(mmap_file_path=mmap_file)
+    # Set environment variable for the Flask app
+    os.environ["SDK_MMAP_EXPORTER_FILE"] = mmap_file
+    os.environ["OTLP_MMAP_SERVICE_NAME"] = "test-flask-server"
+    
+    app = create_app()
     app.config["TESTING"] = True
     
     # Suppress Flask's default logger output during tests
@@ -41,9 +44,9 @@ def flask_app(mmap_file):
 
     yield base_url
     
-    # Clean up environment variables (if any were set by app)
-    if "OTLP_MMAP_FILE" in os.environ:
-        del os.environ["OTLP_MMAP_FILE"]
+    # Clean up environment variables
+    if "SDK_MMAP_EXPORTER_FILE" in os.environ:
+        del os.environ["SDK_MMAP_EXPORTER_FILE"]
     if "OTLP_MMAP_SERVICE_NAME" in os.environ:
         del os.environ["OTLP_MMAP_SERVICE_NAME"]
 
