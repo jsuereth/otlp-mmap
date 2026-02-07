@@ -1,4 +1,4 @@
-import otlp_mmap
+import otlp_mmap_internal as otlp_mmap
 import pytest
 import os
 import tempfile

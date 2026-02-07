@@ -1,10 +1,10 @@
 [package]
-name = "otlp_mmap"
+name = "otlp-mmap-internal"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "otlp_mmap"
+name = "otlp_mmap_internal"
 crate-type = ["cdylib"]
 
 [dependencies]

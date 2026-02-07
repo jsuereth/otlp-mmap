@@ -174,7 +174,7 @@ fn create_otlp_mmap_exporter(path: &str) -> PyResult<OtlpMmapExporter> {
 }
 
 #[pymodule]
-fn otlp_mmap(_py: Python, m: &PyModule) -> PyResult<()> {
+fn otlp_mmap_internal(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<OtlpMmapExporter>()?;
     m.add_function(wrap_pyfunction!(create_otlp_mmap_exporter, m)?)?;
     Ok(())

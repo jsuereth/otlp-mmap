@@ -3,7 +3,7 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "otlp_mmap"
+name = "otlp-mmap-internal"
 requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Rust",
