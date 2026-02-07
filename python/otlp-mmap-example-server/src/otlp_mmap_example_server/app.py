@@ -1,57 +1,75 @@
 import os
+import sys
 from typing import Optional
 from flask import Flask
 from opentelemetry import trace, metrics
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 
-# Import our custom providers
-from otlp_mmap_sdk.metrics import MmapMeterProvider
-from otlp_mmap_sdk.trace import MmapTracerProvider
-
-# Configuration (default if not overridden by create_app param)
-_MMAP_FILE_DEFAULT = "/tmp/mmap_otel_data"
+# Configuration
+MMAP_FILE = os.environ.get("SDK_MMAP_EXPORTER_FILE")
+OTLP_ENDPOINT = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+HTTP_PORT = int(os.environ.get("HTTP_ENDPOINT_PORT", "5000"))
 SERVICE_NAME = os.environ.get("OTLP_MMAP_SERVICE_NAME", "flask-example-server")
-MMAP_FILE = _MMAP_FILE_DEFAULT # Global variable for easier debugging/access if needed
 
-def create_app(mmap_file_path: Optional[str] = None):
-    global MMAP_FILE
-    if mmap_file_path:
-        MMAP_FILE = mmap_file_path
-    else:
-        MMAP_FILE = os.environ.get("OTLP_MMAP_FILE", _MMAP_FILE_DEFAULT)
-
-    print(f"Flask App starting. MMAP_FILE: {MMAP_FILE}")
-    # Configure Resource
+def configure_otel():
     resource = Resource.create({
         "service.name": SERVICE_NAME,
         "service.instance.id": os.environ.get("HOSTNAME", "localhost"),
     })
 
-    # Convert BoundedAttributes to dict
-    resource_attrs_dict = dict(resource.attributes)
+    if MMAP_FILE:
+        print(f"Using OTLP MMAP Exporter. File: {MMAP_FILE}")
+        from otlp_mmap_sdk.metrics import MmapMeterProvider
+        from otlp_mmap_sdk.trace import MmapTracerProvider
+        
+        # Convert BoundedAttributes to dict for Mmap providers
+        resource_attrs_dict = dict(resource.attributes)
 
-    # Configure TracerProvider
-    tracer_provider = MmapTracerProvider(file_path=MMAP_FILE, resource_attributes=resource_attrs_dict)
-    print(f"TracerProvider created. ResourceRef: {tracer_provider._resource_ref}")
-    trace.set_tracer_provider(tracer_provider)
-    print("TracerProvider set.")
+        tracer_provider = MmapTracerProvider(file_path=MMAP_FILE, resource_attributes=resource_attrs_dict)
+        trace.set_tracer_provider(tracer_provider)
 
-    # Configure MeterProvider
-    meter_provider = MmapMeterProvider(file_path=MMAP_FILE, resource_attributes=resource_attrs_dict)
-    print(f"MeterProvider created. ResourceRef: {meter_provider._resource_ref}")
-    metrics.set_meter_provider(meter_provider)
-    print("MeterProvider set.")
+        meter_provider = MmapMeterProvider(file_path=MMAP_FILE, resource_attributes=resource_attrs_dict)
+        metrics.set_meter_provider(meter_provider)
+        
+    elif OTLP_ENDPOINT:
+        print(f"Using Standard OTLP Exporter. Endpoint: {OTLP_ENDPOINT}")
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+        
+        from opentelemetry.sdk.metrics import MeterProvider
+        from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 
-    # Instrument Flask app
+        # Tracer
+        tracer_provider = TracerProvider(resource=resource)
+        span_exporter = OTLPSpanExporter(endpoint=OTLP_ENDPOINT, insecure=True) 
+        tracer_provider.add_span_processor(BatchSpanProcessor(span_exporter))
+        trace.set_tracer_provider(tracer_provider)
+
+        # Meter
+        metric_reader = PeriodicExportingMetricReader(OTLPMetricExporter(endpoint=OTLP_ENDPOINT, insecure=True))
+        meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
+        metrics.set_meter_provider(meter_provider)
+    else:
+        # Fallback for testing if neither is set? 
+        # Or if imported by test, maybe we rely on test setting env var.
+        # But if running as script, we error.
+        if "pytest" not in sys.modules:
+             sys.exit("Must provide either an OTEL_EXPORTER_OTLP_ENDPOINT or SDK_MMAP_EXPORTER_FILE env var.")
+        else:
+             print("Warning: No exporter configured (running in test mode?)")
+
+def create_app():
+    configure_otel()
+    
     app = Flask(__name__)
     FlaskInstrumentor().instrument_app(app)
 
-    # Get tracer and meter
     tracer = trace.get_tracer(__name__)
     meter = metrics.get_meter(__name__)
     
-    # Create a counter
     requests_counter = meter.create_counter(
         name="requests_total",
         description="Total number of requests",
@@ -82,4 +100,4 @@ def create_app(mmap_file_path: Optional[str] = None):
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=HTTP_PORT)

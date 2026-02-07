@@ -94,3 +94,41 @@ This project uses a Rust extension for performance, integrated with Python using
     ```
     The generated wheel files will be located in `python/target/wheels/` on your host machine.
 
+
+## Example HTTP Server
+
+A Flask-based example server is available in `otlp-mmap-example-server`. It can be run using Docker and configured to use either the standard OTLP exporter or the OTLP MMAP SDK.
+
+### 1. Build the Example Server Image
+
+Navigate to the project root and run:
+
+```bash
+docker build -f python/otlp-mmap-example-server/Dockerfile -t python-otlp-mmap-server python/
+```
+
+### 2. Run with OTLP MMAP SDK
+
+To run the server writing to a memory-mapped file:
+
+```bash
+docker run --rm -it \
+  -e SDK_MMAP_EXPORTER_FILE="/tmp/mmap_data" \
+  -e HTTP_ENDPOINT_PORT=5000 \
+  -p 5000:5000 \
+  python-otlp-mmap-server
+```
+
+The server will write telemetry data to `/tmp/mmap_data` inside the container. You can mount a volume to inspect this file on your host.
+
+### 3. Run with Standard OTLP Exporter
+
+To run the server sending data to an OTLP endpoint (e.g., a local collector):
+
+```bash
+docker run --rm -it \
+  -e OTEL_EXPORTER_OTLP_ENDPOINT="http://host.docker.internal:4317" \
+  -e HTTP_ENDPOINT_PORT=5000 \
+  -p 5000:5000 \
+  python-otlp-mmap-server
+```
