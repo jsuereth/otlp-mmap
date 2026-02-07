@@ -27,13 +27,14 @@ class MmapTracerProvider(TracerProvider):
         instrumenting_module_name: str,
         instrumenting_library_version: Optional[str] = None,
         schema_url: Optional[str] = None,
+        attributes: Optional[Dict[str, Any]] = None,
     ) -> Tracer:
-        return MmapTracer(self._exporter, self._resource_ref, instrumenting_module_name, instrumenting_library_version, schema_url)
+        return MmapTracer(self._exporter, self._resource_ref, instrumenting_module_name, instrumenting_library_version, schema_url, attributes)
 
 class MmapTracer(Tracer):
-    def __init__(self, exporter, resource_ref, name, version, schema_url):
+    def __init__(self, exporter, resource_ref, name, version, schema_url, attributes=None):
         self._exporter = exporter
-        self._scope_ref = exporter.create_instrumentation_scope(resource_ref, name, version, {})
+        self._scope_ref = exporter.create_instrumentation_scope(resource_ref, name, version, attributes or {})
 
     def start_span(
         self,
@@ -123,6 +124,7 @@ class MmapSpan(Span):
         self._trace_id_bytes = trace_id_bytes
         self._span_id_bytes = span_id_bytes
         self._end_time = None
+        self._kind = kind # Store kind
         
         # Record start
         # Map kind enum to int
@@ -153,6 +155,10 @@ class MmapSpan(Span):
     def get_span_context(self) -> SpanContext:
         return self._context
 
+    @property
+    def kind(self) -> SpanKind:
+        return self._kind
+    
     def end(self, end_time: Optional[int] = None) -> None:
         if self._end_time is not None:
             return

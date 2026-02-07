@@ -25,14 +25,15 @@ class MmapMeterProvider(MeterProvider):
         name: str,
         version: Optional[str] = None,
         schema_url: Optional[str] = None,
+        attributes: Optional[Dict[str, Any]] = None,
     ) -> Meter:
-        return MmapMeter(self._exporter, self._resource_ref, name, version, schema_url)
+        return MmapMeter(self._exporter, self._resource_ref, name, version, schema_url, attributes)
 
 class MmapMeter(Meter):
-    def __init__(self, exporter, resource_ref, name, version, schema_url):
+    def __init__(self, exporter, resource_ref, name, version, schema_url, attributes=None):
         self._exporter = exporter
         # TODO: version and schema_url mapping?
-        self._scope_ref = exporter.create_instrumentation_scope(resource_ref, name, version, {})
+        self._scope_ref = exporter.create_instrumentation_scope(resource_ref, name, version, attributes or {})
 
     def create_counter(self, name: str, unit: str = "", description: str = "") -> Counter:
         return MmapCounter(self._exporter, self._scope_ref, name, unit, description)
@@ -93,7 +94,7 @@ class MmapHistogram(MmapInstrument, Histogram):
         agg = {"histogram": {"aggregation_temporality": 1, "bucket_boundaries": []}} # Default buckets?
         super().__init__(exporter, scope_ref, name, unit, description, agg)
 
-    def record(self, amount: Union[int, float], attributes: Optional[Dict[str, Any]] = None) -> None:
+    def record(self, amount: Union[int, float], attributes: Optional[Dict[str, Any]] = None, context: Optional[Any] = None) -> None:
         self._record(amount, attributes)
 
 class MmapObservableCounter(MmapInstrument, ObservableCounter):

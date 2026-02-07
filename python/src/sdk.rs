@@ -312,3 +312,68 @@ impl OtlpMmapExporter {
         self.intern_attributes(attributes)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Read;
+
+    #[test]
+    fn test_layout() -> anyhow::Result<()> {
+        let tmp_dir = tempfile::tempdir()?;
+        let file_path = tmp_dir.path().join("test.mmap");
+        let path_str = file_path.to_str().unwrap();
+
+        let mut exporter = OtlpMmapExporter::new(path_str)?;
+
+        // Verify Header Offsets
+        // Read raw file
+        let mut file = std::fs::File::open(&file_path)?;
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer)?;
+
+        // Version
+        let version = u64::from_le_bytes(buffer[0..8].try_into()?);
+        assert_eq!(version, 1);
+
+        // Offsets
+        let events_off = u64::from_le_bytes(buffer[8..16].try_into()?);
+        let spans_off = u64::from_le_bytes(buffer[16..24].try_into()?);
+        let measurements_off = u64::from_le_bytes(buffer[24..32].try_into()?);
+        let dict_off = u64::from_le_bytes(buffer[32..40].try_into()?);
+
+        assert_eq!(events_off, 64);
+        
+        let rb_size = 32 + (4 * DEFAULT_NUM_BUFFERS) + (DEFAULT_NUM_BUFFERS * DEFAULT_BUFFER_SIZE);
+        assert_eq!(spans_off, 64 + rb_size);
+        assert_eq!(measurements_off, spans_off + rb_size);
+        assert_eq!(dict_off, measurements_off + rb_size);
+
+        // Test writing a string
+        let _idx = exporter.record_string("hello")?;
+        
+        // Re-read file
+        let mut file = std::fs::File::open(&file_path)?;
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer)?;
+        
+        let dict_start = dict_off as usize;
+        // First 8 bytes is write pos
+        // let write_pos = u64::from_le_bytes(buffer[dict_start..dict_start+8].try_into()?);
+        
+        // Let's verify content at dict_start + 8
+        let entry_start = dict_start + 8;
+        let len_bytes = &buffer[entry_start..entry_start+4];
+        let len = u32::from_le_bytes(len_bytes.try_into()?);
+        
+        // Decode the message to verify
+        let msg_bytes = &buffer[entry_start+4..entry_start+4+len as usize];
+        let val = data::AnyValue::decode(msg_bytes)?;
+        match val.value {
+            Some(data::any_value::Value::StringValue(s)) => assert_eq!(s, "hello"),
+            _ => panic!("Unexpected value"),
+        }
+
+        Ok(())
+    }
+}
