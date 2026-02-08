@@ -1,4 +1,5 @@
-FROM python:3.9-slim
+# Stage 1: Builder
+FROM python:3.9-slim as builder
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -13,22 +14,39 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # Install build tools
 RUN pip install maturin hatchling editables
 
-# Set working directory
 WORKDIR /app
-
-# Copy the entire python workspace
 COPY . .
 
-# Build and install otlp-mmap-internal
-RUN maturin build -r -m Cargo.toml --out target/wheels
-RUN pip install target/wheels/*.whl
+# Build otlp-mmap-internal wheel
+RUN maturin build -r -m Cargo.toml --out /wheels
 
-# Install otlp-mmap-sdk
-# Use --no-build-isolation to access the installed otlp-mmap-internal
-RUN pip install ./otlp-mmap-sdk --no-build-isolation
+# Install internal wheel to build other packages
+RUN pip install /wheels/*.whl
 
-# Install otlp-mmap-example-server
-RUN pip install ./otlp-mmap-example-server --no-build-isolation
+# Build SDK wheel
+# Use pip wheel with no build isolation to use the installed internal package
+RUN pip wheel --no-build-isolation --wheel-dir /wheels ./otlp-mmap-sdk
+
+# Install SDK wheel to build server
+RUN pip install /wheels/otlp_mmap_sdk*.whl
+
+# Build Server wheel
+RUN pip wheel --no-build-isolation --wheel-dir /wheels ./otlp-mmap-example-server
+
+# Stage 2: Runner
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Copy wheels from builder
+COPY --from=builder /wheels /wheels
+
+# Install all wheels
+# This will install internal, sdk, server and pull in runtime dependencies (Flask, OTel, etc.) from PyPI
+RUN pip install /wheels/*.whl
+
+# Clean up wheels
+RUN rm -rf /wheels
 
 # Default Env Vars
 ENV HTTP_ENDPOINT_PORT=5000

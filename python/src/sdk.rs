@@ -1,4 +1,4 @@
-use crate::data;
+use crate::sdk_mmap::data;
 use memmap2::MmapMut;
 use prost::Message;
 use std::fs::OpenOptions;
@@ -166,10 +166,9 @@ impl OtlpMmapExporter {
                 let chunk_offset = avail_offset + (4 * num_buffers as usize) + (ring_idx * buffer_size as usize);
                 
                 let chunk_slice = &mut self.mmap[chunk_offset..chunk_offset + buffer_size as usize];
-                // Write u32 length
-                let len_bytes = (encoded_len as u32).to_le_bytes();
-                chunk_slice[0..4].copy_from_slice(&len_bytes);
-                msg.encode(&mut &mut chunk_slice[4..])?;
+                // Use encode_length_delimited to match mmap-collector's reader
+                let mut buf = &mut chunk_slice[..];
+                msg.encode_length_delimited(&mut buf)?;
 
                 // Mark Available
                 let avail_ptr = unsafe { self.mmap.as_ptr().add(avail_offset + ring_idx * 4) as *const AtomicI32 };
@@ -195,7 +194,8 @@ impl OtlpMmapExporter {
         
         let current_rel_pos = write_offset_atomic.load(Ordering::Acquire);
         let encoded_len = msg.encoded_len();
-        let total_len = 4 + encoded_len; // 4 bytes for length prefix
+        let delimiter_len = prost::length_delimiter_len(encoded_len);
+        let total_len = delimiter_len + encoded_len;
         
         if (dict_start as u64 + current_rel_pos + total_len as u64) > FILE_SIZE {
              return Err(anyhow::anyhow!("Dictionary full"));
@@ -203,8 +203,34 @@ impl OtlpMmapExporter {
         
         let abs_pos = dict_start + current_rel_pos as usize;
         let slice = &mut self.mmap[abs_pos..abs_pos+total_len];
-        slice[0..4].copy_from_slice(&(encoded_len as u32).to_le_bytes());
-        msg.encode(&mut &mut slice[4..])?;
+        let mut buf = &mut slice[..];
+        msg.encode_length_delimited(&mut buf)?;
+        
+        write_offset_atomic.store(current_rel_pos + total_len as u64, Ordering::Release);
+        
+        Ok(abs_pos)
+    }
+
+    fn write_raw_bytes(&mut self, bytes: &[u8]) -> anyhow::Result<usize> {
+        let dict_start = self.dictionary_offset;
+        let write_offset_ptr = unsafe { self.mmap.as_ptr().add(dict_start) as *const AtomicU64 };
+        let write_offset_atomic = unsafe { &*write_offset_ptr };
+        
+        let current_rel_pos = write_offset_atomic.load(Ordering::Acquire);
+        let len = bytes.len();
+        let delimiter_len = prost::length_delimiter_len(len);
+        let total_len = delimiter_len + len;
+        
+        if (dict_start as u64 + current_rel_pos + total_len as u64) > FILE_SIZE {
+             return Err(anyhow::anyhow!("Dictionary full"));
+        }
+        
+        let abs_pos = dict_start + current_rel_pos as usize;
+        let slice = &mut self.mmap[abs_pos..abs_pos+total_len];
+        let mut buf = &mut slice[..];
+        
+        prost::encoding::encode_varint(len as u64, &mut buf);
+        buf.copy_from_slice(bytes);
         
         write_offset_atomic.store(current_rel_pos + total_len as u64, Ordering::Release);
         
@@ -214,10 +240,7 @@ impl OtlpMmapExporter {
     // Public methods for the exporter
     
     pub fn record_string(&mut self, s: &str) -> anyhow::Result<usize> {
-        let val = data::AnyValue {
-            value: Some(data::any_value::Value::StringValue(s.to_string())),
-        };
-        self.write_dictionary_entry(&val)
+        self.write_raw_bytes(s.as_bytes())
     }
 
     fn intern_attributes(&mut self, attributes: Vec<(String, data::AnyValue)>) -> anyhow::Result<Vec<data::KeyValueRef>> {
@@ -363,16 +386,12 @@ mod tests {
         
         // Let's verify content at dict_start + 8
         let entry_start = dict_start + 8;
-        let len_bytes = &buffer[entry_start..entry_start+4];
-        let len = u32::from_le_bytes(len_bytes.try_into()?);
-        
         // Decode the message to verify
-        let msg_bytes = &buffer[entry_start+4..entry_start+4+len as usize];
-        let val = data::AnyValue::decode(msg_bytes)?;
-        match val.value {
-            Some(data::any_value::Value::StringValue(s)) => assert_eq!(s, "hello"),
-            _ => panic!("Unexpected value"),
-        }
+        let mut msg_bytes = &buffer[entry_start..];
+        let len = prost::encoding::decode_varint(&mut msg_bytes)?;
+        let s_bytes = &msg_bytes[..len as usize];
+        let s = std::str::from_utf8(s_bytes)?;
+        assert_eq!(s, "hello");
 
         Ok(())
     }

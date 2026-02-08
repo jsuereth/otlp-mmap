@@ -1,11 +1,16 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 use std::sync::{Arc, Mutex};
+use prost::Message;
 
-mod data;
-mod sdk;
+mod sdk_mmap;
+use sdk_mmap::data;
+use sdk_mmap::reader::MmapReader as InnerReader;
 
 use sdk::OtlpMmapExporter as InnerExporter;
+
+// Re-export sdk module content if needed, but we used sdk::OtlpMmapExporter
+mod sdk; 
 
 #[pyclass]
 struct OtlpMmapExporter {
@@ -165,6 +170,35 @@ impl OtlpMmapExporter {
     }
 }
 
+#[pyclass]
+struct MmapReader {
+    inner: InnerReader,
+}
+
+#[pymethods]
+impl MmapReader {
+    #[new]
+    fn new(path: &str) -> PyResult<Self> {
+        let inner = InnerReader::new(path).map_err(|e: sdk_mmap::Error| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+        Ok(MmapReader { inner })
+    }
+
+    fn read_event<'py>(&self, py: Python<'py>) -> PyResult<Option<&'py PyBytes>> {
+        let res = self.inner.read_event().map_err(|e: sdk_mmap::Error| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+        Ok(res.map(|msg| PyBytes::new(py, &msg.encode_to_vec())))
+    }
+
+    fn read_span<'py>(&self, py: Python<'py>) -> PyResult<Option<&'py PyBytes>> {
+        let res = self.inner.read_span().map_err(|e: sdk_mmap::Error| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+        Ok(res.map(|msg| PyBytes::new(py, &msg.encode_to_vec())))
+    }
+
+    fn read_metric<'py>(&self, py: Python<'py>) -> PyResult<Option<&'py PyBytes>> {
+        let res = self.inner.read_metric().map_err(|e: sdk_mmap::Error| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+        Ok(res.map(|msg| PyBytes::new(py, &msg.encode_to_vec())))
+    }
+}
+
 #[pyfunction]
 fn create_otlp_mmap_exporter(path: &str) -> PyResult<OtlpMmapExporter> {
     let inner = InnerExporter::new(path).map_err(|e: anyhow::Error| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
@@ -176,6 +210,7 @@ fn create_otlp_mmap_exporter(path: &str) -> PyResult<OtlpMmapExporter> {
 #[pymodule]
 fn otlp_mmap_internal(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<OtlpMmapExporter>()?;
+    m.add_class::<MmapReader>()?;
     m.add_function(wrap_pyfunction!(create_otlp_mmap_exporter, m)?)?;
     Ok(())
 }

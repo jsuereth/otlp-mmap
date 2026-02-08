@@ -4,6 +4,7 @@ import tempfile
 import threading
 import time
 import requests
+import otlp_mmap_internal
 from otlp_mmap_example_server.app import create_app
 
 @pytest.fixture(scope="module")
@@ -56,14 +57,28 @@ def test_hello_world(flask_app, mmap_file):
     assert response.status_code == 200
     assert "Hello, World!" in response.text
     
-    # Minimal verification: check if mmap file has grown
-    assert os.path.exists(mmap_file)
-    assert os.path.getsize(mmap_file) > 0 
+    # Verify we can read spans from the mmap file
+    reader = otlp_mmap_internal.MmapReader(mmap_file)
+    found_span = False
+    # Read until we find a span or give up
+    for _ in range(1000):
+        if reader.read_span():
+            found_span = True
+            break
+            
+    assert found_span, "No spans found in mmap file after request"
 
 def test_fibonacci(flask_app, mmap_file):
     response = requests.get(f"{flask_app}/fib/5")
     assert response.status_code == 200
     assert "Fibonacci(5) = 5" in response.text
     
-    assert os.path.exists(mmap_file)
-    assert os.path.getsize(mmap_file) > 0
+    # Verify we can read metrics (requests_total should be incremented)
+    reader = otlp_mmap_internal.MmapReader(mmap_file)
+    found_metric = False
+    for _ in range(1000):
+        if reader.read_metric():
+            found_metric = True
+            break
+            
+    assert found_metric, "No metrics found in mmap file after request"
