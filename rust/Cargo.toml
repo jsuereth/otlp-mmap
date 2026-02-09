@@ -1,0 +1,29 @@
+
+
+# Workspace definition ========================================================
+[workspace]
+members = ["crates/*"]
+resolver="2"
+
+[workspace.package]
+version = "0.21.2"
+authors = ["OpenTelemetry"]
+edition = "2021"
+repository = "https://github.com/jsuereth/otlp-mmap"
+license = "Apache-2.0"
+publish = false
+rust-version = "1.81.0"
+
+[workspace.dependencies]
+memmap2 = "0.9.9"
+opentelemetry-proto = { version="0.31.0", features = ["full"] }
+serde={ version = "1.0.228", features = ["derive"] }
+prost = "0.14.1"
+thiserror="2.0.17"
+tokio = { version = "1.47.1", features = ["full"] }
+moka = { version = "0.12.11", features = ["future"] }
+tonic = "0.14.2"
+itertools="0.13.0"
+clap = { version = "4.5.53", features = ["derive", "env"] }
+pyo3 = { version = "0.20", features = ["extension-module"] }
+tempfile = "3.23.0"
