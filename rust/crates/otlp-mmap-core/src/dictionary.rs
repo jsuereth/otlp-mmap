@@ -25,14 +25,15 @@ const MIN_DICTIONARY_SIZE: u64 = 1024;
 
 impl Dictionary {
     /// Constructs a new dictionary.
-    pub fn try_new(f: File, offset: u64) -> Result<Dictionary, Error> {
+    pub fn try_new(f: File, offset: u64, opt_min_size: Option<u64>) -> Result<Dictionary, Error> {
         // TODO - update this to take an MMAP directly.
         let file_size = f.metadata()?.len();
         // TODO - default dictionary size here.
         let mut mmap_size = file_size - offset;
-        if mmap_size < MIN_DICTIONARY_SIZE {
-            f.set_len(offset + MIN_DICTIONARY_SIZE)?;
-            mmap_size = MIN_DICTIONARY_SIZE;
+        let min_size = opt_min_size.unwrap_or(MIN_DICTIONARY_SIZE);
+        if mmap_size < min_size {
+            f.set_len(offset + min_size)?;
+            mmap_size = min_size;
         }
 
         let data = unsafe {
@@ -183,7 +184,7 @@ mod tests {
             .open(file.path())?;
         let offset = 64;
         f.set_len(offset)?; // Set file size to be smaller than min_size
-        let dict = Dictionary::try_new(f, offset)?;
+        let dict = Dictionary::try_new(f, offset, None)?;
         let new_size = dict.f.metadata()?.len();
         assert_eq!(new_size, offset + 1024);
         Ok(())
@@ -210,7 +211,7 @@ mod tests {
             .read(true)
             .write(true)
             .open(file.path())?;
-        let dict = Dictionary::try_new(dict_file, offset)?;
+        let dict = Dictionary::try_new(dict_file, offset, None)?;
         let header = dict.header();
 
         assert_eq!(header.end.load(Ordering::Relaxed), end_val);
@@ -250,7 +251,7 @@ mod tests {
             .read(true)
             .write(true)
             .open(file.path())?;
-        let dict = Dictionary::try_new(dict_file, offset)?;
+        let dict = Dictionary::try_new(dict_file, offset, None)?;
 
         let result = dict.try_read_string((offset + 100) as i64)?;
         assert_eq!(result, test_string);
@@ -267,7 +268,7 @@ mod tests {
             .open(file.path())?;
         let offset = 64;
         f.set_len(offset + 1024)?;
-        let dict = Dictionary::try_new(f, offset)?;
+        let dict = Dictionary::try_new(f, offset, None)?;
 
         let result = dict.try_read_string(offset as i64 - 10);
         assert!(matches!(result, Err(Error::NotFoundInDictionary(_, _))));
@@ -306,7 +307,7 @@ mod tests {
             .read(true)
             .write(true)
             .open(file.path())?;
-        let dict = Dictionary::try_new(dict_file, offset)?;
+        let dict = Dictionary::try_new(dict_file, offset, None)?;
         let result: otlp_mmap_protocol::Resource = dict.try_read((offset + 200) as i64)?;
 
         assert_eq!(result.dropped_attributes_count, 42);
@@ -323,7 +324,7 @@ mod tests {
             .open(file.path())?;
         let offset = 64;
         f.set_len(offset + 1024)?;
-        let dict = Dictionary::try_new(f, offset)?;
+        let dict = Dictionary::try_new(f, offset, None)?;
 
         let result: Result<otlp_mmap_protocol::Resource, Error> = dict.try_read(10);
         assert!(matches!(result, Err(Error::NotFoundInDictionary(_, 10))));
@@ -347,7 +348,7 @@ mod tests {
             .read(true)
             .write(true)
             .open(file.path())?;
-        let dict = Dictionary::try_new(dict_file, offset)?;
+        let dict = Dictionary::try_new(dict_file, offset, None)?;
 
         let result: Result<otlp_mmap_protocol::Resource, Error> = dict.try_read(offset as i64);
         assert!(matches!(result, Err(Error::ProtobufDecodeError(_))));
@@ -365,7 +366,7 @@ mod tests {
         // The mmap size is 1024.
         f.set_len(offset + 1024)?;
 
-        let dict = Dictionary::try_new(f, offset)?;
+        let dict = Dictionary::try_new(f, offset, None)?;
 
         // Try to read from an index far beyond the end of the mmap.
         let result: Result<otlp_mmap_protocol::Resource, Error> = dict.try_read(2048);
@@ -396,7 +397,7 @@ mod tests {
             .read(true)
             .write(true)
             .open(file.path())?;
-        let dict = Dictionary::try_new(dict_file, offset)?;
+        let dict = Dictionary::try_new(dict_file, offset, None)?;
 
         // Try to decode it. This should fail because the buffer is unexpectedly short.
         let result: Result<otlp_mmap_protocol::Resource, Error> = dict.try_read(offset as i64);
@@ -433,7 +434,7 @@ mod tests {
             .read(true)
             .write(true)
             .open(file.path())?;
-        let dict = Dictionary::try_new(dict_file, offset)?;
+        let dict = Dictionary::try_new(dict_file, offset, None)?;
 
         // Try to decode it. This should fail as it tries to read past the mmap boundary.
         let result: Result<otlp_mmap_protocol::Resource, Error> =
@@ -455,7 +456,7 @@ mod tests {
 
         // Write a prost-encoded string to the file
         let test_string = "hello world".to_owned();
-        let mut dict = Dictionary::try_new(f, offset)?;
+        let mut dict = Dictionary::try_new(f, offset, None)?;
         let idx = dict
             .try_write_string(&test_string)
             .expect("Failed to write string to dictionary");
@@ -479,7 +480,7 @@ mod tests {
             attributes: vec![],
             dropped_attributes_count: 42,
         };
-        let mut dict = Dictionary::try_new(f, offset)?;
+        let mut dict = Dictionary::try_new(f, offset, None)?;
         let idx = dict.try_write(&msg)?;
         let result: otlp_mmap_protocol::Resource =
             dict.try_read(idx).expect("Failed to read protocol buffer");

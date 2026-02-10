@@ -7,7 +7,7 @@ const DEFAULT_NUM_BUFFERS: usize = 1024;
 /// Default size in bytes for a buffer in a ring.
 const DEFAULT_BUFFER_SIZE: usize = 512;
 /// Minimum size in bytes to allocate for the dictionary in the MMAP file.
-const MIN_DICTIONARY_SIZE: usize = 1024;
+const MIN_DICTIONARY_SIZE: u64 = 1024;
 
 /// Configuration for a RingBuffer in OTLP-MMAP.
 #[derive(Debug, Clone)]
@@ -22,7 +22,7 @@ pub struct RingBufferConfig {
 #[derive(Debug, Clone)]
 pub struct DictionaryConfig {
     /// The size, in bytes, to initialize the dictionary in the file.
-    pub initial_size: usize,
+    pub initial_size: u64,
 }
 
 #[derive(Debug, Default, Clone)]

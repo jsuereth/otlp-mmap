@@ -90,7 +90,11 @@ impl OtlpMmapWriter {
         };
         println!("Loading dictionary @ {dictionary_start}");
         // Dictionary may need to remap itself.
-        let dictionary = Dictionary::try_new(f, dictionary_start as u64)?;
+        let dictionary = Dictionary::try_new(
+            f,
+            dictionary_start as u64,
+            Some(config.dictionary.initial_size),
+        )?;
         Ok(OtlpMmapWriter {
             header,
             events,
@@ -155,7 +159,8 @@ impl OtlpMmapReader {
         };
         println!("Loading dictionary @ {dictionary_start}");
         // Dictionary may need to remap itself.
-        let dictionary = OtlpDictionary::new(Dictionary::try_new(f, dictionary_start as u64)?);
+        let dictionary =
+            OtlpDictionary::new(Dictionary::try_new(f, dictionary_start as u64, None)?);
         Ok(OtlpMmapReader {
             header,
             events,
