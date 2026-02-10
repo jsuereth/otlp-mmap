@@ -11,36 +11,54 @@ use std::{
 // TODO - make this typed?
 
 /// Reads typed messages from a ring buffer.
-pub trait RingBufferReader<T> {
-    /// Attempts to read a message from a ringbuffer.
-    ///
-    /// Returns None if the ringbuffer is empty or otherwise unavailable.
-    fn try_read(&self) -> Result<Option<T>, Error>;
-}
-
-/// Writes types messages to a ring buffer.
-pub trait RingBufferWriter<T> {
-    /// Attempts to write a message to a ringbuffer.
-    ///
-    /// Returns false if the ringbuffer is full or otherwise unavailable.
-    fn try_write(&mut self, msg: &T) -> Result<bool, Error>;
-}
-
-/// A wrapper around the underlying Ringbuffer to safely expose read/write methods.
-struct RingBufferWraper<T> {
+pub struct RingBufferReader<T> {
     ring: RingBuffer,
     _phantom: PhantomData<T>,
 }
 
-impl<T: prost::Message + std::fmt::Debug> RingBufferWriter<T> for RingBufferWraper<T> {
-    fn try_write(&mut self, msg: &T) -> Result<bool, Error> {
-        self.ring.try_write(msg)
+impl<T: prost::Message + Default> RingBufferReader<T> {
+    /// Constructs a new reader of ring buffers.
+    pub fn new(data: MmapMut, offset: usize) -> RingBufferReader<T> {
+        Self {
+            ring: RingBuffer::new(data, offset),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Attempts to read a message from a ringbuffer.
+    ///
+    /// Returns None if the ringbuffer is empty or otherwise unavailable.
+    pub fn try_read(&self) -> Result<Option<T>, Error> {
+        self.ring.try_read()
     }
 }
 
-impl<T: prost::Message + Default> RingBufferReader<T> for RingBufferWraper<T> {
-    fn try_read(&self) -> Result<Option<T>, Error> {
-        self.ring.try_read()
+/// Writes typed messages to a ring buffer.
+pub struct RingBufferWriter<T> {
+    ring: RingBuffer,
+    _phantom: PhantomData<T>,
+}
+
+/// Writes types messages to a ring buffer.
+impl<T: prost::Message + std::fmt::Debug> RingBufferWriter<T> {
+    /// Constructs a new writer of ring buffers.
+    pub fn new(
+        data: MmapMut,
+        offset: usize,
+        buffer_size: usize,
+        num_buffers: usize,
+    ) -> RingBufferWriter<T> {
+        Self {
+            ring: RingBuffer::new_for_write(data, offset, buffer_size, num_buffers),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Attempts to write a message to a ringbuffer.
+    ///
+    /// Returns false if the ringbuffer is full or otherwise unavailable.
+    pub fn try_write(&mut self, msg: &T) -> Result<bool, Error> {
+        self.ring.try_write(msg)
     }
 }
 
@@ -48,7 +66,7 @@ impl<T: prost::Message + Default> RingBufferReader<T> for RingBufferWraper<T> {
 ///
 /// Note: This is currently designed to only allow ONE consumer
 ///       but multiple prodcuers.
-pub struct RingBuffer {
+struct RingBuffer {
     /// The mmap data
     data: MmapMut,
     /// The offset into the mmap data where the ringbuffer starts.
@@ -59,29 +77,6 @@ pub struct RingBuffer {
 }
 
 impl RingBuffer {
-    /// Constructs a new reader of ring buffers.
-    pub fn reader<T: prost::Message + Default>(
-        data: MmapMut,
-        offset: usize,
-    ) -> impl RingBufferReader<T> {
-        RingBufferWraper {
-            ring: Self::new(data, offset),
-            _phantom: PhantomData,
-        }
-    }
-    /// Constructs a new writer of ring buffers.
-    pub fn writer<T: prost::Message + std::fmt::Debug>(
-        data: MmapMut,
-        offset: usize,
-        buffer_size: usize,
-        num_buffers: usize,
-    ) -> impl RingBufferWriter<T> {
-        RingBufferWraper {
-            ring: Self::new_for_write(data, offset, buffer_size, num_buffers),
-            _phantom: PhantomData,
-        }
-    }
-
     /// Constructs a new ring buffer on an mmap at the offset.
     fn new(data: MmapMut, offset: usize) -> RingBuffer {
         let hdr = unsafe { &*(data.as_ref().as_ptr().add(offset) as *const RingBufferHeader) };

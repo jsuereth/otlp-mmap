@@ -26,6 +26,7 @@ const MIN_DICTIONARY_SIZE: u64 = 1024;
 impl Dictionary {
     /// Constructs a new dictionary.
     pub fn try_new(f: File, offset: u64) -> Result<Dictionary, Error> {
+        // TODO - update this to take an MMAP directly.
         let file_size = f.metadata()?.len();
         // TODO - default dictionary size here.
         let mut mmap_size = file_size - offset;
@@ -42,7 +43,9 @@ impl Dictionary {
         };
         // We set the header offset appropriate, if we're the one writing the dictionary.
         let dictionary = Dictionary { data, f, offset };
-        if dictionary.header().end.load(Ordering::Relaxed) < (offset as i64 + DICTIONARY_HEADER_SIZE) {
+        if dictionary.header().end.load(Ordering::Relaxed)
+            < (offset as i64 + DICTIONARY_HEADER_SIZE)
+        {
             dictionary
                 .header()
                 .end
@@ -57,7 +60,7 @@ impl Dictionary {
         if (index as u64) < self.offset {
             return Err(Error::NotFoundInDictionary("string".to_owned(), index));
         }
-        let offset = (index as u64 - self.offset) as usize ;
+        let offset = (index as u64 - self.offset) as usize;
         if let Some(mut buf) = self.data.get(offset..) {
             let mut result = String::new();
             let ctx = prost::encoding::DecodeContext::default();
@@ -86,7 +89,7 @@ impl Dictionary {
         //     std::any::type_name::<T>().to_owned(),
         //     index
         // );
-        let offset = (index as u64 - self.offset) as usize ;
+        let offset = (index as u64 - self.offset) as usize;
         if let Some(buf) = self.data.get(offset..) {
             return Ok(T::decode_length_delimited(buf)?);
         }
@@ -114,7 +117,7 @@ impl Dictionary {
             .header()
             .end
             .fetch_add(total_len as i64, Ordering::Acquire);
-        let start = (current as  u64 - self.offset) as usize;
+        let start = (current as u64 - self.offset) as usize;
         let end = (current as u64 + total_len as u64 - self.offset) as usize;
         let slice = &mut self.data[start..end];
         let mut buf = &mut slice[..];
@@ -136,7 +139,7 @@ impl Dictionary {
             .end
             .fetch_add(total_len as i64, Ordering::Acquire);
         println!("Writing bytes to dictionary. current={current}");
-        let start = (current as  u64 - self.offset) as usize;
+        let start = (current as u64 - self.offset) as usize;
         let end_delimiter = start + delimiter_len;
         let end = (start + total_len) as usize;
         {

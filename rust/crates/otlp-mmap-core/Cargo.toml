@@ -14,6 +14,7 @@ memmap2.workspace = true
 itertools.workspace = true
 prost.workspace = true
 thiserror.workspace = true
+opentelemetry-proto.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
