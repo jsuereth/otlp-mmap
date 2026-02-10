@@ -142,7 +142,7 @@ impl Dictionary {
         println!("Writing bytes to dictionary. current={current}");
         let start = (current as u64 - self.offset) as usize;
         let end_delimiter = start + delimiter_len;
-        let end = (start + total_len);
+        let end = start + total_len;
         {
             let mut length_buf = &mut self.data[start..end_delimiter];
             prost::encoding::encode_varint(bytes.len() as u64, &mut length_buf);
