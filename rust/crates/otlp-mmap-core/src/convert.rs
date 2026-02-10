@@ -62,7 +62,7 @@ impl OtlpDictionary {
         &self,
         metric_ref: i64,
     ) -> Result<otlp_mmap_protocol::MetricRef, Error> {
-        Ok(self.0.try_read(metric_ref)?)
+        self.0.try_read(metric_ref)
     }
 
     /// Converts a vector of OTLP-MMAP KeyValueRef into a vector of OTLP KeyValues.

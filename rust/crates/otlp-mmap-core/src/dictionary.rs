@@ -124,7 +124,7 @@ impl Dictionary {
         msg.encode_length_delimited(&mut buf)?;
         // last - update the number of entries.
         self.header().num_entries.fetch_add(1, Ordering::Relaxed);
-        return Ok(current);
+        Ok(current)
     }
     /// Writes a raw string to the dictionary.
     pub fn try_write_string(&mut self, s: &str) -> Result<i64, Error> {
@@ -141,7 +141,7 @@ impl Dictionary {
         println!("Writing bytes to dictionary. current={current}");
         let start = (current as u64 - self.offset) as usize;
         let end_delimiter = start + delimiter_len;
-        let end = (start + total_len) as usize;
+        let end = (start + total_len);
         {
             let mut length_buf = &mut self.data[start..end_delimiter];
             prost::encoding::encode_varint(bytes.len() as u64, &mut length_buf);
@@ -150,7 +150,7 @@ impl Dictionary {
         buf.copy_from_slice(bytes);
         // last - update the number of entries.
         self.header().num_entries.fetch_add(1, Ordering::Relaxed);
-        return Ok(current);
+        Ok(current)
     }
 }
 
