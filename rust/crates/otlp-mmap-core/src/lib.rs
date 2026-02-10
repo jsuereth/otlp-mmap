@@ -1,5 +1,6 @@
 //! OTLP-MMAP Core processing/utilities for interacting with these files.
 
+mod config;
 mod convert;
 mod dictionary;
 mod error;
@@ -8,30 +9,99 @@ mod ringbuffer;
 
 use std::{fs::OpenOptions, path::Path};
 
+// Exposes the various ringbuffer APIs we need.
+pub use ringbuffer::{RingBufferReader, RingBufferWriter};
+// Exposes the high level dictionary reader we need.
 pub use convert::OtlpDictionary;
-use dictionary::Dictionary;
+// Exposes the configuration used for reading/writing.
+pub use config::{DictionaryConfig, OtlpMmapConfig, RingBufferConfig};
+// Exposes the error handling we use.
 pub use error::Error;
+
+use dictionary::Dictionary;
 use header::MmapHeader;
 use memmap2::MmapOptions;
 use otlp_mmap_protocol::{Event, Measurement, SpanEvent};
-// Exposes the various ringbuffer APIs we need.
-pub use ringbuffer::{RingBufferReader, RingBufferWriter};
 
-// TODO - Refactor this like OTLP-MMAP reader was refactored.
-/// A writer of OTLP-MMAP files.
-pub trait OtlpMmapWriter {
-    /// Ring of events to write into.
-    fn events(&mut self) -> &mut RingBufferWriter<Event>;
-    /// Ring of events to write into.
-    fn spans(&mut self) -> &mut RingBufferWriter<SpanEvent>;
-    /// Ring of events to write into.
-    fn metrics(&mut self) -> &mut RingBufferWriter<Measurement>;
-    // TODO - fancier dictionary abilities.
-    /// Dictionary of things we need to compress.
-    fn dictionary(&mut self) -> &mut Dictionary;
+/// A very low-level writer of OTLP-MMAP files.
+pub struct OtlpMmapWriter {
+    header: MmapHeader,
+    events: RingBufferWriter<Event>,
+    spans: RingBufferWriter<SpanEvent>,
+    metrics: RingBufferWriter<Measurement>,
+    dictionary: Dictionary,
 }
 
-const SUPPORTED_MMAP_VERSION: &[i64] = &[1];
+impl OtlpMmapWriter {
+    /// Constructs a new OTLP-MMAP writer with the given config.
+    pub fn new(path: &Path, config: &OtlpMmapConfig) -> Result<OtlpMmapWriter, Error> {
+        let f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(path)?;
+        let mut header = MmapHeader::new(&f)?;
+        header.initialize(config)?;
+        // This is the order of blocks in the file.
+        // We use this to load separate MMap instances for the various sections.
+        let event_start = header.events_offset();
+        let span_start = header.spans_offset();
+        let measurement_start = header.measurements_offset();
+        let dictionary_start = header.dictionary_offset();
+        println!("Loading log channel @ {event_start}");
+        let events = unsafe {
+            let event_area = MmapOptions::new()
+                .len((span_start - event_start) as usize)
+                .offset(event_start as u64)
+                .map_mut(&f)?;
+            RingBufferWriter::<Event>::new(
+                event_area,
+                0,
+                config.events.buffer_size,
+                config.events.num_buffers,
+            )
+        };
+        println!("Loading span channel @ {span_start}");
+        let spans = unsafe {
+            let span_area = MmapOptions::new()
+                .len((measurement_start - span_start) as usize)
+                .offset(span_start as u64)
+                .map_mut(&f)?;
+            RingBufferWriter::<SpanEvent>::new(
+                span_area,
+                0,
+                config.spans.buffer_size,
+                config.spans.num_buffers,
+            )
+        };
+        println!("Loading measurment channel @ {measurement_start}");
+        let metrics = unsafe {
+            let measurement_area = MmapOptions::new()
+                .len((dictionary_start - measurement_start) as usize)
+                .offset(measurement_start as u64)
+                .map_mut(&f)?;
+            RingBufferWriter::<Measurement>::new(
+                measurement_area,
+                0,
+                config.measurements.buffer_size,
+                config.measurements.num_buffers,
+            )
+        };
+        println!("Loading dictionary @ {dictionary_start}");
+        // Dictionary may need to remap itself.
+        let dictionary = Dictionary::try_new(f, dictionary_start as u64)?;
+        Ok(OtlpMmapWriter {
+            header,
+            events,
+            spans,
+            metrics,
+            dictionary,
+        })
+    }
+}
+
+/// A very low-level reader of OTLP-MMAP files.
 pub struct OtlpMmapReader {
     header: MmapHeader,
     events: RingBufferReader<Event>,
@@ -51,12 +121,7 @@ impl OtlpMmapReader {
             .truncate(false)
             .open(path)?;
         let header = MmapHeader::new(&f)?;
-        if !SUPPORTED_MMAP_VERSION.contains(&header.version()) {
-            return Err(Error::VersionMismatch(
-                header.version(),
-                SUPPORTED_MMAP_VERSION,
-            ));
-        }
+        header.check_version()?;
         let start_time = header.start_time();
         // This is the order of blocks in the file.
         // We use this to load separate MMap instances for the various sections.

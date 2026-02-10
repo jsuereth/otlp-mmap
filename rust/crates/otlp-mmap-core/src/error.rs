@@ -17,6 +17,9 @@ pub enum Error {
 
     #[error(transparent)]
     ProtobufEncodeError(#[from] prost::EncodeError),
+
+    #[error(transparent)]
+    ClockError(#[from] std::time::SystemTimeError),
 }
 
 // TODO - Format errors.

@@ -1,8 +1,17 @@
 //! OTLP-MMAP Core - Header processing
 
-use crate::Error;
+use crate::{Error, OtlpMmapConfig};
 use memmap2::{MmapMut, MmapOptions};
-use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+use std::{
+    sync::atomic::{AtomicI64, AtomicU64, Ordering},
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+/// Current supported versions of OTLP-MMAP from this crate.
+const SUPPORTED_MMAP_VERSION: &[i64] = &[1];
+/// Current MMAP version for files we create.
+const CURRENT_MMAP_VERSION: i64 = 1;
+const RING_BUFFER_HEADER_SIZE: usize = 32;
 
 /// Header of the MMap File.  We use this to check sanity / change of the overall file.
 pub(crate) struct MmapHeader {
@@ -21,6 +30,50 @@ impl MmapHeader {
 
     fn raw(&self) -> &RawMmapHeader {
         unsafe { &*(self.data.as_ref().as_ptr() as *const RawMmapHeader) }
+    }
+    fn raw_mut(&mut self) -> &mut RawMmapHeader {
+        unsafe { &mut *(self.data.as_ref().as_ptr() as *mut RawMmapHeader) }
+    }
+
+    /// Checks whether the version in the header is one we support.
+    pub fn check_version(&self) -> Result<(), Error> {
+        if !SUPPORTED_MMAP_VERSION.contains(&self.version()) {
+            return Err(Error::VersionMismatch(
+                self.version(),
+                SUPPORTED_MMAP_VERSION,
+            ));
+        }
+        Ok(())
+    }
+
+    /// Initialize this header for writing.
+    ///
+    /// TODO - We need configuration input on sizes.
+    pub fn initialize(&mut self, config: &OtlpMmapConfig) -> Result<(), Error> {
+        // TODO - version should use an atomic as well.
+        self.raw_mut().version = CURRENT_MMAP_VERSION;
+        let start_time = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos() as u64;
+        self.raw()
+            .start_time_unix_nano
+            .store(start_time, Ordering::Release);
+        // Calculate and write ring buffer / dictionary offsets.
+        let mut offset = 64; // File header size.
+        self.raw().events.store(offset as i64, Ordering::Release);
+        offset += ring_buffer_size(config.events.num_buffers, config.events.num_buffers);
+        self.raw().spans.store(offset as i64, Ordering::Release);
+        offset += ring_buffer_size(config.spans.num_buffers, config.spans.num_buffers);
+        self.raw()
+            .measurements
+            .store(offset as i64, Ordering::Release);
+        offset += ring_buffer_size(
+            config.measurements.num_buffers,
+            config.measurements.num_buffers,
+        );
+        self.raw()
+            .dictionary
+            .store(offset as i64, Ordering::Release);
+        // TODO - each ring buffer needs to be initialized for writing.
+        Ok(())
     }
 
     /// Version of the MMAP file.
@@ -64,6 +117,12 @@ struct RawMmapHeader {
     dictionary: AtomicI64,
     /// Start timestamp.
     start_time_unix_nano: AtomicU64,
+}
+
+/// Calculate the size a ringbuffer will take up in an OTLP-MMAP file.
+fn ring_buffer_size(num_buffers: usize, buffer_size: usize) -> usize {
+    // Header + Availability + Buffers
+    RING_BUFFER_HEADER_SIZE + (4 * num_buffers) + (num_buffers * buffer_size)
 }
 
 #[cfg(test)]
