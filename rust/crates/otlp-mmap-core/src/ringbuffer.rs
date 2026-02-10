@@ -95,6 +95,7 @@ impl RingBuffer {
         num_buffers: usize,
     ) -> RingBuffer {
         // TODO - Validate memory bounds on MmapMut.
+        println!("Creating ringbuffer header");
         unsafe {
             // Set header for RingBuffer
             let num_buffers_ptr = data.as_mut_ptr().add(offset) as *mut i64;
@@ -105,6 +106,7 @@ impl RingBuffer {
             *read_posiiton_ptr = -1;
             let write_posiiton_ptr = data.as_mut_ptr().add(offset + 24) as *mut i64;
             *write_posiiton_ptr = -1;
+            println!("Creating availability array");
             // Set availability array to -1.
             for i in 0..num_buffers {
                 // Offset is overall offset + HEADER + offset into availability array.
@@ -112,6 +114,7 @@ impl RingBuffer {
                 let av_ptr = data.as_mut_ptr().add(av_offset) as *mut i32;
                 *av_ptr = -1;
             }
+            println!("Done instantiating ring buffer");
         }
         Self::new(data, offset)
     }

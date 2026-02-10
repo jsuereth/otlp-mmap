@@ -7,7 +7,7 @@ mod error;
 mod header;
 mod ringbuffer;
 
-use std::{fs::OpenOptions, path::Path};
+use std::{fs::OpenOptions, os::windows::fs::MetadataExt, path::Path};
 
 // Exposes the various ringbuffer APIs we need.
 pub use ringbuffer::{RingBufferReader, RingBufferWriter};
@@ -22,6 +22,8 @@ use dictionary::Dictionary;
 use header::MmapHeader;
 use memmap2::MmapOptions;
 use otlp_mmap_protocol::{Event, Measurement, SpanEvent};
+
+use crate::header::calculate_minimum_file_size;
 
 /// A very low-level writer of OTLP-MMAP files.
 pub struct OtlpMmapWriter {
@@ -41,6 +43,10 @@ impl OtlpMmapWriter {
             .create(true)
             .truncate(false)
             .open(path)?;
+        let min_size = calculate_minimum_file_size(config);
+        if f.metadata()?.file_size() < min_size {
+            f.set_len(min_size)?;
+        }
         let mut header = MmapHeader::new(&f)?;
         header.initialize(config)?;
         // This is the order of blocks in the file.
@@ -49,7 +55,6 @@ impl OtlpMmapWriter {
         let span_start = header.spans_offset();
         let measurement_start = header.measurements_offset();
         let dictionary_start = header.dictionary_offset();
-        println!("Loading log channel @ {event_start}");
         let events = unsafe {
             let event_area = MmapOptions::new()
                 .len((span_start - event_start) as usize)
@@ -62,7 +67,6 @@ impl OtlpMmapWriter {
                 config.events.num_buffers,
             )
         };
-        println!("Loading span channel @ {span_start}");
         let spans = unsafe {
             let span_area = MmapOptions::new()
                 .len((measurement_start - span_start) as usize)
@@ -75,7 +79,6 @@ impl OtlpMmapWriter {
                 config.spans.num_buffers,
             )
         };
-        println!("Loading measurment channel @ {measurement_start}");
         let metrics = unsafe {
             let measurement_area = MmapOptions::new()
                 .len((dictionary_start - measurement_start) as usize)
@@ -88,7 +91,6 @@ impl OtlpMmapWriter {
                 config.measurements.num_buffers,
             )
         };
-        println!("Loading dictionary @ {dictionary_start}");
         // Dictionary may need to remap itself.
         let dictionary = Dictionary::try_new(
             f,
@@ -133,7 +135,6 @@ impl OtlpMmapReader {
         let span_start = header.spans_offset();
         let measurement_start = header.measurements_offset();
         let dictionary_start = header.dictionary_offset();
-        println!("Loading log channel @ {event_start}");
         let events = unsafe {
             let event_area = MmapOptions::new()
                 .len((span_start - event_start) as usize)
@@ -141,7 +142,6 @@ impl OtlpMmapReader {
                 .map_mut(&f)?;
             RingBufferReader::<Event>::new(event_area, 0)
         };
-        println!("Loading span channel @ {span_start}");
         let spans = unsafe {
             let span_area = MmapOptions::new()
                 .len((measurement_start - span_start) as usize)
@@ -149,7 +149,6 @@ impl OtlpMmapReader {
                 .map_mut(&f)?;
             RingBufferReader::<SpanEvent>::new(span_area, 0)
         };
-        println!("Loading measurment channel @ {measurement_start}");
         let metrics = unsafe {
             let measurement_area = MmapOptions::new()
                 .len((dictionary_start - measurement_start) as usize)
@@ -157,7 +156,6 @@ impl OtlpMmapReader {
                 .map_mut(&f)?;
             RingBufferReader::<Measurement>::new(measurement_area, 0)
         };
-        println!("Loading dictionary @ {dictionary_start}");
         // Dictionary may need to remap itself.
         let dictionary =
             OtlpDictionary::new(Dictionary::try_new(f, dictionary_start as u64, None)?);
@@ -196,5 +194,68 @@ impl OtlpMmapReader {
     /// The start time of the MMAP file in nanoseconds since epoch.
     pub fn start_time(&self) -> u64 {
         self.start_time
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Error, OtlpMmapReader, OtlpMmapWriter};
+    use otlp_mmap_protocol::{
+        any_value::Value, AnyValue, Event, InstrumentationScope, KeyValueRef, Resource,
+    };
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_simple_write_then_read() -> Result<(), Error> {
+        let file = NamedTempFile::new()?;
+        let config = crate::OtlpMmapConfig::default();
+        let mut writer = OtlpMmapWriter::new(file.path(), &config)?;
+        let event_name_ref = writer.dictionary.try_write_string("event")?;
+        let scope_name_ref = writer.dictionary.try_write_string("scope")?;
+        let scope_version_ref = writer.dictionary.try_write_string("1.0")?;
+        let key_ref = writer.dictionary.try_write_string("key")?;
+        let resource_ref = writer.dictionary.try_write(&Resource {
+            attributes: vec![KeyValueRef {
+                key_ref,
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue("value".to_string())),
+                }),
+            }],
+            dropped_attributes_count: 0,
+        })?;
+        let scope_ref = writer.dictionary.try_write(&InstrumentationScope {
+            name_ref: scope_name_ref,
+            version_ref: scope_version_ref,
+            attributes: vec![],
+            dropped_attributes_count: 0,
+            resource_ref,
+        })?;
+        writer.events.try_write(&Event {
+            event_name_ref,
+            scope_ref,
+            time_unix_nano: 1,
+            severity_number: 0,
+            severity_text: "SEVERE".to_string(),
+            body: None,
+            span_context: None,
+            attributes: vec![],
+        })?;
+        // Now try to read the file.
+        let reader = OtlpMmapReader::new(file.path())?;
+        let read_resource = reader.dictionary.try_lookup_resource(resource_ref)?;
+        assert_eq!(read_resource.attributes.len(), 1);
+        let attr = read_resource
+            .attributes
+            .first()
+            .expect("Failed to return attribute");
+        assert_eq!(attr.key, "key");
+        assert_eq!(read_resource.dropped_attributes_count, 0);
+
+        // Now read an event.
+        let event = reader.events.try_read()?.expect("Failed to read an event");
+        assert_eq!(event.event_name_ref, event_name_ref);
+        assert_eq!(event.time_unix_nano, 1);
+
+        Ok(())
     }
 }

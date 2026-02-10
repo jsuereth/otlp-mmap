@@ -13,6 +13,19 @@ const SUPPORTED_MMAP_VERSION: &[i64] = &[1];
 const CURRENT_MMAP_VERSION: i64 = 1;
 const RING_BUFFER_HEADER_SIZE: usize = 32;
 
+/// Determine the minimum file size needed for a given config
+pub(crate) fn calculate_minimum_file_size(config: &OtlpMmapConfig) -> u64 {
+    // Start with header size
+    64 + ring_buffer_size(config.events.num_buffers, config.events.buffer_size) as u64
+        + ring_buffer_size(config.spans.num_buffers, config.spans.buffer_size) as u64
+        + ring_buffer_size(
+            config.measurements.num_buffers,
+            config.measurements.buffer_size,
+        ) as u64
+        + 64
+        + config.dictionary.initial_size
+}
+
 /// Header of the MMap File.  We use this to check sanity / change of the overall file.
 pub(crate) struct MmapHeader {
     data: MmapMut,
@@ -58,21 +71,24 @@ impl MmapHeader {
             .store(start_time, Ordering::Release);
         // Calculate and write ring buffer / dictionary offsets.
         let mut offset = 64; // File header size.
-        self.raw().events.store(offset as i64, Ordering::Release);
-        offset += ring_buffer_size(config.events.num_buffers, config.events.num_buffers);
-        self.raw().spans.store(offset as i64, Ordering::Release);
-        offset += ring_buffer_size(config.spans.num_buffers, config.spans.num_buffers);
+        let event_offset = offset as i64;
+        self.raw().events.store(event_offset, Ordering::Release);
+        offset += ring_buffer_size(config.events.num_buffers, config.events.buffer_size);
+        let span_offset = offset as i64;
+        self.raw().spans.store(span_offset, Ordering::Release);
+        offset += ring_buffer_size(config.spans.num_buffers, config.spans.buffer_size);
+        let measurement_offset = offset as i64;
         self.raw()
             .measurements
-            .store(offset as i64, Ordering::Release);
+            .store(measurement_offset, Ordering::Release);
         offset += ring_buffer_size(
             config.measurements.num_buffers,
-            config.measurements.num_buffers,
+            config.measurements.buffer_size,
         );
         self.raw()
             .dictionary
             .store(offset as i64, Ordering::Release);
-        // TODO - each ring buffer needs to be initialized for writing.
+        // Note - This does NOT initialize the ringbuffers or dictionary header, they will need to that on their own.
         Ok(())
     }
 
