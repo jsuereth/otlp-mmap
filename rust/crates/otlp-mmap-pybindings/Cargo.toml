@@ -8,6 +8,10 @@ publish.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[lib]
+name="otlp_mmap_internal"
+crate-type = ["cdylib"]
+
 [dependencies]
 otlp-mmap-protocol = { path = "../otlp-mmap-protocol" }
 otlp-mmap-core = { path = "../otlp-mmap-core" }

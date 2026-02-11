@@ -7,7 +7,7 @@ mod error;
 mod header;
 mod ringbuffer;
 
-use std::{fs::OpenOptions, os::windows::fs::MetadataExt, path::Path};
+use std::{fs::OpenOptions, path::Path};
 
 // Exposes the various ringbuffer APIs we need.
 pub use ringbuffer::{RingBufferReader, RingBufferWriter};
@@ -45,7 +45,7 @@ impl OtlpMmapWriter {
             .truncate(false)
             .open(path)?;
         let min_size = calculate_minimum_file_size(config);
-        if f.metadata()?.file_size() < min_size {
+        if f.metadata()?.len() < min_size {
             f.set_len(min_size)?;
         }
         let mut header = MmapHeader::new(&f)?;
