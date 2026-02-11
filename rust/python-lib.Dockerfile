@@ -19,6 +19,8 @@ COPY crates /build/crates
 WORKDIR /build/crates/otlp-mmap-pybindings
 RUN maturin build --release --out /wheels
 
+# TODO - Python tests.
+
 # Create layer of python alpine with our module installed.
 FROM python:3.11-alpine
 WORKDIR /app

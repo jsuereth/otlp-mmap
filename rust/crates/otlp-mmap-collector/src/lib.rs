@@ -38,6 +38,7 @@ pub fn new_collector_sdk(path: &Path) -> Result<CollectorSdk, Error> {
 impl CollectorSdk {
     /// Records metrics from the ringbuffer and repor them at an interval.
     pub async fn record_metrics(&self, metric_endpoint: &str) -> Result<(), Error> {
+        println!("Starting metrics pipeline");
         // TODO - we need to set up a timer to export metrics periodically.
         let mut client = MetricsServiceClient::connect(metric_endpoint.to_owned()).await?;
         let mut metric_storage = MetricStorage::new();
@@ -132,6 +133,7 @@ impl CollectorSdk {
     }
 
     pub async fn send_logs_to(&self, log_endpoint: &str) -> Result<(), Error> {
+        println!("Starting logs pipeline");
         let client = LogsServiceClient::connect(log_endpoint.to_owned()).await?;
         // TODO - if this fails, reopen SDK file and start again?
         self.send_events_loop(client).await
@@ -168,6 +170,7 @@ impl CollectorSdk {
 
     /// Open an OTLP connection and fires traces at it.
     pub async fn send_traces_to(&self, trace_endpoint: &str) -> Result<(), Error> {
+        println!("Starting trace pipeline");
         let client = TraceServiceClient::connect(trace_endpoint.to_owned()).await?;
         // TODO - if this fails, reopen SDK file and start again?
         self.send_traces_loop(client).await
