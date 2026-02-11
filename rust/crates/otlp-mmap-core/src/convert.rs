@@ -12,6 +12,11 @@ impl OtlpDictionary {
         Self(d)
     }
 
+    /// Lookup a raw string.
+    pub fn try_lookup_string(&self, string_ref: i64) -> Result<String, Error> {
+        self.0.try_read_string(string_ref)
+    }
+
     /// Perform a resource lookup, including attribute lookups / conversion, for a resource.
     pub fn try_lookup_resource(
         &self,
@@ -77,7 +82,7 @@ impl OtlpDictionary {
     }
 
     // converts an OTLP-MMAP KeyValueRef to an OTLP KeyValue.
-    fn try_convert_kv(
+    pub fn try_convert_kv(
         &self,
         kvr: otlp_mmap_protocol::KeyValueRef,
     ) -> Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error> {
@@ -91,7 +96,7 @@ impl OtlpDictionary {
     }
 
     // converts an OTLP-MMAP AnyValue to an OTLP AnyValue.
-    fn try_convert_anyvalue(
+    pub fn try_convert_anyvalue(
         &self,
         value: otlp_mmap_protocol::AnyValue,
     ) -> Result<Option<opentelemetry_proto::tonic::common::v1::AnyValue>, Error> {

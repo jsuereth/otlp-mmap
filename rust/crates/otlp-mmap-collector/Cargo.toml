@@ -1,0 +1,18 @@
+[package]
+name = "otlp-mmap-collector"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+otlp-mmap-protocol = { path = "../otlp-mmap-protocol" }
+otlp-mmap-core = { path = "../otlp-mmap-core" }
+tokio.workspace = true
+thiserror.workspace = true
+opentelemetry-proto.workspace = true
+prost.workspace = true
+tonic.workspace = true

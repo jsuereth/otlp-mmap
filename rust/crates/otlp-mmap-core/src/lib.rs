@@ -12,7 +12,7 @@ use std::{fs::OpenOptions, os::windows::fs::MetadataExt, path::Path};
 // Exposes the various ringbuffer APIs we need.
 pub use ringbuffer::{RingBufferReader, RingBufferWriter};
 // Exposes the high level dictionary reader we need.
-pub use convert::OtlpDictionary;
+pub use convert::{OtlpDictionary, PartialScope};
 // Exposes the configuration used for reading/writing.
 pub use config::{DictionaryConfig, OtlpMmapConfig, RingBufferConfig};
 // Exposes the error handling we use.
@@ -32,6 +32,7 @@ pub struct OtlpMmapWriter {
     spans: RingBufferWriter<SpanEvent>,
     metrics: RingBufferWriter<Measurement>,
     dictionary: Dictionary,
+    start_time: u64,
 }
 
 impl OtlpMmapWriter {
@@ -97,13 +98,40 @@ impl OtlpMmapWriter {
             dictionary_start as u64,
             Some(config.dictionary.initial_size),
         )?;
+        let start_time = header.start_time();
         Ok(OtlpMmapWriter {
             header,
             events,
             spans,
             metrics,
             dictionary,
+            start_time,
         })
+    }
+
+    /// Returns true if we detect the file has changed behind us.
+    pub fn has_file_changed(&self) -> bool {
+        self.start_time != self.header.start_time()
+    }
+
+    /// Channel for writing events.
+    pub fn events(&self) -> &RingBufferWriter<Event> {
+        &self.events
+    }
+
+    /// Channel for writing span events.
+    pub fn spans(&self) -> &RingBufferWriter<SpanEvent> {
+        &self.spans
+    }
+
+    /// Channel for writing metric measurements.
+    pub fn measurements(&self) -> &RingBufferWriter<Measurement> {
+        &self.metrics
+    }
+
+    // TODO - Dictionary interface...
+    pub fn dictionary(&self) -> &Dictionary {
+        &self.dictionary
     }
 }
 
