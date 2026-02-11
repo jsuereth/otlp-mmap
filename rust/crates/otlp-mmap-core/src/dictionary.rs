@@ -3,6 +3,7 @@
 use crate::Error;
 use memmap2::{MmapMut, MmapOptions};
 use std::{
+    cell::UnsafeCell,
     fs::File,
     sync::atomic::{AtomicI64, Ordering},
 };
@@ -13,7 +14,7 @@ use std::{
 /// Every entry is expected to be length-delimited, using variable integer specification.
 pub struct Dictionary {
     /// The mmap data
-    data: MmapMut,
+    data: UnsafeCell<MmapMut>,
     /// The file we're reading.
     f: File,
     /// The offset into the mmap data where the dictionary starts.
@@ -43,7 +44,11 @@ impl Dictionary {
                 .map_mut(&f)?
         };
         // We set the header offset appropriate, if we're the one writing the dictionary.
-        let dictionary = Dictionary { data, f, offset };
+        let dictionary = Dictionary {
+            data: UnsafeCell::new(data),
+            f,
+            offset,
+        };
         if dictionary.header().end.load(Ordering::Relaxed)
             < (offset as i64 + DICTIONARY_HEADER_SIZE)
         {
@@ -62,7 +67,8 @@ impl Dictionary {
             return Err(Error::NotFoundInDictionary("string".to_owned(), index));
         }
         let offset = (index as u64 - self.offset) as usize;
-        if let Some(mut buf) = self.data.get(offset..) {
+        let data = unsafe { &*self.data.get() };
+        if let Some(mut buf) = data.get(offset..) {
             let mut result = String::new();
             let ctx = prost::encoding::DecodeContext::default();
             let wire_type = prost::encoding::WireType::LengthDelimited;
@@ -91,7 +97,8 @@ impl Dictionary {
         //     index
         // );
         let offset = (index as u64 - self.offset) as usize;
-        if let Some(buf) = self.data.get(offset..) {
+        let data = unsafe { &*self.data.get() };
+        if let Some(buf) = data.get(offset..) {
             return Ok(T::decode_length_delimited(buf)?);
         }
         // TODO - Remap the mmap file and try again.
@@ -104,23 +111,27 @@ impl Dictionary {
 
     // TODO - find ways to check sanity of data.
     fn header(&self) -> &RawDictionaryHeader {
-        unsafe { &*(self.data.as_ref().as_ptr() as *const RawDictionaryHeader) }
+        unsafe {
+            let data = &*self.data.get();
+            &*(data.as_ref().as_ptr() as *const RawDictionaryHeader)
+        }
     }
 
     /// Attempt to write a message to the dictionary.
-    pub fn try_write<T: prost::Message>(&mut self, msg: &T) -> Result<i64, Error> {
+    pub fn try_write<T: prost::Message>(&self, msg: &T) -> Result<i64, Error> {
         let encoded_len = msg.encoded_len();
         let delimiter_len = prost::length_delimiter_len(encoded_len);
         let total_len = delimiter_len + encoded_len;
 
-        // CAS for bytes to write.
+        // CAS for bytes to write - This will keep us "thread safe", so it's ok to take a mutable reference to the mmap.
         let current = self
             .header()
             .end
             .fetch_add(total_len as i64, Ordering::Acquire);
         let start = (current as u64 - self.offset) as usize;
         let end = (current as u64 + total_len as u64 - self.offset) as usize;
-        let slice = &mut self.data[start..end];
+        let data = unsafe { &mut *self.data.get() };
+        let slice = &mut data[start..end];
         let mut buf = &mut slice[..];
         msg.encode_length_delimited(&mut buf)?;
         // last - update the number of entries.
@@ -128,26 +139,27 @@ impl Dictionary {
         Ok(current)
     }
     /// Writes a raw string to the dictionary.
-    pub fn try_write_string(&mut self, s: &str) -> Result<i64, Error> {
+    pub fn try_write_string(&self, s: &str) -> Result<i64, Error> {
         self.try_write_bytes(s.as_bytes())
     }
-    fn try_write_bytes(&mut self, bytes: &[u8]) -> Result<i64, Error> {
+    fn try_write_bytes(&self, bytes: &[u8]) -> Result<i64, Error> {
         let delimiter_len = prost::length_delimiter_len(bytes.len());
         let total_len = delimiter_len + bytes.len();
-        // CAS for bytes to write.
+        // CAS for bytes to write. This makes it safe for us to pull a mutable reference to MMAP.
         let current = self
             .header()
             .end
             .fetch_add(total_len as i64, Ordering::Acquire);
+        let data = unsafe { &mut *self.data.get() };
         println!("Writing bytes to dictionary. current={current}");
         let start = (current as u64 - self.offset) as usize;
         let end_delimiter = start + delimiter_len;
         let end = start + total_len;
         {
-            let mut length_buf = &mut self.data[start..end_delimiter];
+            let mut length_buf = &mut data[start..end_delimiter];
             prost::encoding::encode_varint(bytes.len() as u64, &mut length_buf);
         }
-        let buf = &mut self.data[end_delimiter..end];
+        let buf = &mut data[end_delimiter..end];
         buf.copy_from_slice(bytes);
         // last - update the number of entries.
         self.header().num_entries.fetch_add(1, Ordering::Relaxed);

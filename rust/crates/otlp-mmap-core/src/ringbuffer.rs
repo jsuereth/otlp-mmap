@@ -3,6 +3,7 @@
 use crate::Error;
 use memmap2::MmapMut;
 use std::{
+    cell::UnsafeCell,
     marker::PhantomData,
     ops::{Deref, DerefMut},
     sync::atomic::{AtomicI32, AtomicI64, Ordering},
@@ -57,7 +58,7 @@ impl<T: prost::Message + std::fmt::Debug> RingBufferWriter<T> {
     /// Attempts to write a message to a ringbuffer.
     ///
     /// Returns false if the ringbuffer is full or otherwise unavailable.
-    pub fn try_write(&mut self, msg: &T) -> Result<bool, Error> {
+    pub fn try_write(&self, msg: &T) -> Result<bool, Error> {
         self.ring.try_write(msg)
     }
 }
@@ -68,7 +69,7 @@ impl<T: prost::Message + std::fmt::Debug> RingBufferWriter<T> {
 ///       but multiple prodcuers.
 struct RingBuffer {
     /// The mmap data
-    data: MmapMut,
+    data: UnsafeCell<MmapMut>,
     /// The offset into the mmap data where the ringbuffer starts.
     offset: usize,
     /// Efficient mechanism to convert a message index into
@@ -81,7 +82,7 @@ impl RingBuffer {
     fn new(data: MmapMut, offset: usize) -> RingBuffer {
         let hdr = unsafe { &*(data.as_ref().as_ptr().add(offset) as *const RingBufferHeader) };
         RingBuffer {
-            data,
+            data: UnsafeCell::new(data),
             offset,
             shift: (hdr.num_buffers as u32).ilog2(),
         }
@@ -95,7 +96,6 @@ impl RingBuffer {
         num_buffers: usize,
     ) -> RingBuffer {
         // TODO - Validate memory bounds on MmapMut.
-        println!("Creating ringbuffer header");
         unsafe {
             // Set header for RingBuffer
             let num_buffers_ptr = data.as_mut_ptr().add(offset) as *mut i64;
@@ -106,7 +106,6 @@ impl RingBuffer {
             *read_posiiton_ptr = -1;
             let write_posiiton_ptr = data.as_mut_ptr().add(offset + 24) as *mut i64;
             *write_posiiton_ptr = -1;
-            println!("Creating availability array");
             // Set availability array to -1.
             for i in 0..num_buffers {
                 // Offset is overall offset + HEADER + offset into availability array.
@@ -114,7 +113,6 @@ impl RingBuffer {
                 let av_ptr = data.as_mut_ptr().add(av_offset) as *mut i32;
                 *av_ptr = -1;
             }
-            println!("Done instantiating ring buffer");
         }
         Self::new(data, offset)
     }
@@ -132,7 +130,7 @@ impl RingBuffer {
     }
 
     /// Attempst to write a protobuf message to the ringbuffer.
-    fn try_write<T: prost::Message + std::fmt::Debug>(&mut self, msg: &T) -> Result<bool, Error> {
+    fn try_write<T: prost::Message + std::fmt::Debug>(&self, msg: &T) -> Result<bool, Error> {
         if let Some(idx) = self.try_obtain_write_idx() {
             msg.encode_length_delimited(&mut self.entry_mut(idx).deref_mut())?;
             self.set_read_available(idx);
@@ -176,13 +174,14 @@ impl RingBuffer {
 
     /// The ring buffer header (with atomic access).
     fn header(&self) -> &RingBufferHeader {
-        unsafe { &*(self.data.as_ref().as_ptr().add(self.offset) as *const RingBufferHeader) }
+        unsafe {
+            &*((*self.data.get()).as_ref().as_ptr().add(self.offset) as *const RingBufferHeader)
+        }
     }
     /// The availability array for ring buffer entries.
     fn availability_array(&self) -> &[AtomicI32] {
         unsafe {
-            let start_ptr = self
-                .data
+            let start_ptr = (*self.data.get())
                 .as_ref()
                 .as_ptr()
                 .add(self.availability_array_offset())
@@ -234,21 +233,25 @@ impl RingBuffer {
         let ring_index = self.ring_buffer_index(idx);
         let start_byte_idx = offset_to_ring + (ring_index * (self.header().buffer_size as usize));
         let end_byte_idx = start_byte_idx + (self.header().buffer_size as usize);
+        // We have used atomic integers to lock this PORTION of memory safely away for the lifetime of this reference.
+        let data = unsafe { &*self.data.get() };
         RingBufferEntry {
-            data: &self.data,
+            data,
             start_offset: start_byte_idx,
             end_offset: end_byte_idx,
         }
     }
 
     /// Returns a mutable entry for writing.
-    fn entry_mut<'a>(&'a mut self, idx: i64) -> RingBufferEntryMut<'a> {
+    fn entry_mut<'a>(&'a self, idx: i64) -> RingBufferEntryMut<'a> {
         let offset_to_ring = self.first_buffer_offset();
         let ring_index = self.ring_buffer_index(idx);
         let start_byte_idx = offset_to_ring + (ring_index * (self.header().buffer_size as usize));
         let end_byte_idx = start_byte_idx + (self.header().buffer_size as usize);
+        // We have used atomic integers to lock this PORTION of memory safely away for the lifetime of this reference.
+        let data = unsafe { &mut *self.data.get() };
         RingBufferEntryMut {
-            data: &mut self.data,
+            data,
             start_offset: start_byte_idx,
             end_offset: end_byte_idx,
         }
