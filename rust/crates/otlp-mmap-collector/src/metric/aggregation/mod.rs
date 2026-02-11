@@ -27,7 +27,7 @@ pub fn convert_sdk_mmap_config(
             is_monotonic: sum.is_monotonic,
             aggregation_temporality: sum.aggregation_temporality,
         }),
-        Some(otlp_mmap_protocol::metric_ref::Aggregation::Histogram(hist)) => todo!(),
+        Some(otlp_mmap_protocol::metric_ref::Aggregation::Histogram(_hist)) => todo!(),
         Some(otlp_mmap_protocol::metric_ref::Aggregation::ExpHist(ehist)) => {
             Box::new(exp_hist::BucketConfig {
                 max_size: ehist.max_buckets as i32,

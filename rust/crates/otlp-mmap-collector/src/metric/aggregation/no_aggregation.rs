@@ -23,7 +23,7 @@ impl super::AggregationConfig for NoAggregationConfig {
 pub struct NoAggregation {}
 // Aggregation which does nothing.
 impl super::Aggregation for NoAggregation {
-    fn join(&mut self, m: Measurement) -> Result<(), Error> {
+    fn join(&mut self, _m: Measurement) -> Result<(), Error> {
         Ok(())
     }
 

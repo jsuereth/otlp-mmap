@@ -54,7 +54,7 @@ impl MetricStorage {
     /// Handles an incoming measurement.
     pub fn handle_measurement(
         &mut self,
-        lookup: &(impl SdkLookup),
+        lookup: &impl SdkLookup,
         measurement: Measurement,
     ) -> Result<(), Error> {
         match self.metrics.entry(measurement.metric_ref) {
