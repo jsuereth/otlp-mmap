@@ -21,6 +21,9 @@ pub struct Dictionary {
     offset: u64,
 }
 
+// We are using memory primitives on MMAP memory to allow multi-thread usage here.
+unsafe impl Sync for Dictionary {}
+
 const DICTIONARY_HEADER_SIZE: i64 = 64;
 const MIN_DICTIONARY_SIZE: u64 = 1024;
 

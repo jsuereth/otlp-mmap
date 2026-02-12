@@ -39,6 +39,8 @@ pub struct RingBufferWriter<T> {
     ring: RingBuffer,
     _phantom: PhantomData<T>,
 }
+// We are using memory primitives on MMAP memory to allow multi-thread usage here.
+unsafe impl <T> Sync for RingBufferWriter<T> {}
 
 /// Writes types messages to a ring buffer.
 impl<T: prost::Message + std::fmt::Debug> RingBufferWriter<T> {
