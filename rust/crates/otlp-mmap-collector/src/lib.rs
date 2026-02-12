@@ -1,4 +1,10 @@
-//! API and test for collecting MMAP SDK files into OTLP messages.
+//! API and tests for collecting MMAP SDK files into OTLP messages.
+//! 
+//! This package defines necessary components and methods to read an OTLP-mmap file and
+//! convert it into vanilla OTLP messages that can fired at an OTLP endpoint.
+//!
+//! This should mirror the implementation behavior of an OpenTelemetry SDK and provide
+//! compliance to its specification.
 
 mod error;
 pub mod log;

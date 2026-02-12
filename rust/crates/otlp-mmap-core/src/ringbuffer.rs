@@ -1,4 +1,19 @@
-//! Ringbuffers in MMAP file protocol.
+//! Multi-Producer, single-consumer ring buffer.
+//!
+//! A RingBuffer is the heart of the OTLP-MMAP implementation.
+//! This package provides everything we need to read, efficiently, from a RingBuffer.
+//!
+//! A RingBuffer is structured as follows:
+//! | Header | Availability Array | Buffer1 | ... | BufferN |
+//!
+//! More than one process is expected to mount a file containing the ring buffer, and
+//! communication between processes MUST be done via atomic memory operations (e.g. CAS).
+//!
+//! This ringbuffer is designed to allow multi-producer, single-consumer.
+//! The header contains information about the position of the single reader, in
+//! addition to the *maximum taken* buffers for writing. When a producer is finished
+//! writing to a buffer, it will update the availability array with a given flag.
+//! Reader MUST check the availability array to ensure a buffer is complete before reading.
 
 use crate::Error;
 use memmap2::MmapMut;
