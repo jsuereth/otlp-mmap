@@ -1,9 +1,8 @@
-use otlp_mmap_core::{OtlpMmapConfig, OtlpMmapWriter};
+use otlp_mmap_core::{OtlpMmapConfig, OtlpMmapReader};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
-use scc::HashIndex;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use crate::sdk::SdkWriter;
 
@@ -206,15 +205,110 @@ fn create_otlp_mmap_exporter(path: &str) -> PyResult<OtlpMmapExporter> {
     })
 }
 
+/// An inefficient reader implementation used for testing Python SDK implementation only.
+#[pyclass]
+struct TestOtlpMmapReader {
+    reader: Arc<Mutex<OtlpMmapReader>>,
+}
+
+#[pymethods]
+impl TestOtlpMmapReader {
+    fn read_string(&self, idx: i64) -> PyResult<String> {
+        let reader = self.reader.lock().map_err(poison_to_py_err)?;
+        reader
+            .dictionary()
+            .try_lookup_string(idx)
+            .map_err(core_to_py_err)
+    }
+    fn read_resource<'a>(&self, py: Python<'a>, idx: i64) -> PyResult<Bound<'a, PyDict>> {
+        let reader = self.reader.lock().map_err(poison_to_py_err)?;
+        // TODO - convert proto to resource?
+        let result = reader
+            .dictionary()
+            .try_lookup_resource(idx)
+            .map_err(core_to_py_err)?;
+        let dict = PyDict::new(py);
+        // TODO - Add attributes
+        dict.set_item("dropped_attributes_count", result.dropped_attributes_count)?;
+        Ok(dict)
+    }
+    fn read_scope<'a>(&self, py: Python<'a>, idx: i64) -> PyResult<Bound<'a, PyDict>> {
+        let reader = self.reader.lock().map_err(poison_to_py_err)?;
+        // TODO - convert proto to resource?
+        let result = reader
+            .dictionary()
+            .try_lookup_scope(idx)
+            .map_err(core_to_py_err)?;
+        let dict = PyDict::new(py);
+        dict.set_item("resource_ref", result.resource_ref)?;
+        dict.set_item("name", result.scope.name)?;
+        dict.set_item("version", result.scope.version)?;
+        dict.set_item(
+            "dropped_attributes_count",
+            result.scope.dropped_attributes_count,
+        )?;
+        // TODO - Add attributes
+        Ok(dict)
+    }
+    fn read_metric<'a>(&self, py: Python<'a>, idx: i64) -> PyResult<Bound<'a, PyDict>> {
+        let reader = self.reader.lock().map_err(poison_to_py_err)?;
+        // TODO - convert proto to resource?
+        let result = reader
+            .dictionary()
+            .try_lookup_metric_stream(idx)
+            .map_err(core_to_py_err)?;
+        let dict = PyDict::new(py);
+        dict.set_item(
+            "instrumentation_scope_ref",
+            result.instrumentation_scope_ref,
+        )?;
+        dict.set_item("name", result.name)?;
+        dict.set_item("name", result.description)?;
+        dict.set_item("unit", result.unit)?;
+        // TODO - Add aggregation
+        Ok(dict)
+    }
+
+    fn read_measurement<'a>(&self, py: Python<'a>) -> PyResult<Bound<'a, PyDict>> {
+        let reader = self.reader.lock().map_err(poison_to_py_err)?;
+        // TODO - spin-lock read.
+        let dict = PyDict::new(py);
+        if let Some(result) = reader.metrics().try_read().map_err(core_to_py_err)? {
+            dict.set_item("metric_ref", result.metric_ref)?;
+            dict.set_item("time_unix_nano", result.time_unix_nano)?;
+            // TODO - attributes
+            // TODO - span context
+        }
+        Ok(dict)
+    }
+}
+
+#[pyfunction]
+fn create_test_otlp_mmap_reader(path: &str) -> PyResult<TestOtlpMmapReader> {
+    Ok(TestOtlpMmapReader {
+        reader: Arc::new(Mutex::new(
+            OtlpMmapReader::new(Path::new(path)).map_err(core_to_py_err)?,
+        )),
+    })
+}
+
 #[pymodule]
 mod otlp_mmap_internal {
     #[pymodule_export]
     use super::create_otlp_mmap_exporter;
     #[pymodule_export]
+    use super::create_test_otlp_mmap_reader;
+    #[pymodule_export]
     use super::OtlpMmapExporter;
+    #[pymodule_export]
+    use super::TestOtlpMmapReader;
 }
 
 /// Conversion from core errors to py errors.
 pub(crate) fn core_to_py_err(e: otlp_mmap_core::Error) -> PyErr {
+    PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string())
+}
+
+pub(crate) fn poison_to_py_err<T>(e: PoisonError<T>) -> PyErr {
     PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string())
 }

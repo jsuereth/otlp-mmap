@@ -251,7 +251,7 @@ fn convert_aggregation(
             },
         ))
     } else if let Some(exp_dict) = dict.get_item("exp_histogram")? {
-        let d = exp_dict.downcast::<PyDict>()?;
+        let d = exp_dict.cast::<PyDict>()?;
         let temp = if let Some(i) = d.get_item("aggregation_temporality")? {
             i.extract::<i32>()?
         } else {
