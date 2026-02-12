@@ -19,5 +19,5 @@ pub enum Error {
     #[error(transparent)]
     TonicTransportError(#[from] tonic::transport::Error),
     #[error(transparent)]
-    ArgumentError(#[from] clap::Error)
+    ArgumentError(#[from] clap::Error),
 }

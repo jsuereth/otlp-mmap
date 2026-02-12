@@ -17,3 +17,4 @@ otlp-mmap-protocol = { path = "../otlp-mmap-protocol" }
 otlp-mmap-core = { path = "../otlp-mmap-core" }
 pyo3.workspace=true
 scc.workspace=true
+prost.workspace=true

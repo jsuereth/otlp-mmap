@@ -680,6 +680,7 @@ version = "0.21.2"
 dependencies = [
  "otlp-mmap-core",
  "otlp-mmap-protocol",
+ "prost",
  "pyo3",
  "scc",
 ]
