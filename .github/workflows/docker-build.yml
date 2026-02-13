@@ -29,9 +29,13 @@ jobs:
           - image: mmap-collector
             dockerfile: ./rust/mmap-collector.Dockerfile
             context: ./rust
-          - image: otlp-mmap-python-base
-            dockerfile: ./rust/python-lib.Dockerfile
-            context: ./rust
+          - image: mmap-python-demo
+            dockerfile: ./python/otlp-mmap-example-server/Dockerfile
+            context: .
+          # - image: otlp-mmap-python-base
+          #   dockerfile: ./rust/python-lib.Dockerfile
+          #   context: ./rust
+          
 
     steps:
       - name: checkout

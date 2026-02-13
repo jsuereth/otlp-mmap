@@ -22,32 +22,20 @@ class MmapLogger(Logger):
 
     def emit(self, record: LogRecord) -> None:
         # Map LogRecord to record_event
-        # We need an event name. OTel Logs don't strictly have "event name" like the mmap protocol expects (it expects event_name_ref).
-        # We can use "log" or the body as name? Or map body to body field in proto?
-        # The mmap protocol `Event` has `body`, `severity_number`, etc.
-        # But `OtlpMmapExporter.record_event` currently takes `event_name_ref`.
-        # `data.rs` Event has `event_name_ref`.
-        
-        # Let's use a default event name "log" for now.
-        event_name_ref = self._exporter.record_string("log")
+        # Use a default event name "log" for now or use body if it's a simple string.
+        event_name = "log"
         
         # We need to construct attributes.
         attrs = record.attributes or {}
         
-        # TODO: Handle body, severity, etc.
-        # The current `record_event` signature in `internal` only takes `attributes` and `event_name_ref`.
-        # It doesn't expose `body` or `severity` fields of the `Event` struct in `sdk.rs`.
-        # `sdk.rs` `record_event` initializes severity to 0 and body to None.
-        
-        # So we can only pass attributes for now.
-        # We can encode body/severity into attributes if needed or update `internal` later.
-        
         if record.body:
-            attrs["body"] = str(record.body)
-        if record.severity_text:
-            attrs["severity_text"] = record.severity_text
-        if record.severity_number:
-            attrs["severity_number"] = int(record.severity_number)
+             if isinstance(record.body, str):
+                 event_name = record.body
+             else:
+                 attrs["body"] = str(record.body)
+        
+        severity_number = int(record.severity_number) if record.severity_number else 0
+        severity_text = record.severity_text or ""
             
         ctx = None
         if record.trace_id and record.span_id:
@@ -60,7 +48,9 @@ class MmapLogger(Logger):
         self._exporter.record_event(
             self._scope_ref,
             ctx,
-            event_name_ref,
+            event_name,
             record.timestamp or now_ns(),
+            severity_number,
+            severity_text,
             attrs
         )

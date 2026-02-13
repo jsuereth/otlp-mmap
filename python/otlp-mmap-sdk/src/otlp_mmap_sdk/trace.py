@@ -179,7 +179,6 @@ class MmapSpan(Span):
         attributes: Optional[Dict[str, Any]] = None,
         timestamp: Optional[int] = None,
     ) -> None:
-        event_name_ref = self._exporter.record_string(name)
         # Create span context dict for export
         sc_dict = {
             "trace_id": self._trace_id_bytes,
@@ -189,8 +188,10 @@ class MmapSpan(Span):
         self._exporter.record_event(
             self._scope_ref,
             sc_dict,
-            event_name_ref,
+            name,
             timestamp or now_ns(),
+            0, # severity_number
+            "", # severity_text
             attributes or {}
         )
 

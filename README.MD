@@ -95,9 +95,13 @@ docker build -f rust/mmap-collector.Dockerfile rust -t ghcr.io/jsuereth/mmap-col
 2. Build java-demo-app image
 
 ```
-cd java
-cd otlp-mmap
-docker build . -t ghcr.io/jsuereth/mmap-demo:main
+docker build -f java/otlp-mmap/Dockerfile java/otlp-mmap -t ghcr.io/jsuereth/mmap-demo:main
+```
+
+3. Build the python-demo-app image
+
+```
+docker build -f python/otlp-mmap-example-server/Dockerfile . -t ghcr.io/jsuereth/mmap-python-demo:main
 ```
 
 ### Running manually

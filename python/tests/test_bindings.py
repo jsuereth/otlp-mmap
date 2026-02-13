@@ -6,9 +6,6 @@ import tempfile
 @pytest.fixture
 def exporter():
     # Use a temp file path
-    # On Windows, we can't open a file that is already open if we are not careful, 
-    # but tempfile.NamedTemporaryFile keeps it open.
-    # So we close it first.
     f = tempfile.NamedTemporaryFile(delete=False)
     path = f.name
     f.close()
@@ -49,9 +46,8 @@ def test_metrics(exporter):
 def test_events(exporter):
     res = exporter.create_resource({}, None)
     scope = exporter.create_instrumentation_scope(res, "my.scope", None, None)
-    event_name = exporter.record_string("my.event")
     
-    exporter.record_event(scope, None, event_name, 123456789, {"attr": "val"})
+    exporter.record_event(scope, None, "my.event", 123456789, 0, "", {"attr": "val"})
 
 def test_spans(exporter):
     res = exporter.create_resource({}, None)

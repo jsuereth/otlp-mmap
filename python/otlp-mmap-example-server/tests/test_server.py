@@ -15,7 +15,10 @@ def mmap_file():
     f.close() # Close so Flask app can open it
     yield path
     # Clean up the file after tests
-    os.remove(path)
+    try:
+        os.remove(path)
+    except:
+        pass
 
 @pytest.fixture(scope="module")
 def flask_app(mmap_file):
@@ -57,28 +60,31 @@ def test_hello_world(flask_app, mmap_file):
     assert response.status_code == 200
     assert "Hello, World!" in response.text
     
-    # Verify we can read spans from the mmap file
-    reader = otlp_mmap_internal.MmapReader(mmap_file)
-    found_span = False
-    # Read until we find a span or give up
+    # Verify we can read measurements from the mmap file
+    # (Using the new TestOtlpMmapReader API)
+    reader = otlp_mmap_internal.create_test_otlp_mmap_reader(mmap_file)
+    found_measurement = False
+    # Read until we find a measurement or give up
     for _ in range(1000):
-        if reader.read_span():
-            found_span = True
+        m = reader.read_measurement()
+        if m and m.get("metric_ref"):
+            found_measurement = True
             break
             
-    assert found_span, "No spans found in mmap file after request"
+    assert found_measurement, "No measurements found in mmap file after request"
 
 def test_fibonacci(flask_app, mmap_file):
     response = requests.get(f"{flask_app}/fib/5")
     assert response.status_code == 200
     assert "Fibonacci(5) = 5" in response.text
     
-    # Verify we can read metrics (requests_total should be incremented)
-    reader = otlp_mmap_internal.MmapReader(mmap_file)
-    found_metric = False
+    # Verify we can read metrics
+    reader = otlp_mmap_internal.create_test_otlp_mmap_reader(mmap_file)
+    found_measurement = False
     for _ in range(1000):
-        if reader.read_metric():
-            found_metric = True
+        m = reader.read_measurement()
+        if m and m.get("metric_ref"):
+            found_measurement = True
             break
             
-    assert found_metric, "No metrics found in mmap file after request"
+    assert found_measurement, "No measurements found in mmap file after request"

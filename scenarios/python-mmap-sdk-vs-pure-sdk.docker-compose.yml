@@ -25,9 +25,7 @@ services:
 
   # The HTTP server with normal python SDK
   python_http_server_sdk:
-    build:
-      context: ../python
-      dockerfile: otlp-mmap-example-server/Dockerfile
+    image: ghcr.io/jsuereth/mmap-python-demo:main
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel_collector:4317
       HTTP_ENDPOINT_PORT: 8082
@@ -39,9 +37,7 @@ services:
 
   # HTTP server that is instrumented, configured to use SDK MMap
   python_http_server_mmap_sdk:
-    build:
-      context: ../python
-      dockerfile: otlp-mmap-example-server/Dockerfile
+    image: ghcr.io/jsuereth/mmap-python-demo:main
     volumes: 
       - ./export:/otlp/export
     environment:
