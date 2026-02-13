@@ -1,0 +1,20 @@
+[package]
+name = "otlp-mmap-pybindings"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+name="otlp_mmap_internal"
+crate-type = ["cdylib"]
+
+[dependencies]
+otlp-mmap-protocol = { path = "../otlp-mmap-protocol" }
+otlp-mmap-core = { path = "../otlp-mmap-core" }
+pyo3.workspace=true
+scc.workspace=true
+prost.workspace=true

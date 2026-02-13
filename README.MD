@@ -13,7 +13,7 @@ See also:
 
 - [Protocol Specification](specification/FILE_PROTOCOL.MD)
 - [Benchmarks](benchmarks/README.MD)
-- [mmap-collector implementation](rust)
+- [mmap-collector implementation](rust/crates/otlp-mmap-collector/README.md)
 - [Try it out](#try-it-yourself)
 - [Frequently Asked Questions](FAQS.md)
 
@@ -89,16 +89,19 @@ You can also build the images locally as follows:
 1. Build mmap-collector image
 
 ```
-cd mmap_collector
-docker build . -t ghcr.io/jsuereth/mmap-collector:main
+docker build -f rust/mmap-collector.Dockerfile rust -t ghcr.io/jsuereth/mmap-collector:main
 ```
 
 2. Build java-demo-app image
 
 ```
-cd java
-cd otlp-mmap
-docker build . -t ghcr.io/jsuereth/mmap-demo:main
+docker build -f java/otlp-mmap/Dockerfile java/otlp-mmap -t ghcr.io/jsuereth/mmap-demo:main
+```
+
+3. Build the python-demo-app image
+
+```
+docker build -f python/otlp-mmap-example-server/Dockerfile . -t ghcr.io/jsuereth/mmap-python-demo:main
 ```
 
 ### Running manually

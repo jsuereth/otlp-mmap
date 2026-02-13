@@ -1,0 +1,20 @@
+[package]
+name = "otlp-mmap-core"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+otlp-mmap-protocol = { path = "../otlp-mmap-protocol" }
+memmap2.workspace = true
+itertools.workspace = true
+prost.workspace = true
+thiserror.workspace = true
+opentelemetry-proto.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

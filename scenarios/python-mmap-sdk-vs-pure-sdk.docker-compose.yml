@@ -1,0 +1,130 @@
+# Python Mmap SDK vs traditional SDK comparison
+# 
+# This Compose spins up two Python servers -
+# 1. A simple Python http server using a traditional OpenTelemetry SDK
+# 2. A simple Python http server using a streamlined MMAP SDK.
+#
+# This runs cadvisor + k6 load testing on each server to demonstrate latency + performance characteristics.
+#
+# A machine-local (but separate container) collector reads the file
+# and processes data into actual OTLP which is sent to an
+# OpenTelemetry collector
+services:
+  # OpenTelemetry collector actually pull
+  otel_collector:
+    image: otel/opentelemetry-collector-contrib:0.139.0
+    volumes:
+      - ./otel-config:/otel-config
+    command: ["--config=/otel-config/otel-lgtm-config.yaml"]
+    depends_on:
+      - lgtm
+    ports:
+      - "4317"
+      - "4318"
+      - "8091"
+
+  # The HTTP server with normal python SDK
+  python_http_server_sdk:
+    image: ghcr.io/jsuereth/mmap-python-demo:main
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel_collector:4317
+      HTTP_ENDPOINT_PORT: 8082
+      OTLP_MMAP_SERVICE_NAME: http_python_sdk
+    ports:
+      - "8082:8082"
+    depends_on:
+      - otel_collector
+
+  # HTTP server that is instrumented, configured to use SDK MMap
+  python_http_server_mmap_sdk:
+    image: ghcr.io/jsuereth/mmap-python-demo:main
+    volumes: 
+      - ./export:/otlp/export
+    environment:
+      SDK_MMAP_EXPORTER_FILE: /otlp/export/python-mmap.otlp
+      HTTP_ENDPOINT_PORT: 8081
+      OTLP_MMAP_SERVICE_NAME: http_python_mmap_sdk
+    ports:
+      - "8081:8081"
+
+  # Collector for the MMAP sdk file that will send OTLP to the otel collector.
+  mmap_collector:
+    image: ghcr.io/jsuereth/mmap-collector:main
+    depends_on:
+      - otel_collector
+      - python_http_server_mmap_sdk
+    environment:
+      SDK_MMAP_EXPORTER_FILE: /otlp/export/python-mmap.otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel_collector:4317
+    volumes: 
+      - ./export:/otlp/export
+    restart: unless-stopped
+
+  # Load tester for our HTTP server
+  k6_mmap_loadtester:
+    image: grafana/k6:latest
+    command: ["run", "-o", "experimental-opentelemetry", "/config/k6-load-test.js"]
+    environment:
+      TARGET_URL: http://python_http_server_mmap_sdk:8081/
+      K6_OTEL_SERVICE_NAME: python_http_mmap_load_test
+      K6_OTEL_FLUSH_INTERVAL: 10s
+      K6_OTEL_EXPORTER_TYPE: grpc
+      K6_OTEL_GRPC_EXPORTER_INSECURE: true
+      K6_OTEL_GRPC_EXPORTER_ENDPOINT: lgtm:4317
+      K6_OTEL_METRIC_PREFIX: k6_
+    depends_on:
+      - python_http_server_mmap_sdk
+    volumes: 
+      - ./k6-config:/config
+
+  k6_sdk_loadtester:
+    image: grafana/k6:latest
+    command: ["run", "-o", "experimental-opentelemetry", "/config/k6-load-test.js"]
+    environment:
+      TARGET_URL: http://python_http_server_sdk:8082/
+      K6_OTEL_SERVICE_NAME: python_http_sdk_load_test
+      K6_OTEL_FLUSH_INTERVAL: 10s
+      K6_OTEL_EXPORTER_TYPE: grpc
+      K6_OTEL_GRPC_EXPORTER_INSECURE: true
+      K6_OTEL_GRPC_EXPORTER_ENDPOINT: lgtm:4317
+      K6_OTEL_METRIC_PREFIX: k6_
+    depends_on:
+      - python_http_server_sdk
+      - lgtm
+    volumes: 
+      - ./k6-config:/config
+
+  # cAdvisor (Collects container CPU and Memory metrics)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8090:8080"
+    privileged: true
+
+  lgtm:
+    # Use the official all-in-one image
+    image: grafana/otel-lgtm:latest
+    container_name: lgtm-backend
+    ports:
+      # Grafana UI
+      - "3000:3000" 
+      - "4317" 
+      - "4318" 
+    volumes:
+      # Persist the data for Prometheus, Loki, and Tempo across restarts
+      - dashboard-data:/data
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      # Ensure cAdvisor is running before the collector starts scraping it
+      - cadvisor 
+    restart: unless-stopped
+
+volumes:
+  # Database/Dashbaords
+  dashboard-data: {}

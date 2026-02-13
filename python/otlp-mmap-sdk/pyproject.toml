@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "otlp-mmap-sdk"
+version = "0.1.0"
+description = "OpenTelemetry MMap SDK implementation for Python"
+requires-python = ">=3.9"
+dependencies = [
+    "opentelemetry-api>=1.20.0",
+    "otlp-mmap-pybindings",
+]
+
+[project.entry-points."opentelemetry_meter_provider"]
+mmap = "otlp_mmap_sdk.metrics:MmapMeterProvider"
+
+[project.entry-points."opentelemetry_tracer_provider"]
+mmap = "otlp_mmap_sdk.trace:MmapTracerProvider"
+
+[project.entry-points."opentelemetry_logger_provider"]
+mmap = "otlp_mmap_sdk.logs:MmapLoggerProvider"

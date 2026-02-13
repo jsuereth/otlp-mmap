@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "otlp-mmap-example-server"
+version = "0.1.0"
+description = "Example Flask HTTP server with OTLP Mmap SDK instrumentation"
+requires-python = ">=3.9"
+dependencies = [
+    "Flask>=2.0",
+    "opentelemetry-instrumentation-flask",
+    "otlp-mmap-sdk",
+    "requests",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp",
+]
