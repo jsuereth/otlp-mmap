@@ -64,25 +64,34 @@ impl Ord for TimeSeriesIdentity {
             match l.key.cmp(&r.key) {
                 std::cmp::Ordering::Less => return std::cmp::Ordering::Less,
                 std::cmp::Ordering::Greater => return std::cmp::Ordering::Greater,
-                std::cmp::Ordering::Equal => match compare_opt_values(&l.value, &r.value) {
+                std::cmp::Ordering::Equal => match compare_opt_any_values(&l.value, &r.value) {
                     std::cmp::Ordering::Less => return std::cmp::Ordering::Less,
                     std::cmp::Ordering::Greater => return std::cmp::Ordering::Greater,
                     std::cmp::Ordering::Equal => (),
                 },
             }
         }
-        std::cmp::Ordering::Equal
+        self.attributes.len().cmp(&other.attributes.len())
     }
 }
 
-fn compare_opt_values(
+fn compare_opt_any_values(
     l: &Option<opentelemetry_proto::tonic::common::v1::AnyValue>,
     r: &Option<opentelemetry_proto::tonic::common::v1::AnyValue>,
 ) -> std::cmp::Ordering {
-    match (
-        l.as_ref().and_then(|v| v.value.as_ref()),
-        r.as_ref().and_then(|v| v.value.as_ref()),
-    ) {
+    match (l, r) {
+        (None, None) => std::cmp::Ordering::Equal,
+        (None, Some(_)) => std::cmp::Ordering::Less,
+        (Some(_), None) => std::cmp::Ordering::Greater,
+        (Some(lv), Some(rv)) => compare_any_values(lv, rv),
+    }
+}
+
+fn compare_any_values(
+    l: &opentelemetry_proto::tonic::common::v1::AnyValue,
+    r: &opentelemetry_proto::tonic::common::v1::AnyValue,
+) -> std::cmp::Ordering {
+    match (l.value.as_ref(), r.value.as_ref()) {
         (None, None) => std::cmp::Ordering::Equal,
         (None, Some(_)) => std::cmp::Ordering::Less,
         (Some(_), None) => std::cmp::Ordering::Greater,
@@ -95,57 +104,88 @@ fn compare_values(
     r: &opentelemetry_proto::tonic::common::v1::any_value::Value,
 ) -> std::cmp::Ordering {
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
-    // TODO - We need to handle same key id, but different types...  Treat them the same if their "to_string" is the same.
+    
+    // 1. Try to compare directly if same type for efficiency
     match (l, r) {
-        (Value::StringValue(ls), Value::StringValue(rs)) => ls.cmp(rs),
-        (Value::StringValue(_), Value::BoolValue(_)) => todo!(),
-        (Value::StringValue(_), Value::IntValue(_)) => todo!(),
-        (Value::StringValue(_), Value::DoubleValue(_)) => todo!(),
-        (Value::StringValue(_), Value::ArrayValue(_)) => todo!(),
-        (Value::StringValue(_), Value::KvlistValue(_)) => todo!(),
-        (Value::StringValue(_), Value::BytesValue(_)) => todo!(),
-        (Value::BoolValue(_), Value::StringValue(_)) => todo!(),
-        (Value::BoolValue(lv), Value::BoolValue(rv)) => lv.cmp(rv),
-        (Value::BoolValue(_), Value::IntValue(_)) => todo!(),
-        (Value::BoolValue(_), Value::DoubleValue(_)) => todo!(),
-        (Value::BoolValue(_), Value::ArrayValue(_)) => todo!(),
-        (Value::BoolValue(_), Value::KvlistValue(_)) => todo!(),
-        (Value::BoolValue(_), Value::BytesValue(_)) => todo!(),
-        (Value::IntValue(_), Value::StringValue(_)) => todo!(),
-        (Value::IntValue(_), Value::BoolValue(_)) => todo!(),
-        (Value::IntValue(lv), Value::IntValue(rv)) => lv.cmp(rv),
-        (Value::IntValue(_), Value::DoubleValue(_)) => todo!(),
-        (Value::IntValue(_), Value::ArrayValue(_)) => todo!(),
-        (Value::IntValue(_), Value::KvlistValue(_)) => todo!(),
-        (Value::IntValue(_), Value::BytesValue(_)) => todo!(),
-        (Value::DoubleValue(_), Value::StringValue(_)) => todo!(),
-        (Value::DoubleValue(_), Value::BoolValue(_)) => todo!(),
-        (Value::DoubleValue(_), Value::IntValue(_)) => todo!(),
-        (Value::DoubleValue(lv), Value::DoubleValue(rv)) => lv.total_cmp(rv),
-        (Value::DoubleValue(_), Value::ArrayValue(_)) => todo!(),
-        (Value::DoubleValue(_), Value::KvlistValue(_)) => todo!(),
-        (Value::DoubleValue(_), Value::BytesValue(_)) => todo!(),
-        (Value::ArrayValue(_), Value::StringValue(_)) => todo!(),
-        (Value::ArrayValue(_), Value::BoolValue(_)) => todo!(),
-        (Value::ArrayValue(_), Value::IntValue(_)) => todo!(),
-        (Value::ArrayValue(_), Value::DoubleValue(_)) => todo!(),
-        (Value::ArrayValue(_), Value::ArrayValue(_)) => todo!(),
-        (Value::ArrayValue(_), Value::KvlistValue(_)) => todo!(),
-        (Value::ArrayValue(_), Value::BytesValue(_)) => todo!(),
-        (Value::KvlistValue(_), Value::StringValue(_)) => todo!(),
-        (Value::KvlistValue(_), Value::BoolValue(_)) => todo!(),
-        (Value::KvlistValue(_), Value::IntValue(_)) => todo!(),
-        (Value::KvlistValue(_), Value::DoubleValue(_)) => todo!(),
-        (Value::KvlistValue(_), Value::ArrayValue(_)) => todo!(),
-        (Value::KvlistValue(_), Value::KvlistValue(_)) => todo!(),
-        (Value::KvlistValue(_), Value::BytesValue(_)) => todo!(),
-        (Value::BytesValue(_), Value::StringValue(_)) => todo!(),
-        (Value::BytesValue(_), Value::BoolValue(_)) => todo!(),
-        (Value::BytesValue(_), Value::IntValue(_)) => todo!(),
-        (Value::BytesValue(_), Value::DoubleValue(_)) => todo!(),
-        (Value::BytesValue(_), Value::ArrayValue(_)) => todo!(),
-        (Value::BytesValue(_), Value::KvlistValue(_)) => todo!(),
-        (Value::BytesValue(_), Value::BytesValue(_)) => todo!(),
+        (Value::StringValue(ls), Value::StringValue(rs)) => return ls.cmp(rs),
+        (Value::BoolValue(lb), Value::BoolValue(rb)) => return lb.cmp(rb),
+        (Value::IntValue(li), Value::IntValue(ri)) => return li.cmp(ri),
+        (Value::DoubleValue(ld), Value::DoubleValue(rd)) => return ld.total_cmp(rd),
+        (Value::BytesValue(lb), Value::BytesValue(rb)) => return lb.cmp(rb),
+        (Value::ArrayValue(la), Value::ArrayValue(ra)) => {
+            match la.values.len().cmp(&ra.values.len()) {
+                std::cmp::Ordering::Equal => {
+                    for (lv, rv) in la.values.iter().zip(ra.values.iter()) {
+                        match compare_any_values(lv, rv) {
+                            std::cmp::Ordering::Equal => continue,
+                            ord => return ord,
+                        }
+                    }
+                    return std::cmp::Ordering::Equal;
+                }
+                ord => return ord,
+            }
+        }
+        (Value::KvlistValue(lk), Value::KvlistValue(rk)) => {
+            match lk.values.len().cmp(&rk.values.len()) {
+                std::cmp::Ordering::Equal => {
+                    // For Kvlist we should ideally sort them to compare as maps,
+                    // but the user suggested JSON-like strings for complex types.
+                    // Fallthrough to string comparison.
+                }
+                ord => return ord,
+            }
+        }
+        _ => {} 
+    }
+
+    // 2. Different types or complex types needing stable tie-breaker: compare via string representation
+    let ls = value_to_string(l);
+    let rs = value_to_string(r);
+    ls.cmp(&rs)
+}
+
+fn value_to_string(v: &opentelemetry_proto::tonic::common::v1::any_value::Value) -> String {
+    use opentelemetry_proto::tonic::common::v1::any_value::Value;
+    match v {
+        Value::StringValue(s) => s.clone(),
+        Value::BoolValue(b) => b.to_string(),
+        Value::IntValue(i) => i.to_string(),
+        Value::DoubleValue(d) => d.to_string(),
+        Value::BytesValue(b) => format!("{:?}", b),
+        Value::ArrayValue(a) => {
+            let mut s = String::from("[");
+            for (i, val) in a.values.iter().enumerate() {
+                if i > 0 { s.push(','); }
+                s.push_str(&any_value_to_string(val));
+            }
+            s.push(']');
+            s
+        }
+        Value::KvlistValue(k) => {
+            let mut kvs = k.values.clone();
+            kvs.sort_by(|a, b| a.key.cmp(&b.key));
+            let mut s = String::from("{");
+            for (i, kv) in kvs.iter().enumerate() {
+                if i > 0 { s.push(','); }
+                s.push_str(&kv.key);
+                s.push(':');
+                s.push_str(&any_value_to_string_opt(&kv.value));
+            }
+            s.push('}');
+            s
+        }
+    }
+}
+
+fn any_value_to_string(v: &opentelemetry_proto::tonic::common::v1::AnyValue) -> String {
+    any_value_to_string_opt(&Some(v.clone()))
+}
+
+fn any_value_to_string_opt(v: &Option<opentelemetry_proto::tonic::common::v1::AnyValue>) -> String {
+    match v.as_ref().and_then(|av| av.value.as_ref()) {
+        Some(val) => value_to_string(val),
+        None => "null".to_owned(),
     }
 }
 
@@ -322,19 +362,19 @@ mod tests {
     #[test]
     fn test_ord_timeseries_identity_multiple_attributes() {
         let id1 = TimeSeriesIdentity::new(vec![
-            kv("key1", OTLPValue::StringValue("value1".to_string())),
+            kv("key1", OTLPValue::StringValue("value1".to_owned())),
             kv("key2", OTLPValue::IntValue(1)),
         ]);
         let id2 = TimeSeriesIdentity::new(vec![
-            kv("key1", OTLPValue::StringValue("value1".to_string())),
+            kv("key1", OTLPValue::StringValue("value1".to_owned())),
             kv("key2", OTLPValue::IntValue(2)),
         ]);
         let id3 = TimeSeriesIdentity::new(vec![
-            kv("key1", OTLPValue::StringValue("value1".to_string())),
+            kv("key1", OTLPValue::StringValue("value1".to_owned())),
             kv("key2", OTLPValue::IntValue(1)),
         ]);
         let id4 = TimeSeriesIdentity::new(vec![
-            kv("key1", OTLPValue::StringValue("valueA".to_string())),
+            kv("key1", OTLPValue::StringValue("valueA".to_owned())),
             kv("key2", OTLPValue::IntValue(1)),
         ]);
 
@@ -349,86 +389,53 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Unimplemented: Handle different key ID but different types"]
-    fn test_compare_values_string_bool() {
-        // TODO: Add test when `compare_values` handles this case
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "Unimplemented: Handle different key ID but different types"]
     fn test_compare_values_string_int() {
-        // TODO: Add test when `compare_values` handles this case
-        todo!()
+        let s = OTLPValue::StringValue("10".to_owned());
+        let i = OTLPValue::IntValue(10);
+        assert_eq!(compare_values(&s, &i), std::cmp::Ordering::Equal);
     }
 
     #[test]
-    #[ignore = "Unimplemented: Handle different key ID but different types"]
-    fn test_compare_values_string_double() {
-        // TODO: Add test when `compare_values` handles this case
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "Unimplemented: Handle different key ID but different types"]
     fn test_compare_values_bool_string() {
-        // TODO: Add test when `compare_values` handles this case
-        todo!()
+        let b = OTLPValue::BoolValue(true);
+        let s = OTLPValue::StringValue("true".to_owned());
+        assert_eq!(compare_values(&b, &s), std::cmp::Ordering::Equal);
     }
 
     #[test]
-    #[ignore = "Unimplemented: Handle different key ID but different types"]
-    fn test_compare_values_bool_int() {
-        // TODO: Add test when `compare_values` handles this case
-        todo!()
+    fn test_compare_values_mixed_complex() {
+        let a = OTLPValue::ArrayValue(opentelemetry_proto::tonic::common::v1::ArrayValue {
+            values: vec![OTLPAnyValue { value: Some(OTLPValue::IntValue(1)) }]
+        });
+        let s = OTLPValue::StringValue("[1]".to_owned());
+        assert_eq!(compare_values(&a, &s), std::cmp::Ordering::Equal);
     }
 
     #[test]
-    #[ignore = "Unimplemented: Handle different key ID but different types"]
-    fn test_compare_values_bool_double() {
-        // TODO: Add test when `compare_values` handles this case
-        todo!()
+    fn test_compare_values_kvlist_sorting() {
+        let kv1 = opentelemetry_proto::tonic::common::v1::KeyValue {
+            key: "a".to_owned(),
+            value: Some(OTLPAnyValue { value: Some(OTLPValue::IntValue(1)) }),
+        };
+        let kv2 = opentelemetry_proto::tonic::common::v1::KeyValue {
+            key: "b".to_owned(),
+            value: Some(OTLPAnyValue { value: Some(OTLPValue::IntValue(2)) }),
+        };
+        
+        let l1 = OTLPValue::KvlistValue(opentelemetry_proto::tonic::common::v1::KeyValueList {
+            values: vec![kv1.clone(), kv2.clone()],
+        });
+        let l2 = OTLPValue::KvlistValue(opentelemetry_proto::tonic::common::v1::KeyValueList {
+            values: vec![kv2.clone(), kv1.clone()],
+        });
+        
+        // They should be equal because value_to_string sorts them
+        assert_eq!(compare_values(&l1, &l2), std::cmp::Ordering::Equal);
     }
 
     #[test]
-    #[ignore = "Unimplemented: Handle different key ID but different types"]
-    fn test_compare_values_int_string() {
-        // TODO: Add test when `compare_values` handles this case
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "Unimplemented: Handle different key ID but different types"]
-    fn test_compare_values_int_bool() {
-        // TODO: Add test when `compare_values` handles this case
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "Unimplemented: Handle different key ID but different types"]
-    fn test_compare_values_int_double() {
-        // TODO: Add test when `compare_values` handles this case
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "Unimplemented: Handle different key ID but different types"]
-    fn test_compare_values_double_string() {
-        // TODO: Add test when `compare_values` handles this case
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "Unimplemented: Handle different key ID but different types"]
-    fn test_compare_values_double_bool() {
-        // TODO: Add test when `compare_values` handles this case
-        todo!()
-    }
-
-    #[test]
-    #[ignore = "Unimplemented: Handle different key ID but different types"]
-    fn test_compare_values_double_int() {
-        // TODO: Add test when `compare_values` handles this case
-        todo!()
+    fn test_any_value_to_string_opt_null() {
+        assert_eq!(any_value_to_string_opt(&None), "null");
+        assert_eq!(any_value_to_string_opt(&Some(OTLPAnyValue { value: None })), "null");
     }
 }
