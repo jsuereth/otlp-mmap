@@ -17,9 +17,67 @@ pub(crate) struct SdkWriter {
     writer: OtlpMmapWriter,
     /// Cache of previously written keys in the dictionary.
     key_cache: HashIndex<String, i64>,
-    // TODO - Resoure cache?
-    // TODO - InstrumentationScope cache?
-    // TODO - Metric cache?
+    /// Cache of previously written resources.
+    resource_cache: HashIndex<ResourceCacheKey, i64>,
+    /// Cache of previously written instrumentation scopes.
+    scope_cache: HashIndex<InstrumentationScopeCacheKey, i64>,
+    /// Cache of previously written metric definitions.
+    metric_cache: HashIndex<MetricCacheKey, i64>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub(crate) enum HashableAnyValue {
+    String(String),
+    Bool(bool),
+    Int(i64),
+    Double(u64),
+    Bytes(Vec<u8>),
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub(crate) struct HashableKeyValue {
+    pub key_ref: i64,
+    pub value: Option<HashableAnyValue>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub(crate) struct ResourceCacheKey {
+    pub attributes: Vec<HashableKeyValue>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub(crate) struct InstrumentationScopeCacheKey {
+    pub resource_ref: i64,
+    pub name: String,
+    pub version: Option<String>,
+    pub attributes: Vec<HashableKeyValue>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub(crate) enum HashableAggregation {
+    Gauge,
+    Sum {
+        temporality: i32,
+        is_monotonic: bool,
+    },
+    Histogram {
+        temporality: i32,
+        buckets: Vec<u64>, // bits of f64
+    },
+    ExpHist {
+        temporality: i32,
+        max_buckets: i64,
+        max_scale: i64,
+    },
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub(crate) struct MetricCacheKey {
+    pub scope_ref: i64,
+    pub name: String,
+    pub description: String,
+    pub unit: String,
+    pub aggregation: HashableAggregation,
 }
 
 impl SdkWriter {
@@ -28,6 +86,9 @@ impl SdkWriter {
         Ok(Self {
             writer: OtlpMmapWriter::new(Path::new(path), &config).map_err(core_to_py_err)?,
             key_cache: HashIndex::new(),
+            resource_cache: HashIndex::new(),
+            scope_cache: HashIndex::new(),
+            metric_cache: HashIndex::new(),
         })
     }
 
@@ -83,17 +144,25 @@ impl SdkWriter {
         attributes: &Bound<'_, PyDict>,
         _schema_url: Option<&str>,
     ) -> PyResult<i64> {
-        let attributes = self.convert_attributes(attributes)?;
+        let (attributes, hashable) = self.convert_attributes_hashable(attributes)?;
+        let key = ResourceCacheKey {
+            attributes: hashable,
+        };
+
+        if let Some(idx) = self.resource_cache.get_sync(&key) {
+            return Ok(*idx.get());
+        }
+
         let resource = otlp_mmap_protocol::Resource {
             attributes,
             dropped_attributes_count: 0,
         };
-        // TODO - use cache.
         let result = self
             .writer
             .dictionary()
             .try_write(&resource)
             .map_err(core_to_py_err)?;
+        let _ = self.resource_cache.insert_sync(key, result);
         Ok(result)
     }
 
@@ -105,11 +174,23 @@ impl SdkWriter {
         version: Option<&str>,
         attributes: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<i64> {
-        let kvs = if let Some(a) = attributes {
-            self.convert_attributes(a)?
+        let (kvs, hashable_kvs) = if let Some(a) = attributes {
+            self.convert_attributes_hashable(a)?
         } else {
-            Vec::new()
+            (Vec::new(), Vec::new())
         };
+
+        let key = InstrumentationScopeCacheKey {
+            resource_ref,
+            name: name.to_owned(),
+            version: version.map(|s| s.to_owned()),
+            attributes: hashable_kvs,
+        };
+
+        if let Some(idx) = self.scope_cache.get_sync(&key) {
+            return Ok(*idx.get());
+        }
+
         let name_ref = self.intern_string(name)?;
         let version_ref = if let Some(v) = version {
             self.intern_string(v)?
@@ -123,11 +204,13 @@ impl SdkWriter {
             dropped_attributes_count: 0,
             resource_ref,
         };
-        // TODO - use cache.
-        self.writer
+        let result = self
+            .writer
             .dictionary()
             .try_write(&scope)
-            .map_err(core_to_py_err)
+            .map_err(core_to_py_err)?;
+        let _ = self.scope_cache.insert_sync(key, result);
+        Ok(result)
     }
 
     /// Records the metric definition in the dictionary or returns cached pervious recording.
@@ -140,6 +223,39 @@ impl SdkWriter {
         aggregation: &Bound<'_, PyDict>,
     ) -> PyResult<i64> {
         let agg = convert_aggregation(aggregation)?;
+        let h_agg = match &agg {
+            otlp_mmap_protocol::metric_ref::Aggregation::Gauge(_) => HashableAggregation::Gauge,
+            otlp_mmap_protocol::metric_ref::Aggregation::Sum(s) => HashableAggregation::Sum {
+                temporality: s.aggregation_temporality,
+                is_monotonic: s.is_monotonic,
+            },
+            otlp_mmap_protocol::metric_ref::Aggregation::Histogram(h) => {
+                HashableAggregation::Histogram {
+                    temporality: h.aggregation_temporality,
+                    buckets: h.bucket_boundares.iter().map(|f| f.to_bits()).collect(),
+                }
+            }
+            otlp_mmap_protocol::metric_ref::Aggregation::ExpHist(e) => {
+                HashableAggregation::ExpHist {
+                    temporality: e.aggregation_temporality,
+                    max_buckets: e.max_buckets,
+                    max_scale: e.max_scale,
+                }
+            }
+        };
+
+        let key = MetricCacheKey {
+            scope_ref,
+            name: name.to_owned(),
+            description: description.to_owned(),
+            unit: unit.to_owned(),
+            aggregation: h_agg,
+        };
+
+        if let Some(idx) = self.metric_cache.get_sync(&key) {
+            return Ok(*idx.get());
+        }
+
         let metric = otlp_mmap_protocol::MetricRef {
             name: name.to_owned(),
             description: description.to_owned(),
@@ -147,13 +263,39 @@ impl SdkWriter {
             instrumentation_scope_ref: scope_ref,
             aggregation: Some(agg),
         };
-        // TODO - use cache.
         let result = self
             .writer
             .dictionary()
             .try_write(&metric)
             .map_err(core_to_py_err)?;
+        let _ = self.metric_cache.insert_sync(key, result);
         Ok(result)
+    }
+
+    /// Converts a python dictionary into OTLP-MMAP KeyValueRefs and hashable identity.
+    pub fn convert_attributes_hashable(
+        &self,
+        dict: &Bound<'_, PyDict>,
+    ) -> PyResult<(Vec<otlp_mmap_protocol::KeyValueRef>, Vec<HashableKeyValue>)> {
+        let mut attrs = Vec::with_capacity(dict.len());
+        let mut hashable = Vec::with_capacity(dict.len());
+        for (k, v) in dict {
+            let key = k.extract::<String>()?;
+            let key_ref = self.intern_string(&key)?;
+            let (value, h_value) = self.convert_any_value_hashable(&v)?;
+            attrs.push(otlp_mmap_protocol::KeyValueRef {
+                key_ref,
+                value: Some(value.clone()),
+            });
+            hashable.push(HashableKeyValue {
+                key_ref,
+                value: h_value,
+            });
+        }
+        // Sort for canonical representation
+        attrs.sort_by_key(|a| a.key_ref);
+        hashable.sort_by_key(|a| a.key_ref);
+        Ok((attrs, hashable))
     }
 
     /// Converts a python dictionary into OTLP-MMAP KeyValueRefs.
@@ -161,47 +303,62 @@ impl SdkWriter {
         &self,
         dict: &Bound<'_, PyDict>,
     ) -> PyResult<Vec<otlp_mmap_protocol::KeyValueRef>> {
-        let mut attrs = Vec::with_capacity(dict.len());
-        for (k, v) in dict {
-            let key = k.extract::<String>()?;
-            let key_ref = self.intern_string(&key)?;
-            let value = self.convert_any_value(&v)?;
-            attrs.push(otlp_mmap_protocol::KeyValueRef {
-                key_ref,
-                value: Some(value),
-            });
-        }
+        let (attrs, _) = self.convert_attributes_hashable(dict)?;
         Ok(attrs)
     }
 
-    /// Converts a python any into an OTLP-MMAP AnyValue.
-    fn convert_any_value(&self, v: &Bound<'_, PyAny>) -> PyResult<otlp_mmap_protocol::AnyValue> {
-        // TODO - We should handle complex values.
+    /// Converts a python any into an OTLP-MMAP AnyValue and hashable identity.
+    fn convert_any_value_hashable(
+        &self,
+        v: &Bound<'_, PyAny>,
+    ) -> PyResult<(otlp_mmap_protocol::AnyValue, Option<HashableAnyValue>)> {
         if let Ok(s) = v.extract::<String>() {
-            Ok(otlp_mmap_protocol::AnyValue {
-                value: Some(otlp_mmap_protocol::any_value::Value::StringValue(s)),
-            })
+            Ok((
+                otlp_mmap_protocol::AnyValue {
+                    value: Some(otlp_mmap_protocol::any_value::Value::StringValue(s.clone())),
+                },
+                Some(HashableAnyValue::String(s)),
+            ))
         } else if let Ok(b) = v.extract::<bool>() {
-            Ok(otlp_mmap_protocol::AnyValue {
-                value: Some(otlp_mmap_protocol::any_value::Value::BoolValue(b)),
-            })
+            Ok((
+                otlp_mmap_protocol::AnyValue {
+                    value: Some(otlp_mmap_protocol::any_value::Value::BoolValue(b)),
+                },
+                Some(HashableAnyValue::Bool(b)),
+            ))
         } else if let Ok(i) = v.extract::<i64>() {
-            Ok(otlp_mmap_protocol::AnyValue {
-                value: Some(otlp_mmap_protocol::any_value::Value::IntValue(i)),
-            })
+            Ok((
+                otlp_mmap_protocol::AnyValue {
+                    value: Some(otlp_mmap_protocol::any_value::Value::IntValue(i)),
+                },
+                Some(HashableAnyValue::Int(i)),
+            ))
         } else if let Ok(f) = v.extract::<f64>() {
-            Ok(otlp_mmap_protocol::AnyValue {
-                value: Some(otlp_mmap_protocol::any_value::Value::DoubleValue(f)),
-            })
+            Ok((
+                otlp_mmap_protocol::AnyValue {
+                    value: Some(otlp_mmap_protocol::any_value::Value::DoubleValue(f)),
+                },
+                Some(HashableAnyValue::Double(f.to_bits())),
+            ))
         } else {
             if let Ok(b) = v.extract::<&[u8]>() {
-                Ok(otlp_mmap_protocol::AnyValue {
-                    value: Some(otlp_mmap_protocol::any_value::Value::BytesValue(b.to_vec())),
-                })
+                Ok((
+                    otlp_mmap_protocol::AnyValue {
+                        value: Some(otlp_mmap_protocol::any_value::Value::BytesValue(b.to_vec())),
+                    },
+                    Some(HashableAnyValue::Bytes(b.to_vec())),
+                ))
             } else {
-                Ok(otlp_mmap_protocol::AnyValue { value: None })
+                Ok((otlp_mmap_protocol::AnyValue { value: None }, None))
             }
         }
+    }
+
+    /// Converts a python any into an OTLP-MMAP AnyValue.
+    #[allow(dead_code)]
+    fn convert_any_value(&self, v: &Bound<'_, PyAny>) -> PyResult<otlp_mmap_protocol::AnyValue> {
+        let (val, _) = self.convert_any_value_hashable(v)?;
+        Ok(val)
     }
 }
 
@@ -320,4 +477,43 @@ fn spin_lock_write<T: prost::Message + std::fmt::Debug>(
             }
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use otlp_mmap_core::OtlpMmapConfig;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_caching() {
+        Python::initialize();
+        Python::attach(|py| {
+            let temp_file = NamedTempFile::new().unwrap();
+            let config = OtlpMmapConfig::default();
+            let writer = SdkWriter::new(temp_file.path(), &config).unwrap();
+
+            // Resource caching
+            let attrs1 = PyDict::new(py);
+            attrs1.set_item("service.name", "test-service").unwrap();
+            attrs1.set_item("service.version", "1.0.0").unwrap();
+
+            let res1 = writer.intern_resource(&attrs1, None).unwrap();
+            let res2 = writer.intern_resource(&attrs1, None).unwrap();
+            assert_eq!(res1, res2, "Resource caching failed");
+
+            // InstrumentationScope caching
+            let scope1 = writer.intern_instrumentation_scope(res1, "test-scope", Some("1.0"), Some(&attrs1)).unwrap();
+            let scope2 = writer.intern_instrumentation_scope(res1, "test-scope", Some("1.0"), Some(&attrs1)).unwrap();
+            assert_eq!(scope1, scope2, "Scope caching failed");
+
+            // Metric caching
+            let agg = PyDict::new(py);
+            agg.set_item("gauge", PyDict::new(py)).unwrap();
+            
+            let m1 = writer.intern_metric_stream(scope1, "test-metric", "desc", "unit", &agg).unwrap();
+            let m2 = writer.intern_metric_stream(scope1, "test-metric", "desc", "unit", &agg).unwrap();
+            assert_eq!(m1, m2, "Metric caching failed");
+        });
+    }
 }

@@ -58,3 +58,20 @@ def test_spans(exporter):
     
     exporter.record_span_start(scope, trace_id, span_id, None, 0, "my-span", 1, 1000, {"span.attr": 1})
     exporter.record_span_end(scope, trace_id, span_id, 2000)
+
+def test_caching(exporter):
+    # Resource caching
+    res1 = exporter.create_resource({"a": 1, "b": 2}, None)
+    res2 = exporter.create_resource({"b": 2, "a": 1}, None)
+    assert res1 == res2, "Resource caching failed"
+
+    # Scope caching
+    scope1 = exporter.create_instrumentation_scope(res1, "scope", "1.0", {"x": "y"})
+    scope2 = exporter.create_instrumentation_scope(res1, "scope", "1.0", {"x": "y"})
+    assert scope1 == scope2, "Scope caching failed"
+
+    # Metric caching
+    agg = {"sum": {"aggregation_temporality": 1, "is_monotonic": True}}
+    m1 = exporter.create_metric_stream(scope1, "metric", "desc", "unit", agg)
+    m2 = exporter.create_metric_stream(scope1, "metric", "desc", "unit", agg)
+    assert m1 == m2, "Metric caching failed"

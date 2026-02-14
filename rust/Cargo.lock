@@ -684,6 +684,7 @@ dependencies = [
  "prost",
  "pyo3",
  "scc",
+ "tempfile",
 ]
 
 [[package]]
