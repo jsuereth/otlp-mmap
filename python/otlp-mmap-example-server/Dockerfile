@@ -1,5 +1,5 @@
 # --- Build Stage ---
-FROM python:3.11-alpine AS builder
+FROM python:3.11-alpine@sha256:303398d5c9f110790bce60d64f902e51e1a061e33292985c72bf6cd07960bf09 AS builder
 
 # Install build tools
 RUN apk add --no-cache rust cargo build-base python3-dev libffi-dev openssl-dev
@@ -32,15 +32,24 @@ RUN pip install /wheels/otlp_mmap_sdk*.whl /wheels/otlp_mmap_example_server*.whl
 RUN python -m pytest
 
 # --- Runner Stage ---
-FROM python:3.11-alpine
+FROM python:3.11-alpine@sha256:303398d5c9f110790bce60d64f902e51e1a061e33292985c72bf6cd07960bf09
+
+# Create non-root user for security
+RUN addgroup -g 10001 appuser && \
+    adduser -D -u 10001 -G appuser appuser
+
 WORKDIR /app
+RUN chown appuser:appuser /app
 
 # Copy wheels from builder
-COPY --from=builder /wheels /wheels
+COPY --from=builder --chown=appuser:appuser /wheels /wheels
+
+# Switch to non-root user
+USER appuser
 
 # Install all wheels
 # This will install internal, sdk, server and pull in runtime dependencies from PyPI
-RUN pip install /wheels/*.whl && rm -rf /wheels
+RUN pip install --user /wheels/*.whl && rm -rf /wheels
 
 # Default Env Vars
 ENV HTTP_ENDPOINT_PORT=5000
