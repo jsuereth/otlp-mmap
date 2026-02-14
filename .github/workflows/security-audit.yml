@@ -44,7 +44,7 @@ jobs:
             context: ./java/otlp-mmap
             name: java-otlp-mmap
           - path: ./python/Dockerfile
-            context: ./python
+            context: .
             name: python
           - path: ./python/otlp-mmap-example-server/Dockerfile
             context: .
