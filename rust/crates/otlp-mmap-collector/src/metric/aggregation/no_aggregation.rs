@@ -35,3 +35,32 @@ impl super::Aggregation for NoAggregation {
     ) {
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::metric::aggregation::{Aggregation, AggregationConfig};
+    use otlp_mmap_protocol::measurement::Value;
+    use otlp_mmap_protocol::Measurement;
+
+    #[test]
+    fn test_no_aggregation() {
+        let config = NoAggregationConfig {};
+        let mut agg = config.new_aggregation();
+        let data = config.new_collection_data();
+
+        assert!(data.is_none());
+
+        agg.join(Measurement {
+            metric_ref: 1,
+            attributes: vec![],
+            time_unix_nano: 150,
+            span_context: None,
+            value: Some(Value::AsLong(10)),
+        })
+        .unwrap();
+
+        // collect is a no-op, but we can't really call it without valid Data,
+        // which new_collection_data doesn't provide.
+    }
+}

@@ -199,91 +199,19 @@ impl ActiveSpans {
 
 #[cfg(test)]
 mod test {
+    use crate::test_utils::{MockSdkLookup, TestEventQueue};
+    use crate::{trace::ActiveSpans, Error};
     use otlp_mmap_protocol::{
         any_value::Value,
         span_event::{EndSpan, Event, StartSpan},
         AnyValue, KeyValueRef, SpanEvent, Status,
     };
-    use std::collections::HashMap;
-    use tokio::sync::Mutex;
-
-    use crate::{trace::ActiveSpans, AsyncEventQueue, AttributeLookup, Error};
-
-    struct TestSpanEventQueue {
-        index: Mutex<usize>,
-        events: Vec<SpanEvent>,
-    }
-
-    impl TestSpanEventQueue {
-        fn new<E: Into<Vec<SpanEvent>>>(events: E) -> Self {
-            Self {
-                index: Mutex::new(0),
-                events: events.into(),
-            }
-        }
-    }
-    impl AsyncEventQueue<SpanEvent> for TestSpanEventQueue {
-        async fn try_read_next(&self) -> Result<otlp_mmap_protocol::SpanEvent, Error> {
-            let mut idx = self.index.lock().await;
-            if *idx < self.events.len() {
-                let real_idx: usize = *idx;
-                *idx += 1;
-                Ok(self.events[real_idx].to_owned())
-            } else {
-                // TODO - real error
-                Err(otlp_mmap_core::Error::NotFoundInDictionary(
-                    "Index is too large".to_owned(),
-                    *idx as i64,
-                )
-                .into())
-            }
-        }
-    }
-    // TODO - move this into some helper location for all SDK pieces.
-    struct TestAttributeLookup {
-        string_lookup: HashMap<i64, String>,
-    }
-    impl TestAttributeLookup {
-        fn new(string_lookup: HashMap<i64, String>) -> Self {
-            Self { string_lookup }
-        }
-    }
-
-    impl AttributeLookup for TestAttributeLookup {
-        fn try_convert_attribute(
-            &self,
-            kv: otlp_mmap_protocol::KeyValueRef,
-        ) -> Result<opentelemetry_proto::tonic::common::v1::KeyValue, Error> {
-            // TODO - share this definition with actual algorithm.
-            let key = self
-                .string_lookup
-                .get(&kv.key_ref)
-                .cloned()
-                .unwrap_or("<not found>".to_owned());
-            // TODO - handle real conversions.
-            let value = match kv.value {
-                None => None,
-                Some(v) => match v.value {
-                    None => None,
-                    Some(Value::IntValue(v)) => {
-                        Some(opentelemetry_proto::tonic::common::v1::AnyValue {
-                            value: Some(
-                                opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(
-                                    v,
-                                ),
-                            ),
-                        })
-                    }
-                    Some(v) => todo!("Support value {v:?}"),
-                },
-            };
-            Ok(opentelemetry_proto::tonic::common::v1::KeyValue { key, value })
-        }
-    }
 
     #[test]
     fn test_active_spans_returns_completed_span() -> Result<(), Error> {
-        let attr = TestAttributeLookup::new([(1, "one".to_owned())].into_iter().collect());
+        let mut lookup = MockSdkLookup::new();
+        lookup.strings.insert(1, "one".to_owned());
+
         let mut tracker = ActiveSpans::new();
         let scope_ref = 10i64;
         let trace_id: Vec<u8> = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
@@ -308,7 +236,7 @@ mod test {
                 }],
             })),
         };
-        let result = tracker.try_handle_span_event(start, &attr)?;
+        let result = tracker.try_handle_span_event(start, &lookup)?;
         assert!(
             result.is_none(),
             "Should not return complete span on start event"
@@ -325,7 +253,7 @@ mod test {
                 }),
             })),
         };
-        let result2 = tracker.try_handle_span_event(end, &attr)?;
+        let result2 = tracker.try_handle_span_event(end, &lookup)?;
         assert!(
             result2.is_some(),
             "Should return complete span after span end."
@@ -385,9 +313,9 @@ mod test {
 
     #[tokio::test]
     async fn test_active_spans_create_batch() -> Result<(), Error> {
-        let attr = TestAttributeLookup::new([(1, "one".to_owned())].into_iter().collect());
+        let lookup = MockSdkLookup::new();
         let mut tracker = ActiveSpans::new();
-        let event_queue = TestSpanEventQueue::new([
+        let event_queue = TestEventQueue::new([
             make_span_start(make_span_id(0)),
             make_span_start(make_span_id(1)),
             make_span_end(make_span_id(1)),
@@ -398,7 +326,12 @@ mod test {
             make_span_end(make_span_id(2)),
         ]);
         let batch = tracker
-            .try_buffer_spans(&event_queue, &attr, 3, tokio::time::Duration::from_secs(10))
+            .try_buffer_spans(
+                &event_queue,
+                &lookup,
+                3,
+                tokio::time::Duration::from_secs(10),
+            )
             .await?;
         assert_eq!(batch.len(), 3, "Failed to batch three spans");
         // We should have a remaining active span.

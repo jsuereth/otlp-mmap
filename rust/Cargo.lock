@@ -648,6 +648,7 @@ dependencies = [
  "otlp-mmap-core",
  "otlp-mmap-protocol",
  "prost",
+ "tempfile",
  "thiserror",
  "tokio",
  "tonic",

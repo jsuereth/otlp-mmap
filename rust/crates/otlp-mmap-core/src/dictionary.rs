@@ -68,7 +68,7 @@ impl Dictionary {
     pub fn try_read_string(&self, index: i64) -> Result<String, Error> {
         // 0 is special, and always the empty string.
         if index == 0 {
-            return Ok("".to_owned())
+            return Ok("".to_owned());
         }
 
         if (index as u64) < self.offset {

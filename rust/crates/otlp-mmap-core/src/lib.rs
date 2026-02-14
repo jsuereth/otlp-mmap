@@ -237,7 +237,7 @@ mod tests {
     fn test_simple_write_then_read() -> Result<(), Error> {
         let file = NamedTempFile::new()?;
         let config = crate::OtlpMmapConfig::default();
-        let mut writer = OtlpMmapWriter::new(file.path(), &config)?;
+        let writer = OtlpMmapWriter::new(file.path(), &config)?;
         let event_name_ref = writer.dictionary.try_write_string("event")?;
         let scope_name_ref = writer.dictionary.try_write_string("scope")?;
         let scope_version_ref = writer.dictionary.try_write_string("1.0")?;

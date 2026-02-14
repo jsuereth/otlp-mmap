@@ -4,7 +4,7 @@ use std::{
 };
 
 use clap::Parser;
-use otlp_mmap_collector::{new_collector_sdk, Error};
+use otlp_mmap_collector::{CollectorSdkConfig, Error, LogSdkConfig, MetricSdkConfig, TraceSdkConfig, new_collector_sdk};
 
 /// An MMAP Collector.
 #[derive(Parser, Debug)]
@@ -36,22 +36,35 @@ async fn main() -> Result<(), Error> {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
     println!("Starting SDK");
-    run_sdk_mmap(&args.otlp_endpoint, path).await
+    let config = CollectorSdkConfig {
+        metrics: MetricSdkConfig {
+            metric_endpoint: args.otlp_endpoint.to_owned(),
+            ..Default::default()
+        },
+        logs: LogSdkConfig {
+            log_endpoint: args.otlp_endpoint.to_owned(),
+            ..Default::default()
+        },
+        traces: TraceSdkConfig {
+            trace_endpoint: args.otlp_endpoint.to_owned(),
+            ..Default::default()
+        },
+    };
+    run_sdk_mmap(&config, path).await
 }
 
-async fn run_sdk_mmap(otlp_url: &str, export_file: PathBuf) -> Result<(), Error> {
+async fn run_sdk_mmap(config: &CollectorSdkConfig, export_file: PathBuf) -> Result<(), Error> {
+    // TODO - configuration for reading file handling.
     let sdk = Arc::new(new_collector_sdk(&export_file)?);
     // Note: We do NOT put the different pipelines on different tasks.  We do NOT want different CPUs causing
     // cache coherency problems as this may actually slow down performance.
-    let log_otlp = otlp_url.to_owned();
     let log_sdk = sdk.clone();
-    let log_pipeline = async move { log_sdk.send_logs_to(&log_otlp).await };
-    let trace_otlp = otlp_url.to_owned();
+    let log_pipeline = async move { log_sdk.send_logs_to(&config.logs).await };
     let trace_sdk = sdk.clone();
-    let trace_pipeline = async move { trace_sdk.send_traces_to(&trace_otlp).await };
+    let trace_pipeline = async move { trace_sdk.send_traces_to(&config.traces).await };
     // We do not pass the metric piepline to another thread.
     // This is because we haven't made our aggregations "Send" yet.
-    let metric_pipeline = sdk.record_metrics(otlp_url);
+    let metric_pipeline = sdk.record_metrics(&config.metrics);
     // Run the event loops by waiting on them.
     // TODO - wait for all to finish or crash?
     tokio::select! {

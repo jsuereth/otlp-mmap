@@ -154,6 +154,7 @@ impl OtlpDictionary {
 }
 
 /// A scope with reference to its resource in the dictionary.
+#[derive(Clone)]
 pub struct PartialScope {
     /// The instrumentation scope.
     pub scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope,

@@ -11,6 +11,15 @@ This codebase documents itself in `README.md` and that should be used to validat
 - Prefer non-async tests where possible.
 - Update the `TODO.md` file when completing a task.
 
+## Process
+
+- Inspect the TODO file or TODO prompt and pick a test to write.
+- Write the test, ensuring it is only in a `#cfg[test]` section.
+- Validate the test with the validation rules specified later.
+- DO NOT continue to new tests if validation fails, instead fix the validation issues only by fixing the test code.
+- If you encounter a bug that appears to be in the implementation, mark the test pending and add a comment explaining the bug.
+
+
 ## Validation
 
 - Run all changes through `cargo test`

@@ -166,3 +166,248 @@ pub(crate) struct TrackedEvent {
     /// The log itself.
     pub log: opentelemetry_proto::tonic::logs::v1::LogRecord,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::{MockSdkLookup, TestEventQueue};
+    use otlp_mmap_core::PartialScope;
+    use otlp_mmap_protocol::{any_value::Value, AnyValue, KeyValueRef};
+
+    #[tokio::test]
+    async fn test_log_conversion_and_batching() -> Result<(), Error> {
+        let mut lookup = MockSdkLookup::new();
+        lookup.strings.insert(1, "body_text".to_owned());
+        lookup.strings.insert(2, "attr_key".to_owned());
+
+        lookup.scopes.insert(
+            10,
+            PartialScope {
+                resource_ref: 100,
+                scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
+                    name: "scope_name".to_owned(),
+                    version: "1.0".to_owned(),
+                    ..Default::default()
+                },
+            },
+        );
+
+        lookup.resources.insert(
+            100,
+            opentelemetry_proto::tonic::resource::v1::Resource {
+                ..Default::default()
+            },
+        );
+
+        let event = Event {
+            scope_ref: 10,
+            time_unix_nano: 1000,
+            severity_number: 9, // Info
+            severity_text: "INFO".to_owned(),
+            body: Some(AnyValue {
+                value: Some(Value::ValueRef(1)),
+            }),
+            event_name_ref: 0,
+            span_context: None,
+            attributes: vec![KeyValueRef {
+                key_ref: 2,
+                value: Some(AnyValue {
+                    value: Some(Value::IntValue(42)),
+                }),
+            }],
+        };
+
+        let queue = TestEventQueue::new(vec![event]);
+        let mut collector = EventCollector::new();
+
+        let batch = collector
+            .try_create_next_batch(&queue, &lookup, 1, Duration::from_secs(1))
+            .await?
+            .unwrap();
+
+        assert_eq!(batch.resource_logs.len(), 1);
+        let resource_log = &batch.resource_logs[0];
+        assert_eq!(resource_log.scope_logs.len(), 1);
+        let scope_log = &resource_log.scope_logs[0];
+        assert_eq!(scope_log.log_records.len(), 1);
+        let record = &scope_log.log_records[0];
+
+        assert_eq!(record.time_unix_nano, 1000);
+        assert_eq!(record.severity_number, 9);
+        assert_eq!(record.severity_text, "INFO");
+        if let Some(opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(s)) =
+            record.body.as_ref().and_then(|b| b.value.as_ref())
+        {
+            assert_eq!(s, "body_text");
+        } else {
+            panic!("Expected string body");
+        }
+        assert_eq!(record.attributes.len(), 1);
+        assert_eq!(record.attributes[0].key, "attr_key");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_log_grouping() -> Result<(), Error> {
+        let mut lookup = MockSdkLookup::new();
+
+        // Resource 1, Scope 1
+        lookup.scopes.insert(
+            1,
+            PartialScope {
+                resource_ref: 100,
+                scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
+                    name: "scope1".to_owned(),
+                    ..Default::default()
+                },
+            },
+        );
+        // Resource 1, Scope 2
+        lookup.scopes.insert(
+            2,
+            PartialScope {
+                resource_ref: 100,
+                scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
+                    name: "scope2".to_owned(),
+                    ..Default::default()
+                },
+            },
+        );
+        // Resource 2, Scope 3
+        lookup.scopes.insert(
+            3,
+            PartialScope {
+                resource_ref: 200,
+                scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
+                    name: "scope3".to_owned(),
+                    ..Default::default()
+                },
+            },
+        );
+
+        lookup.resources.insert(
+            100,
+            opentelemetry_proto::tonic::resource::v1::Resource {
+                attributes: vec![opentelemetry_proto::tonic::common::v1::KeyValue {
+                    key: "res".to_owned(),
+                    value: Some(opentelemetry_proto::tonic::common::v1::AnyValue {
+                        value: Some(
+                            opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(1),
+                        ),
+                    }),
+                }],
+                ..Default::default()
+            },
+        );
+        lookup.resources.insert(
+            200,
+            opentelemetry_proto::tonic::resource::v1::Resource {
+                attributes: vec![opentelemetry_proto::tonic::common::v1::KeyValue {
+                    key: "res".to_owned(),
+                    value: Some(opentelemetry_proto::tonic::common::v1::AnyValue {
+                        value: Some(
+                            opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(2),
+                        ),
+                    }),
+                }],
+                ..Default::default()
+            },
+        );
+
+        let events = vec![
+            Event {
+                scope_ref: 1,
+                ..Default::default()
+            },
+            Event {
+                scope_ref: 1,
+                ..Default::default()
+            },
+            Event {
+                scope_ref: 2,
+                ..Default::default()
+            },
+            Event {
+                scope_ref: 3,
+                ..Default::default()
+            },
+        ];
+
+        let queue = TestEventQueue::new(events);
+        let mut collector = EventCollector::new();
+
+        let batch = collector
+            .try_create_next_batch(&queue, &lookup, 4, Duration::from_secs(1))
+            .await?
+            .unwrap();
+
+        // Should have 2 resource logs (Resource 100 and 200)
+        assert_eq!(batch.resource_logs.len(), 2);
+
+        let res100 = batch
+            .resource_logs
+            .iter()
+            .find(|rl| {
+                rl.resource.as_ref().unwrap().attributes[0]
+                    .value
+                    .as_ref()
+                    .unwrap()
+                    .value
+                    == Some(opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(1))
+            })
+            .unwrap();
+        assert_eq!(res100.scope_logs.len(), 2); // scope1 and scope2
+
+        let s1 = res100
+            .scope_logs
+            .iter()
+            .find(|sl| sl.scope.as_ref().unwrap().name == "scope1")
+            .unwrap();
+        assert_eq!(s1.log_records.len(), 2);
+
+        let s2 = res100
+            .scope_logs
+            .iter()
+            .find(|sl| sl.scope.as_ref().unwrap().name == "scope2")
+            .unwrap();
+        assert_eq!(s2.log_records.len(), 1);
+
+        let res200 = batch
+            .resource_logs
+            .iter()
+            .find(|rl| {
+                rl.resource.as_ref().unwrap().attributes[0]
+                    .value
+                    .as_ref()
+                    .unwrap()
+                    .value
+                    == Some(opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(2))
+            })
+            .unwrap();
+        assert_eq!(res200.scope_logs.len(), 1); // scope3
+        assert_eq!(res200.scope_logs[0].log_records.len(), 1);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_invalid_dictionary_reference() -> Result<(), Error> {
+        let lookup = MockSdkLookup::new(); // Empty strings map
+        let event = Event {
+            scope_ref: 10,
+            event_name_ref: 1, // Invalid
+            ..Default::default()
+        };
+
+        let queue = TestEventQueue::new(vec![event]);
+        let mut collector = EventCollector::new();
+
+        let result = collector
+            .try_create_next_batch(&queue, &lookup, 1, Duration::from_secs(1))
+            .await;
+
+        assert!(result.is_err());
+        Ok(())
+    }
+}

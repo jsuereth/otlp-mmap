@@ -33,7 +33,7 @@ pub fn convert_sdk_mmap_config(
                 max_size: 100,
                 max_scale: 20,
             })
-        },
+        }
         Some(otlp_mmap_protocol::metric_ref::Aggregation::ExpHist(ehist)) => {
             Box::new(exp_hist::BucketConfig {
                 max_size: ehist.max_buckets as i32,
