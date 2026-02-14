@@ -40,20 +40,22 @@ jobs:
       - name: Setup Rust (for Python bindings)
         uses: actions-rust-lang/setup-rust-toolchain@11df97af8e8102fd60b60a77dfbf58d40cd843b8 # v1.10.1
 
-      - name: Install maturin
-        run: pip install maturin
+      - name: Install build dependencies
+        run: pip install maturin hatchling pytest requests flask opentelemetry-api opentelemetry-sdk opentelemetry-instrumentation-flask opentelemetry-exporter-otlp
 
-      - name: Build Python bindings
+      - name: Build and install Python bindings
         working-directory: ./python
         run: maturin develop
 
-      - name: Install test dependencies
+      - name: Install SDK packages
         working-directory: ./python
-        run: pip install pytest
+        run: |
+          pip install -e ./otlp-mmap-sdk
+          pip install -e ./otlp-mmap-example-server
 
       - name: Run Python tests
         working-directory: ./python
-        run: python -m pytest tests/
+        run: python -m pytest
 
   java-tests:
     name: Java/Scala Tests
