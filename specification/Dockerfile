@@ -1,19 +1,25 @@
 # TODO - figure out how to build all language protobufs here.
 
 ARG PROTOBUF_VERSION=33.0
+# SHA256 checksum for protoc-33.0-linux-x86_64.zip
+ARG PROTOBUF_SHA256=5cc0cf75a9c7d0ab6340d59fda3ca05d2efb2dcd7a323a5ba2b7211c2aba9d0f
+
 FROM rust:1-alpine3.22@sha256:3c06253e433c1b2ac2c279a98226d385d25c5f324138ab2861a5414bfa6855f9
 LABEL maintainer="The OpenTelemetry Authors"
-RUN apk add --no-cache curl unzip
-RUN apk add --no-cache musl-dev
+RUN apk add --no-cache curl unzip musl-dev
+
 ARG PROTOBUF_VERSION
-# Download protoc with checksum verification
+ARG PROTOBUF_SHA256
+
+# Download protoc with SHA256 checksum verification
 RUN mkdir -p /protoc && \
     cd /protoc && \
     curl -sSL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-linux-x86_64.zip && \
-    echo "Verifying download..." && \
+    echo "${PROTOBUF_SHA256}  protoc.zip" | sha256sum -c - && \
     unzip protoc.zip && \
-    rm protoc.zip
-RUN chmod a+x /protoc/bin/protoc
+    rm protoc.zip && \
+    chmod a+x /protoc/bin/protoc
+
 ENV PROTOC=/protoc/bin/protoc
 
 # Make directories we need.

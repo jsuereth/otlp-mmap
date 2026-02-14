@@ -76,26 +76,25 @@ All Docker base images have been pinned to their SHA256 digests:
 
 ### 3. Missing Checksum Verification for Downloaded Binaries
 
-**Status:** ✅ **PARTIALLY FIXED**  
+**Status:** ✅ **FIXED**  
 **Severity:** MEDIUM-HIGH  
 **Impact:** Risk of downloading tampered or malicious binaries  
 **Affected File:** `specification/Dockerfile`
 
 **Resolution:**
-The protoc download process has been hardened:
-- Download now saves to a file before extraction (instead of piping directly)
-- Added `unzip` to the installed packages for proper extraction
-- The download process is now more traceable and auditable
-
-**Note:** Full checksum verification would require hardcoding the expected SHA256 for the specific protobuf version. Since the version is parameterized (PROTOBUF_VERSION=33.0), adding checksum verification would require either:
-1. Hardcoding the checksum for each version
-2. Downloading and verifying a checksum file from the protobuf releases
-
-**Alternative Recommendation:** Consider installing protoc from the Alpine package manager:
+The protoc download process now includes SHA256 checksum verification:
 ```dockerfile
-RUN apk add --no-cache protoc
+ARG PROTOBUF_SHA256=5cc0cf75a9c7d0ab6340d59fda3ca05d2efb2dcd7a323a5ba2b7211c2aba9d0f
+RUN mkdir -p /protoc && \
+    cd /protoc && \
+    curl -sSL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-linux-x86_64.zip && \
+    echo "${PROTOBUF_SHA256}  protoc.zip" | sha256sum -c - && \
+    unzip protoc.zip && \
+    rm protoc.zip && \
+    chmod a+x /protoc/bin/protoc
 ```
-This leverages Alpine's package signing and verification mechanisms.
+
+The checksum is verified before extraction, ensuring the downloaded binary hasn't been tampered with. If the checksum doesn't match, the build will fail immediately.
 
 ---
 
