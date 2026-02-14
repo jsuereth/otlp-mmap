@@ -1,5 +1,5 @@
 # --- Build Stage ---
-FROM python:3.11-alpine@sha256:303398d5c9f110790bce60d64f902e51e1a061e33292985c72bf6cd07960bf09 AS builder
+FROM python:3.14-alpine@sha256:faee120f7885a06fcc9677922331391fa690d911c020abb9e8025ff3d908e510 AS builder
 
 # Install build tools
 RUN apk add --no-cache rust cargo build-base python3-dev libffi-dev openssl-dev
@@ -32,7 +32,7 @@ RUN pip install /wheels/otlp_mmap_sdk*.whl /wheels/otlp_mmap_example_server*.whl
 RUN python -m pytest
 
 # --- Runner Stage ---
-FROM python:3.11-alpine@sha256:303398d5c9f110790bce60d64f902e51e1a061e33292985c72bf6cd07960bf09
+FROM python:3.14-alpine@sha256:faee120f7885a06fcc9677922331391fa690d911c020abb9e8025ff3d908e510
 
 # Copy wheels from builder to temporary location
 COPY --from=builder /wheels /tmp/wheels
