@@ -34,22 +34,23 @@ RUN python -m pytest
 # --- Runner Stage ---
 FROM python:3.11-alpine@sha256:303398d5c9f110790bce60d64f902e51e1a061e33292985c72bf6cd07960bf09
 
+# Copy wheels from builder to temporary location
+COPY --from=builder /wheels /tmp/wheels
+
 # Create non-root user for security
 RUN addgroup -g 10001 appuser && \
-    adduser -D -u 10001 -G appuser appuser
+    adduser -D -u 10001 -G appuser appuser && \
+    chown -R appuser:appuser /tmp/wheels
 
 WORKDIR /app
 RUN chown appuser:appuser /app
 
-# Copy wheels from builder
-COPY --from=builder --chown=appuser:appuser /wheels /wheels
-
 # Switch to non-root user
 USER appuser
 
-# Install all wheels
+# Install all wheels and clean up
 # This will install internal, sdk, server and pull in runtime dependencies from PyPI
-RUN pip install --user /wheels/*.whl && rm -rf /wheels
+RUN pip install --user /tmp/wheels/*.whl && rm -rf /tmp/wheels
 
 # Default Env Vars
 ENV HTTP_ENDPOINT_PORT=5000
