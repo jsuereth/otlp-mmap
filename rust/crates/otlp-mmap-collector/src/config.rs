@@ -44,7 +44,7 @@ const DEFAULT_OTLP_ENDPOINT: &str = "http://localhost:4317";
 impl Default for MetricSdkConfig {
     fn default() -> Self {
         Self {
-            report_interval: tokio::time::Duration::from_mins(1),
+            report_interval: tokio::time::Duration::from_secs(60),
             metric_endpoint: DEFAULT_OTLP_ENDPOINT.to_owned(),
         }
     }
@@ -53,7 +53,7 @@ impl Default for LogSdkConfig {
     fn default() -> Self {
         Self {
             max_batch_length: 1000,
-            batch_timeout: tokio::time::Duration::from_mins(1),
+            batch_timeout: tokio::time::Duration::from_secs(60),
             log_endpoint: DEFAULT_OTLP_ENDPOINT.to_owned(),
         }
     }
@@ -63,7 +63,7 @@ impl Default for TraceSdkConfig {
     fn default() -> Self {
         Self {
             max_batch_length: 1000,
-            batch_timeout: tokio::time::Duration::from_mins(1),
+            batch_timeout: tokio::time::Duration::from_secs(60),
             trace_endpoint: DEFAULT_OTLP_ENDPOINT.to_owned(),
         }
     }
