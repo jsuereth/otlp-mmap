@@ -35,7 +35,6 @@ jobs:
           # - image: otlp-mmap-python-base
           #   dockerfile: ./rust/python-lib.Dockerfile
           #   context: ./rust
-          
 
     steps:
       - name: checkout
