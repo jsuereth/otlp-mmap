@@ -1,0 +1,79 @@
+name: Security Audit
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    # Run weekly on Mondays
+    - cron: '0 0 * * 1'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  cargo-audit:
+    runs-on: ubuntu-latest
+    name: Cargo Audit (Rust Dependencies)
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@11df97af8e8102fd60b60a77dfbf58d40cd843b8 # v1.10.1
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run cargo audit
+        working-directory: ./rust
+        run: cargo audit
+
+  docker-security-scan:
+    runs-on: ubuntu-latest
+    name: Docker Image Security Scan
+    strategy:
+      matrix:
+        dockerfile:
+          - path: ./specification/Dockerfile
+            context: ./specification
+            name: specification
+          - path: ./java/otlp-mmap/Dockerfile
+            context: ./java/otlp-mmap
+            name: java-otlp-mmap
+          - path: ./python/Dockerfile
+            context: ./python
+            name: python
+          - path: ./python/otlp-mmap-example-server/Dockerfile
+            context: .
+            name: python-example-server
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5 # v3.8.0
+
+      - name: Build Docker image
+        uses: docker/build-push-action@48aba3b46d1b1fec4febb7c5d0c644b249a11355 # v6.10.0
+        with:
+          context: ${{ matrix.dockerfile.context }}
+          file: ${{ matrix.dockerfile.path }}
+          push: false
+          load: true
+          tags: ${{ matrix.dockerfile.name }}:test
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0 # v0.30.0
+        with:
+          image-ref: ${{ matrix.dockerfile.name }}:test
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.dockerfile.name }}.sarif'
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@aa578102511db1f4524ed59b8cc2bae4f6e88195 # v3.28.6
+        if: always()
+        with:
+          sarif_file: 'trivy-results-${{ matrix.dockerfile.name }}.sarif'
