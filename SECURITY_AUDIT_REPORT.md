@@ -76,25 +76,27 @@ All Docker base images have been pinned to their SHA256 digests:
 
 ### 3. Missing Checksum Verification for Downloaded Binaries
 
-**Status:** ✅ **FIXED**  
+**Status:** ✅ **FIXED - IMPROVED APPROACH**  
 **Severity:** MEDIUM-HIGH  
 **Impact:** Risk of downloading tampered or malicious binaries  
 **Affected File:** `specification/Dockerfile`
 
 **Resolution:**
-The protoc download process now includes SHA256 checksum verification:
+Switched from manual binary download to using Alpine's package manager:
 ```dockerfile
-ARG PROTOBUF_SHA256=5cc0cf75a9c7d0ab6340d59fda3ca05d2efb2dcd7a323a5ba2b7211c2aba9d0f
-RUN mkdir -p /protoc && \
-    cd /protoc && \
-    curl -sSL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-linux-x86_64.zip && \
-    echo "${PROTOBUF_SHA256}  protoc.zip" | sha256sum -c - && \
-    unzip protoc.zip && \
-    rm protoc.zip && \
-    chmod a+x /protoc/bin/protoc
+# Install protoc from Alpine package manager for better security
+# This leverages Alpine's package signing and verification mechanisms
+RUN apk add --no-cache protoc musl-dev
 ```
 
-The checksum is verified before extraction, ensuring the downloaded binary hasn't been tampered with. If the checksum doesn't match, the build will fail immediately.
+This approach is superior to manual checksums because:
+- Alpine's package manager (`apk`) automatically verifies package signatures
+- Packages are cryptographically signed by Alpine maintainers
+- No need to manually update checksums when versions change
+- More maintainable and follows Alpine best practices
+- Reduces attack surface by removing curl/unzip dependencies
+
+The Alpine 3.22 repository includes `protoc` version 29.4-r0, which is maintained and verified by the Alpine Security Team.
 
 ---
 
