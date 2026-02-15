@@ -13,7 +13,7 @@ use crate::{
 };
 
 mod aggregation;
-mod timeseries_id;
+pub(crate) mod timeseries_id;
 
 /// Current value of a collected metric, in OTLP form.
 pub struct CollectedMetric {

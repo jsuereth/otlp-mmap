@@ -30,3 +30,7 @@ This codebase documents itself in `README.md` and that should be used to validat
 - Run all changes through `cargo test`
 - Run all changes through `cargo fmt` after `cargo test` passes.
 - Run all changes through `cargo clippy` after `cargo fmt` and `cargo test` pass.
+
+## Style
+
+- There should be no `.unwrap()` calls in tests, only `.expect("some message explaining why this is expected for the test")`.
