@@ -287,8 +287,10 @@ mod tests {
         // Manually write a header
         let end_val: i64 = 123;
         let num_entries_val: i64 = 456;
-        f.write_all(&end_val.to_ne_bytes()).expect("Failed to write to file");
-        f.write_all(&num_entries_val.to_ne_bytes()).expect("Failed to write to file");
+        f.write_all(&end_val.to_ne_bytes())
+            .expect("Failed to write to file");
+        f.write_all(&num_entries_val.to_ne_bytes())
+            .expect("Failed to write to file");
         f.flush().expect("Failed to flush file");
 
         let dict_file = OpenOptions::new()
@@ -296,7 +298,8 @@ mod tests {
             .write(true)
             .open(file.path())
             .expect("Failed to open temp file");
-        let dict = Dictionary::try_new(dict_file, offset, None).expect("Failed to create dictionary");
+        let dict =
+            Dictionary::try_new(dict_file, offset, None).expect("Failed to create dictionary");
         let header = dict.header();
 
         assert_eq!(header.end.load(Ordering::Relaxed), end_val);
@@ -324,13 +327,18 @@ mod tests {
         let encoded_string = &buf[1..];
 
         // Write header
-        f.seek(std::io::SeekFrom::Start(offset)).expect("Failed to seek in file");
+        f.seek(std::io::SeekFrom::Start(offset))
+            .expect("Failed to seek in file");
         let end: i64 = offset as i64 + 200 + encoded_string.len() as i64;
         let num_messages: i64 = 1;
-        f.write(&end.to_le_bytes()).expect("Failed to write to file");
-        f.write(&num_messages.to_le_bytes()).expect("Failed to write to file");
-        f.seek(std::io::SeekFrom::Start(offset + 100)).expect("Failed to seek in file");
-        f.write_all(encoded_string).expect("Failed to write to file");
+        f.write(&end.to_le_bytes())
+            .expect("Failed to write to file");
+        f.write(&num_messages.to_le_bytes())
+            .expect("Failed to write to file");
+        f.seek(std::io::SeekFrom::Start(offset + 100))
+            .expect("Failed to seek in file");
+        f.write_all(encoded_string)
+            .expect("Failed to write to file");
         f.flush().expect("Failed to flush file");
 
         let dict_file = OpenOptions::new()
@@ -338,9 +346,12 @@ mod tests {
             .write(true)
             .open(file.path())
             .expect("Failed to open temp file");
-        let dict = Dictionary::try_new(dict_file, offset, None).expect("Failed to create dictionary");
+        let dict =
+            Dictionary::try_new(dict_file, offset, None).expect("Failed to create dictionary");
 
-        let result = dict.try_read_string((offset + 100) as i64).expect("Failed to read string");
+        let result = dict
+            .try_read_string((offset + 100) as i64)
+            .expect("Failed to read string");
         assert_eq!(result, test_string);
 
         Ok(())
@@ -381,14 +392,20 @@ mod tests {
         };
 
         let mut buf = Vec::new();
-        resource.encode_length_delimited(&mut buf).expect("Failed to encode resource");
+        resource
+            .encode_length_delimited(&mut buf)
+            .expect("Failed to encode resource");
         // Write header
-        f.seek(std::io::SeekFrom::Start(offset)).expect("Failed to seek in file");
+        f.seek(std::io::SeekFrom::Start(offset))
+            .expect("Failed to seek in file");
         let end: i64 = offset as i64 + 200 + buf.len() as i64;
         let num_messages: i64 = 1;
-        f.write(&end.to_le_bytes()).expect("Failed to write to file");
-        f.write(&num_messages.to_le_bytes()).expect("Failed to write to file");
-        f.seek(std::io::SeekFrom::Start(offset + 200)).expect("Failed to seek in file");
+        f.write(&end.to_le_bytes())
+            .expect("Failed to write to file");
+        f.write(&num_messages.to_le_bytes())
+            .expect("Failed to write to file");
+        f.seek(std::io::SeekFrom::Start(offset + 200))
+            .expect("Failed to seek in file");
         f.write_all(&buf).expect("Failed to write to file");
         f.flush().expect("Failed to flush file");
 
@@ -397,8 +414,11 @@ mod tests {
             .write(true)
             .open(file.path())
             .expect("Failed to open temp file");
-        let dict = Dictionary::try_new(dict_file, offset, None).expect("Failed to create dictionary");
-        let result: otlp_mmap_protocol::Resource = dict.try_read((offset + 200) as i64).expect("Failed to read resource");
+        let dict =
+            Dictionary::try_new(dict_file, offset, None).expect("Failed to create dictionary");
+        let result: otlp_mmap_protocol::Resource = dict
+            .try_read((offset + 200) as i64)
+            .expect("Failed to read resource");
 
         assert_eq!(result.dropped_attributes_count, 42);
 
@@ -433,7 +453,8 @@ mod tests {
             .expect("Failed to open temp file");
         let offset = 0;
         f.set_len(1024).expect("Failed to set file length");
-        f.write_all(&[0xDE, 0xAD, 0xBE, 0xEF]).expect("Failed to write to file"); // Write garbage
+        f.write_all(&[0xDE, 0xAD, 0xBE, 0xEF])
+            .expect("Failed to write to file"); // Write garbage
         f.flush().expect("Failed to flush file");
 
         let dict_file = OpenOptions::new()
@@ -441,7 +462,8 @@ mod tests {
             .write(true)
             .open(file.path())
             .expect("Failed to open temp file");
-        let dict = Dictionary::try_new(dict_file, offset, None).expect("Failed to create dictionary");
+        let dict =
+            Dictionary::try_new(dict_file, offset, None).expect("Failed to create dictionary");
 
         let result: Result<otlp_mmap_protocol::Resource, Error> = dict.try_read(offset as i64);
         assert!(matches!(result, Err(Error::ProtobufDecodeError(_))));
@@ -484,7 +506,8 @@ mod tests {
             100, // varint-encoded length of 100
             1, 2, 3, // Not enough data
         ];
-        f.seek(std::io::SeekFrom::Start(offset as u64)).expect("Failed to seek in file");
+        f.seek(std::io::SeekFrom::Start(offset as u64))
+            .expect("Failed to seek in file");
         f.write_all(malformed_buf).expect("Failed to write to file");
         f.flush().expect("Failed to flush file");
 
@@ -493,7 +516,8 @@ mod tests {
             .write(true)
             .open(file.path())
             .expect("Failed to open temp file");
-        let dict = Dictionary::try_new(dict_file, offset, None).expect("Failed to create dictionary");
+        let dict =
+            Dictionary::try_new(dict_file, offset, None).expect("Failed to create dictionary");
 
         // Try to decode it. This should fail because the buffer is unexpectedly short.
         let result: Result<otlp_mmap_protocol::Resource, Error> = dict.try_read(offset as i64);
@@ -512,7 +536,8 @@ mod tests {
             .expect("Failed to open temp file");
         let offset = 0;
         let mmap_size = 1024;
-        f.set_len(offset + mmap_size).expect("Failed to set file length");
+        f.set_len(offset + mmap_size)
+            .expect("Failed to set file length");
 
         // Position the entry near the end of the mmap
         let entry_offset = offset + mmap_size - 4; // 4 bytes from the end
@@ -523,7 +548,8 @@ mod tests {
             10, // varint-encoded length of 10
             1, 2, 3, // Only 3 bytes of payload, total of 4 bytes with length
         ];
-        f.seek(std::io::SeekFrom::Start(entry_offset)).expect("Failed to seek in file");
+        f.seek(std::io::SeekFrom::Start(entry_offset))
+            .expect("Failed to seek in file");
         f.write_all(malformed_buf).expect("Failed to write to file");
         f.flush().expect("Failed to flush file");
 
@@ -532,7 +558,8 @@ mod tests {
             .write(true)
             .open(file.path())
             .expect("Failed to open temp file");
-        let dict = Dictionary::try_new(dict_file, offset, None).expect("Failed to create dictionary");
+        let dict =
+            Dictionary::try_new(dict_file, offset, None).expect("Failed to create dictionary");
 
         // Try to decode it. This should fail as it tries to read past the mmap boundary.
         let result: Result<otlp_mmap_protocol::Resource, Error> =
@@ -670,7 +697,7 @@ mod tests {
     fn test_reader_edge_case_growth() -> Result<(), Error> {
         let file = NamedTempFile::new().expect("Failed to create temp file");
         let initial_size = 1024;
-        
+
         let f_writer = OpenOptions::new()
             .read(true)
             .write(true)
@@ -691,21 +718,27 @@ mod tests {
         let mut last_idx = 0;
         loop {
             let s = "short";
-            last_idx = dict_writer.try_write_string(s).expect("Failed to write string");
+            last_idx = dict_writer
+                .try_write_string(s)
+                .expect("Failed to write string");
             if last_idx > 1000 {
                 break;
             }
         }
-        
+
         // 2. Writer writes a long string that crosses the 1024 boundary.
         // The index will be < 1024, but the payload will end > 1024.
         let long_str = "This string is long enough to definitely cross the 1024 byte boundary from wherever we started near 1000";
-        let edge_idx = dict_writer.try_write_string(long_str).expect("Failed to write long string at edge");
+        let edge_idx = dict_writer
+            .try_write_string(long_str)
+            .expect("Failed to write long string at edge");
         assert!(edge_idx < 1024);
-        
+
         // 3. Reader tries to read the edge entry.
         // If the reader doesn't remap on decoding error, this will FAIL.
-        let result = dict_reader.try_read_string(edge_idx).expect("Reader failed to read edge-crossing entry");
+        let result = dict_reader
+            .try_read_string(edge_idx)
+            .expect("Reader failed to read edge-crossing entry");
         assert_eq!(result, long_str);
 
         Ok(())
