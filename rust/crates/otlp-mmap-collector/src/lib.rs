@@ -51,7 +51,6 @@ impl CollectorSdk {
     /// Records metrics from the ringbuffer and repor them at an interval.
     pub async fn record_metrics(&self, config: &MetricSdkConfig) -> Result<(), Error> {
         println!("Starting metrics pipeline");
-        // TODO - we need to set up a timer to export metrics periodically.
         let mut client = MetricsServiceClient::connect(config.metric_endpoint.clone()).await?;
         let mut metric_storage = MetricStorage::new();
         // Report metrics every minute.
@@ -71,7 +70,6 @@ impl CollectorSdk {
                     },
                     _ = &mut send_by_time => {
                         let metrics = metric_storage.collect(&metric::CollectionContext::new(self.reader.start_time(), 0));
-                        // TODO - send the metrics.
                         let batch = self.try_create_metric_batch(metrics).await?;
                         // TODO - check response for retry, etc.
                         let _ = client.export(batch).await?;
