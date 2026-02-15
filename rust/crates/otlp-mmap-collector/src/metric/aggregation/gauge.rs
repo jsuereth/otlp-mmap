@@ -8,11 +8,13 @@ impl super::AggregationConfig for GaugeAggregationConfig {
     }
 
     fn new_collection_data(&self) -> Option<opentelemetry_proto::tonic::metrics::v1::metric::Data> {
-        Some(opentelemetry_proto::tonic::metrics::v1::metric::Data::Gauge(
-            opentelemetry_proto::tonic::metrics::v1::Gauge {
-                data_points: Vec::new(),
-            },
-        ))
+        Some(
+            opentelemetry_proto::tonic::metrics::v1::metric::Data::Gauge(
+                opentelemetry_proto::tonic::metrics::v1::Gauge {
+                    data_points: Vec::new(),
+                },
+            ),
+        )
     }
 }
 
@@ -69,7 +71,9 @@ mod tests {
         let mut agg = config.new_aggregation();
         let id = TimeSeriesIdentity::new(vec![]);
         let ctx = CollectionContext::new(100, 200);
-        let mut data = config.new_collection_data().expect("Failed to create collection data");
+        let mut data = config
+            .new_collection_data()
+            .expect("Failed to create collection data");
 
         agg.join(Measurement {
             metric_ref: 1,
@@ -115,7 +119,9 @@ mod tests {
         let mut agg = config.new_aggregation();
         let id = TimeSeriesIdentity::new(vec![]);
         let ctx = CollectionContext::new(100, 200);
-        let mut data = config.new_collection_data().expect("Failed to create collection data");
+        let mut data = config
+            .new_collection_data()
+            .expect("Failed to create collection data");
 
         agg.join(Measurement {
             metric_ref: 1,

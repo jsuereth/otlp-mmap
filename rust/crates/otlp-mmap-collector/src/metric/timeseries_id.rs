@@ -104,7 +104,7 @@ fn compare_values(
     r: &opentelemetry_proto::tonic::common::v1::any_value::Value,
 ) -> std::cmp::Ordering {
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
-    
+
     // 1. Try to compare directly if same type for efficiency
     match (l, r) {
         (Value::StringValue(ls), Value::StringValue(rs)) => return ls.cmp(rs),
@@ -136,7 +136,7 @@ fn compare_values(
                 ord => return ord,
             }
         }
-        _ => {} 
+        _ => {}
     }
 
     // 2. Different types or complex types needing stable tie-breaker: compare via string representation
@@ -156,7 +156,9 @@ fn value_to_string(v: &opentelemetry_proto::tonic::common::v1::any_value::Value)
         Value::ArrayValue(a) => {
             let mut s = String::from("[");
             for (i, val) in a.values.iter().enumerate() {
-                if i > 0 { s.push(','); }
+                if i > 0 {
+                    s.push(',');
+                }
                 s.push_str(&any_value_to_string(val));
             }
             s.push(']');
@@ -167,7 +169,9 @@ fn value_to_string(v: &opentelemetry_proto::tonic::common::v1::any_value::Value)
             kvs.sort_by(|a, b| a.key.cmp(&b.key));
             let mut s = String::from("{");
             for (i, kv) in kvs.iter().enumerate() {
-                if i > 0 { s.push(','); }
+                if i > 0 {
+                    s.push(',');
+                }
                 s.push_str(&kv.key);
                 s.push(':');
                 s.push_str(&any_value_to_string_opt(&kv.value));
@@ -218,17 +222,26 @@ mod tests {
                     let mut values = Vec::new();
                     for val in av.values {
                         if let Some(otlp_val) = self.try_convert_anyvalue_internal(val) {
-                            values.push(OTLPAnyValue { value: Some(otlp_val) });
+                            values.push(OTLPAnyValue {
+                                value: Some(otlp_val),
+                            });
                         }
                     }
-                    OTLPValue::ArrayValue(opentelemetry_proto::tonic::common::v1::ArrayValue { values })
+                    OTLPValue::ArrayValue(opentelemetry_proto::tonic::common::v1::ArrayValue {
+                        values,
+                    })
                 }
                 Value::KvlistValue(kvl) => {
                     let mut values = Vec::new();
                     for kv_ref in kvl.values {
-                        values.push(self.try_convert_attribute(kv_ref).expect("Failed to convert attribute in mock"));
+                        values.push(
+                            self.try_convert_attribute(kv_ref)
+                                .expect("Failed to convert attribute in mock"),
+                        );
                     }
-                    OTLPValue::KvlistValue(opentelemetry_proto::tonic::common::v1::KeyValueList { values })
+                    OTLPValue::KvlistValue(opentelemetry_proto::tonic::common::v1::KeyValueList {
+                        values,
+                    })
                 }
                 Value::ValueRef(r) => {
                     // In this simple mock, we just use the ref as a string
@@ -246,9 +259,8 @@ mod tests {
             let key_string = format!("key_{}", kv_ref.key_ref); // Simplified key lookup
 
             let otlp_value = if let Some(any_value) = kv_ref.value {
-                self.try_convert_anyvalue_internal(any_value).map(|v| OTLPAnyValue {
-                    value: Some(v),
-                })
+                self.try_convert_anyvalue_internal(any_value)
+                    .map(|v| OTLPAnyValue { value: Some(v) })
             } else {
                 None
             };
@@ -428,7 +440,9 @@ mod tests {
     #[test]
     fn test_compare_values_mixed_complex() {
         let a = OTLPValue::ArrayValue(opentelemetry_proto::tonic::common::v1::ArrayValue {
-            values: vec![OTLPAnyValue { value: Some(OTLPValue::IntValue(1)) }]
+            values: vec![OTLPAnyValue {
+                value: Some(OTLPValue::IntValue(1)),
+            }],
         });
         let s = OTLPValue::StringValue("[1]".to_owned());
         assert_eq!(compare_values(&a, &s), std::cmp::Ordering::Equal);
@@ -438,20 +452,24 @@ mod tests {
     fn test_compare_values_kvlist_sorting() {
         let kv1 = opentelemetry_proto::tonic::common::v1::KeyValue {
             key: "a".to_owned(),
-            value: Some(OTLPAnyValue { value: Some(OTLPValue::IntValue(1)) }),
+            value: Some(OTLPAnyValue {
+                value: Some(OTLPValue::IntValue(1)),
+            }),
         };
         let kv2 = opentelemetry_proto::tonic::common::v1::KeyValue {
             key: "b".to_owned(),
-            value: Some(OTLPAnyValue { value: Some(OTLPValue::IntValue(2)) }),
+            value: Some(OTLPAnyValue {
+                value: Some(OTLPValue::IntValue(2)),
+            }),
         };
-        
+
         let l1 = OTLPValue::KvlistValue(opentelemetry_proto::tonic::common::v1::KeyValueList {
             values: vec![kv1.clone(), kv2.clone()],
         });
         let l2 = OTLPValue::KvlistValue(opentelemetry_proto::tonic::common::v1::KeyValueList {
             values: vec![kv2.clone(), kv1.clone()],
         });
-        
+
         // They should be equal because value_to_string sorts them
         assert_eq!(compare_values(&l1, &l2), std::cmp::Ordering::Equal);
     }
@@ -459,6 +477,9 @@ mod tests {
     #[test]
     fn test_any_value_to_string_opt_null() {
         assert_eq!(any_value_to_string_opt(&None), "null");
-        assert_eq!(any_value_to_string_opt(&Some(OTLPAnyValue { value: None })), "null");
+        assert_eq!(
+            any_value_to_string_opt(&Some(OTLPAnyValue { value: None })),
+            "null"
+        );
     }
 }

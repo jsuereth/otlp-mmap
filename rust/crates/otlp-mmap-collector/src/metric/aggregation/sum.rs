@@ -84,7 +84,9 @@ mod tests {
         let mut agg = config.new_aggregation();
         let id = TimeSeriesIdentity::new(vec![]);
         let ctx = CollectionContext::new(100, 200);
-        let mut data = config.new_collection_data().expect("Failed to create collection data");
+        let mut data = config
+            .new_collection_data()
+            .expect("Failed to create collection data");
 
         agg.join(Measurement {
             metric_ref: 1,
@@ -133,7 +135,9 @@ mod tests {
         let mut agg = config.new_aggregation();
         let id = TimeSeriesIdentity::new(vec![]);
         let ctx = CollectionContext::new(100, 200);
-        let mut data = config.new_collection_data().expect("Failed to create collection data");
+        let mut data = config
+            .new_collection_data()
+            .expect("Failed to create collection data");
 
         agg.join(Measurement {
             metric_ref: 1,
@@ -180,7 +184,9 @@ mod tests {
         let mut agg = config.new_aggregation();
         let id = TimeSeriesIdentity::new(vec![]);
         let ctx = CollectionContext::new(100, 200);
-        let mut data = config.new_collection_data().expect("Failed to create collection data");
+        let mut data = config
+            .new_collection_data()
+            .expect("Failed to create collection data");
 
         agg.join(Measurement {
             metric_ref: 1,

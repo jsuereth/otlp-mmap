@@ -253,7 +253,11 @@ impl LogsService for MockOtlpService {
         &self,
         request: Request<ExportLogsServiceRequest>,
     ) -> Result<Response<ExportLogsServiceResponse>, Status> {
-        if *self.should_fail.lock().expect("Lock should not be poisoned") {
+        if *self
+            .should_fail
+            .lock()
+            .expect("Lock should not be poisoned")
+        {
             return Err(Status::internal("intentional failure"));
         }
         let _ = self.logs_tx.send(request.into_inner()).await;
@@ -269,7 +273,11 @@ impl MetricsService for MockOtlpService {
         &self,
         request: Request<ExportMetricsServiceRequest>,
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
-        if *self.should_fail.lock().expect("Lock should not be poisoned") {
+        if *self
+            .should_fail
+            .lock()
+            .expect("Lock should not be poisoned")
+        {
             return Err(Status::internal("intentional failure"));
         }
         let _ = self.metrics_tx.send(request.into_inner()).await;
@@ -285,7 +293,11 @@ impl TraceService for MockOtlpService {
         &self,
         request: Request<ExportTraceServiceRequest>,
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
-        if *self.should_fail.lock().expect("Lock should not be poisoned") {
+        if *self
+            .should_fail
+            .lock()
+            .expect("Lock should not be poisoned")
+        {
             return Err(Status::internal("intentional failure"));
         }
         let _ = self.trace_tx.send(request.into_inner()).await;
