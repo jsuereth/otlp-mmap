@@ -16,6 +16,11 @@ syntax = "proto3";
 
 package opentelemetry.proto.mmap.v1;
 
+// SpanEvent represents a lifecycle event for a span.
+//
+// Rationale: SpanEvent contains trace_id and span_id directly (rather than
+// using a nested SpanContext message) because the SpanEvent is the primary
+// source of these IDs for the span it describes.
 message SpanEvent {
   // InstrumentationScope from which this was recorded.
   int64 scope_ref = 20;
@@ -304,6 +309,8 @@ message Measurement {
     }
     // (optional) Span context information if this measurement was
     // recorded within a span.
+    // Note: Unlike SpanEvent, this uses a nested SpanContext message as
+    // it is referring to an existing span context rather than defining it.
     SpanContext span_context = 6;
 }
 
@@ -386,6 +393,8 @@ message Event {
   int64 event_name_ref = 6;
   // Span information in which this event was recorded.
   // [Optional].
+  // Note: Unlike SpanEvent, this uses a nested SpanContext message as
+  // it is referring to an existing span context rather than defining it.
   SpanContext span_context = 7;
 
   // Attributes about this event.

@@ -92,16 +92,25 @@ struct RingBuffer {
     /// Efficient mechanism to convert a message index into
     /// an availability flag.  Effectively - size.ilog2()
     shift: u32,
+    /// Mask used for bitwise AND to calculate the ring buffer index.
+    /// This is `num_buffers - 1`.
+    mask: i64,
 }
 
 impl RingBuffer {
     /// Constructs a new ring buffer on an mmap at the offset.
     fn new(data: MmapMut, offset: usize) -> RingBuffer {
         let hdr = unsafe { &*(data.as_ref().as_ptr().add(offset) as *const RingBufferHeader) };
+        assert!(
+            hdr.num_buffers > 0 && (hdr.num_buffers & (hdr.num_buffers - 1)) == 0,
+            "num_buffers must be a power of two, found {}",
+            hdr.num_buffers
+        );
         RingBuffer {
             data: UnsafeCell::new(data),
             offset,
             shift: (hdr.num_buffers as u32).ilog2(),
+            mask: hdr.num_buffers - 1,
         }
     }
 
@@ -112,6 +121,11 @@ impl RingBuffer {
         buffer_size: usize,
         num_buffers: usize,
     ) -> RingBuffer {
+        assert!(
+            num_buffers > 0 && (num_buffers & (num_buffers - 1)) == 0,
+            "num_buffers must be a power of two, found {}",
+            num_buffers
+        );
         // TODO - Validate memory bounds on MmapMut.
         unsafe {
             // Set header for RingBuffer
@@ -223,9 +237,7 @@ impl RingBuffer {
     }
 
     fn ring_buffer_index(&self, idx: i64) -> usize {
-        // TODO - optimise this.
-        // We can force power-of-two and use a mask on the integer.
-        (idx % self.header().num_buffers) as usize
+        (idx & self.mask) as usize
     }
 
     /// Checks whether a given ring buffer is avialable to read.

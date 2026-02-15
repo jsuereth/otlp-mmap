@@ -26,19 +26,13 @@ case class RingBufferOptions(
 final class RingBufferHeader(val segment: MemorySegment) extends Header:
     val num_buffers = MetadataLongField(0)
     val buffer_size = MetadataLongField(8)
-    val read_position = MetadataLongField(16)
-    val write_position = MetadataLongField(24)
+    val reader_index = MetadataLongField(16)
+    val writer_index = MetadataLongField(24)
 
 final class RingBufferAvailability(val segment: MemorySegment, buffer_size: Int) extends Header:
   val availability = MetadataIntArray(0, buffer_size)
   val shift = log2(buffer_size)
-
-  // We need to fill the availability buffer with sentinel values.
-  for idx <- (0 until buffer_size)
-  do availability(idx) = -1
-
-  // TODO assumes power of two for index size.
-  // val mask = buffer_size-1
+  val mask = buffer_size - 1
 
   /** Marks a ring buffer available for reading. */
   def setAvailable(idx: Long): Unit =
@@ -59,14 +53,14 @@ final class RingBufferAvailability(val segment: MemorySegment, buffer_size: Int)
   private def availabilityFlagForIndex(idx: Long): Int =
     (idx >>> shift).toInt
   def ringIndexFromRawIndex(idx: Long): Int =
-    (idx % buffer_size).toInt
-    // TODO - force power of two (idx.toInt & mask )
+    (idx.toInt & mask)
 
 /**
   * An in-memory ring-buffer that will use primitives against the header
   * to write to each ring buffer chunk.
   *
   * @param header A wrapper around the memory segment representing the header.
+  * @param availability A wrapper around the availability array.
   * @param chunks The memory segments we use for each chunk in the ringbuffer.
   */
 final class RingBuffer(
@@ -86,7 +80,7 @@ final class RingBuffer(
     (header.buffer_size.get() * header.num_buffers.get())
 
   def hasEvents(): Boolean =
-    val readerPosition = header.read_position.getVolatile()
+    val readerPosition = header.reader_index.getVolatile()
     val nextRead = readerPosition+1
     availability.isAvailable(nextRead)
 
@@ -94,17 +88,17 @@ final class RingBuffer(
     // We calculate as far "back" in the ring buffer index
     // we can go before we'd overwrite something waiting to be read.
     val previousIndexWithConflict = currentIdx + 1 - header.num_buffers.get()
-    val readerPosition = header.read_position.getVolatile()
+    val readerPosition = header.reader_index.getVolatile()
     // we rely on the reader catching up with the writers to check capacity here.
     previousIndexWithConflict < readerPosition
 
   /** Attempts to return the next index or None if buffer is full. */
   private def tryObtainNextWrite(): Option[Long] =
     // First we grab the next value.
-    val current = header.write_position.get()
+    val current = header.writer_index.getVolatile()
     val next = current + 1
     val hasCapacity = hasWriteCapacity(current)
-    if hasCapacity && header.write_position.compareAndSet(current, next)
+    if hasCapacity && header.writer_index.compareAndSet(current, next)
     then Some(next)
     else None
 
@@ -125,7 +119,7 @@ final class RingBuffer(
       availability.setAvailable(idx)
 
   private def tryObtainNextRead(): Option[Long] =
-    val readerPosition = header.read_position.getVolatile()
+    val readerPosition = header.reader_index.getVolatile()
     val nextRead = readerPosition+1
     if availability.isAvailable(nextRead)
     then Some(nextRead)
@@ -140,7 +134,7 @@ final class RingBuffer(
           nextReadIndex()
     val idx = nextReadIndex()
     try summon[Readable[A]].read(chunks(availability.ringIndexFromRawIndex(idx)).asByteBuffer().order(ByteOrder.nativeOrder()))
-    finally header.read_position.setRelease(idx)
+    finally header.reader_index.setRelease(idx)
 
   def force(): Unit =
     header.force()
@@ -149,16 +143,23 @@ final class RingBuffer(
 object RingBuffer:
     private val HEADER_SIZE = 32
     def apply(channel: FileChannel, offset: Long, opt: RingBufferOptions): RingBuffer =
-        // TODO - validation on options.
+        require(opt.num_buffers > 0 && (opt.num_buffers & (opt.num_buffers - 1)) == 0, s"num_buffers must be a power of two, found ${opt.num_buffers}")
         val arena = Arena.ofShared()
         val header = RingBufferHeader(channel.map(MapMode.READ_WRITE, offset, HEADER_SIZE, arena))
         // Check if we're "fresh" here, and initialize the buffer.
         if header.buffer_size.get() != opt.buffer_size then
           header.buffer_size.set(opt.buffer_size)
           header.num_buffers.set(opt.num_buffers)
-          header.read_position.set(-1)
-          header.write_position.set(-1)
-        // next create availability array.
+          header.reader_index.set(-1)
+          header.writer_index.set(-1)
+          // next create availability array.
+          val availability_bytes = 4*opt.num_buffers
+          val availability_offset = offset+HEADER_SIZE
+          val segment = channel.map(MapMode.READ_WRITE, availability_offset, availability_bytes, arena)
+          // Initialize availability to -1
+          for i <- 0 until opt.num_buffers.toInt
+          do segment.set(java.lang.foreign.ValueLayout.JAVA_INT, i * 4, -1)
+          
         val availability_bytes = 4*opt.num_buffers
         val availability_offset = offset+HEADER_SIZE
         val availability = RingBufferAvailability(

@@ -35,7 +35,7 @@ impl TimeSeriesIdentity {
         }
         // Sort by key name for faster comparisons later.
         kvs.sort_by(|l, r| l.key.cmp(&r.key));
-        // TODO - remove duplicate keys.
+        // TODO - remove duplicate keys (Ideally we dedup while sorting).
         Ok(TimeSeriesIdentity { attributes: kvs })
     }
 

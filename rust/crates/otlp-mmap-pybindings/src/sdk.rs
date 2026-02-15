@@ -232,7 +232,7 @@ impl SdkWriter {
             otlp_mmap_protocol::metric_ref::Aggregation::Histogram(h) => {
                 HashableAggregation::Histogram {
                     temporality: h.aggregation_temporality,
-                    buckets: h.bucket_boundares.iter().map(|f| f.to_bits()).collect(),
+                    buckets: h.bucket_boundaries.iter().map(|f| f.to_bits()).collect(),
                 }
             }
             otlp_mmap_protocol::metric_ref::Aggregation::ExpHist(e) => {
@@ -404,7 +404,7 @@ fn convert_aggregation(
         Ok(otlp_mmap_protocol::metric_ref::Aggregation::Histogram(
             otlp_mmap_protocol::metric_ref::Histogram {
                 aggregation_temporality: temp,
-                bucket_boundares: bounds,
+                bucket_boundaries: bounds,
             },
         ))
     } else if let Some(exp_dict) = dict.get_item("exp_histogram")? {

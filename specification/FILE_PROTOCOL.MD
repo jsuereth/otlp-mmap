@@ -184,6 +184,8 @@ The dictionary begins with a 64-byte header. The `end` and `num_entries` fields 
 | num_entries      | 8    | 8      | int64 | The number of entries written.                     |
 | unused           | 48   | 16     |       | Reserved for future use. Must be zeroed.           |
 
+Note: Dictionary offset `0` is reserved for empty/null values. All valid entries will have an offset greater than zero.
+
 When interacting with the dictionary, all references are *offsets from the start of the file*.
 
 Dictionary entries are serialized Protocol Buffer messages (they MUST begin with a serialized size as a varint).
@@ -220,6 +222,8 @@ entry at this location which is a serialized `Resource` message from
 Anywhere a `key_ref` is defined, you should expect a dictionary entry at this location which is a length-delimited, serialized UTF-8 `String`.
 
 This is also used for `name_ref`, `version_ref`, and `event_name_ref`.
+
+Note: The `ValueRef` field in `AnyValueRef` (and `AnyValue`) allows for dictionary encoding of strings and other complex types. However, this is currently **unused** in all implementations to avoid unpredictable growth of the dictionary. Future versions may employ heuristics to selectively intern **low-cardinality** string values (where many occurrences share few unique values) to optimize file size without dictionary bloat.
 
 ### Dictionary - MetricDefinitions
 
