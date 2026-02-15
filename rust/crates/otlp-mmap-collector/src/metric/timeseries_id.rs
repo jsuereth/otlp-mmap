@@ -206,6 +206,38 @@ mod tests {
     // Mock implementation of `AttributeLookup` for testing `from_keyvalue_refs`
     struct MockAttributeLookup;
 
+    impl MockAttributeLookup {
+        fn try_convert_anyvalue_internal(&self, any_value: AnyValue) -> Option<OTLPValue> {
+            any_value.value.map(|v| match v {
+                Value::StringValue(s) => OTLPValue::StringValue(s),
+                Value::BoolValue(b) => OTLPValue::BoolValue(b),
+                Value::IntValue(i) => OTLPValue::IntValue(i),
+                Value::DoubleValue(d) => OTLPValue::DoubleValue(d),
+                Value::BytesValue(b) => OTLPValue::BytesValue(b),
+                Value::ArrayValue(av) => {
+                    let mut values = Vec::new();
+                    for val in av.values {
+                        if let Some(otlp_val) = self.try_convert_anyvalue_internal(val) {
+                            values.push(OTLPAnyValue { value: Some(otlp_val) });
+                        }
+                    }
+                    OTLPValue::ArrayValue(opentelemetry_proto::tonic::common::v1::ArrayValue { values })
+                }
+                Value::KvlistValue(kvl) => {
+                    let mut values = Vec::new();
+                    for kv_ref in kvl.values {
+                        values.push(self.try_convert_attribute(kv_ref).expect("Failed to convert attribute in mock"));
+                    }
+                    OTLPValue::KvlistValue(opentelemetry_proto::tonic::common::v1::KeyValueList { values })
+                }
+                Value::ValueRef(r) => {
+                    // In this simple mock, we just use the ref as a string
+                    OTLPValue::StringValue(format!("ref_{}", r))
+                }
+            })
+        }
+    }
+
     impl AttributeLookup for MockAttributeLookup {
         fn try_convert_attribute(
             &self,
@@ -214,18 +246,8 @@ mod tests {
             let key_string = format!("key_{}", kv_ref.key_ref); // Simplified key lookup
 
             let otlp_value = if let Some(any_value) = kv_ref.value {
-                any_value.value.map(|v| {
-                    let new_val = match v {
-                        Value::StringValue(s) => OTLPValue::StringValue(s),
-                        Value::BoolValue(b) => OTLPValue::BoolValue(b),
-                        Value::IntValue(i) => OTLPValue::IntValue(i),
-                        Value::DoubleValue(d) => OTLPValue::DoubleValue(d),
-                        Value::BytesValue(b) => OTLPValue::BytesValue(b),
-                        _ => todo!(), // For ArrayValue, KvlistValue, ValueRef
-                    };
-                    OTLPAnyValue {
-                        value: Some(new_val),
-                    }
+                self.try_convert_anyvalue_internal(any_value).map(|v| OTLPAnyValue {
+                    value: Some(v),
                 })
             } else {
                 None
@@ -288,7 +310,8 @@ mod tests {
                 }),
             },
         ];
-        let id = TimeSeriesIdentity::from_keyvalue_refs(&attributes_unsorted, &sdk).unwrap();
+        let id = TimeSeriesIdentity::from_keyvalue_refs(&attributes_unsorted, &sdk)
+            .expect("Failed to create TimeSeriesIdentity from KeyValueRefs in test");
 
         assert_eq!(id.attributes[0].key, "key_1");
         assert_eq!(id.attributes[1].key, "key_2");
