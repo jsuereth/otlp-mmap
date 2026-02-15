@@ -22,7 +22,7 @@ prost = "0.14.1"
 thiserror="2.0.17"
 tokio = { version = "1.47.1", features = ["full", "test-util"] }
 moka = { version = "0.12.11", features = ["future"] }
-scc = "3.5.6"
+scc = "3.6.1"
 tonic = "0.14.2"
 itertools="0.13.0"
 clap = { version = "4.5.53", features = ["derive", "env"] }
