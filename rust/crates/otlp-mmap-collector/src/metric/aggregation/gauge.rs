@@ -1,42 +1,30 @@
 //! Gauge Aggregation
 
-use crate::Error;
-
-/// Configuration for a Gauge aggregation.
+/// Configuration for a Gauge.
 pub struct GaugeAggregationConfig {}
 impl super::AggregationConfig for GaugeAggregationConfig {
     fn new_aggregation(&self) -> Box<dyn super::Aggregation> {
-        Box::new(GaugeAggregation {
-            latest_measurement: 0.,
-        })
+        Box::new(GaugeAggregation { latest_value: 0. })
     }
 
     fn new_collection_data(&self) -> Option<opentelemetry_proto::tonic::metrics::v1::metric::Data> {
-        Some(
-            opentelemetry_proto::tonic::metrics::v1::metric::Data::Gauge(
-                opentelemetry_proto::tonic::metrics::v1::Gauge {
-                    data_points: Vec::new(),
-                },
-            ),
-        )
+        Some(opentelemetry_proto::tonic::metrics::v1::metric::Data::Gauge(
+            opentelemetry_proto::tonic::metrics::v1::Gauge {
+                data_points: Vec::new(),
+            },
+        ))
     }
 }
 
-/// "cell" of aggregation for a Gauge.
 struct GaugeAggregation {
-    latest_measurement: f64, // TODO - exemplars
+    latest_value: f64,
 }
 impl super::Aggregation for GaugeAggregation {
-    fn join(&mut self, m: super::Measurement) -> Result<(), Error> {
-        // TODO - exemplars, timestamps, etc.
+    fn join(&mut self, m: otlp_mmap_protocol::Measurement) -> Result<(), crate::Error> {
         if let Some(v) = m.value {
             match v {
-                otlp_mmap_protocol::measurement::Value::AsLong(lv) => {
-                    self.latest_measurement = lv as f64
-                }
-                otlp_mmap_protocol::measurement::Value::AsDouble(dv) => {
-                    self.latest_measurement = dv
-                }
+                otlp_mmap_protocol::measurement::Value::AsLong(lv) => self.latest_value = lv as f64,
+                otlp_mmap_protocol::measurement::Value::AsDouble(dv) => self.latest_value = dv,
             }
         }
         Ok(())
@@ -44,8 +32,8 @@ impl super::Aggregation for GaugeAggregation {
 
     fn collect(
         &self,
-        id: &super::TimeSeriesIdentity,
-        ctx: &super::CollectionContext,
+        id: &crate::metric::timeseries_id::TimeSeriesIdentity,
+        ctx: &crate::metric::CollectionContext,
         cell: &mut opentelemetry_proto::tonic::metrics::v1::metric::Data,
     ) {
         if let opentelemetry_proto::tonic::metrics::v1::metric::Data::Gauge(gauge) = cell {
@@ -54,12 +42,10 @@ impl super::Aggregation for GaugeAggregation {
                 start_time_unix_nano: ctx.start_unix_nano,
                 time_unix_nano: ctx.current_unix_nano,
                 exemplars: Vec::new(),
-                // We don't allow flags
                 flags: 0,
-                // TODO - support int or double.
                 value: Some(
                     opentelemetry_proto::tonic::metrics::v1::number_data_point::Value::AsDouble(
-                        self.latest_measurement,
+                        self.latest_value,
                     ),
                 ),
             };
@@ -83,7 +69,7 @@ mod tests {
         let mut agg = config.new_aggregation();
         let id = TimeSeriesIdentity::new(vec![]);
         let ctx = CollectionContext::new(100, 200);
-        let mut data = config.new_collection_data().unwrap();
+        let mut data = config.new_collection_data().expect("Failed to create collection data");
 
         agg.join(Measurement {
             metric_ref: 1,
@@ -92,7 +78,7 @@ mod tests {
             span_context: None,
             value: Some(Value::AsLong(10)),
         })
-        .unwrap();
+        .expect("Failed to join measurement");
 
         agg.join(Measurement {
             metric_ref: 1,
@@ -101,7 +87,7 @@ mod tests {
             span_context: None,
             value: Some(Value::AsLong(20)),
         })
-        .unwrap();
+        .expect("Failed to join measurement");
 
         agg.collect(&id, &ctx, &mut data);
 
@@ -129,7 +115,7 @@ mod tests {
         let mut agg = config.new_aggregation();
         let id = TimeSeriesIdentity::new(vec![]);
         let ctx = CollectionContext::new(100, 200);
-        let mut data = config.new_collection_data().unwrap();
+        let mut data = config.new_collection_data().expect("Failed to create collection data");
 
         agg.join(Measurement {
             metric_ref: 1,
@@ -138,7 +124,7 @@ mod tests {
             span_context: None,
             value: Some(Value::AsDouble(10.5)),
         })
-        .unwrap();
+        .expect("Failed to join measurement");
 
         agg.join(Measurement {
             metric_ref: 1,
@@ -147,7 +133,7 @@ mod tests {
             span_context: None,
             value: Some(Value::AsDouble(20.25)),
         })
-        .unwrap();
+        .expect("Failed to join measurement");
 
         agg.collect(&id, &ctx, &mut data);
 
