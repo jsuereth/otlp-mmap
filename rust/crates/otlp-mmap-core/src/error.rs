@@ -20,6 +20,9 @@ pub enum Error {
 
     #[error(transparent)]
     ClockError(#[from] std::time::SystemTimeError),
+
+    #[error("Invalid configuration: {0}")]
+    InvalidConfiguration(String),
 }
 
 // TODO - Format errors.

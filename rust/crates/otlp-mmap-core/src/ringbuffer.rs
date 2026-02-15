@@ -338,8 +338,8 @@ struct RingBufferHeader {
 mod test {
     use crate::ringbuffer::RingBuffer;
     use memmap2::MmapOptions;
-    use std::sync::atomic::Ordering;
     use std::fs::OpenOptions;
+    use std::sync::atomic::Ordering;
 
     /// A helper to create a RingBuffer for testing with a specific state.
     struct TestRingBuffer {
@@ -368,7 +368,8 @@ mod test {
 
     impl TestRingBuffer {
         fn new(opts: TestRingBufferOptions) -> TestRingBuffer {
-            let file = tempfile::NamedTempFile::new().expect("Failed to create temp file for testing");
+            let file =
+                tempfile::NamedTempFile::new().expect("Failed to create temp file for testing");
             let f = OpenOptions::new()
                 .read(true)
                 .write(true)
@@ -379,10 +380,16 @@ mod test {
             let availability_array_size = opts.num_buffers * 4;
             let buffers_size = opts.num_buffers * opts.buffer_size;
             let total_size = header_size + availability_array_size + buffers_size;
-            f.set_len(total_size as u64).expect("Failed to set file length for testing");
-            let data = unsafe { MmapOptions::new().map_mut(&f).expect("Failed to create mmap for testing") };
+            f.set_len(total_size as u64)
+                .expect("Failed to set file length for testing");
+            let data = unsafe {
+                MmapOptions::new()
+                    .map_mut(&f)
+                    .expect("Failed to create mmap for testing")
+            };
 
-            let buffer = RingBuffer::new_for_write(data, 0, opts.buffer_size, opts.num_buffers).expect("Failed to create ring buffer for testing");
+            let buffer = RingBuffer::new_for_write(data, 0, opts.buffer_size, opts.num_buffers)
+                .expect("Failed to create ring buffer for testing");
             buffer
                 .header()
                 .reader_index
