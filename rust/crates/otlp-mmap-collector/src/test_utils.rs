@@ -174,6 +174,34 @@ impl SdkLookup for MockSdkLookup {
                     ),
                 }))
             }
+            Some(Value::ArrayValue(av)) => {
+                let mut values = Vec::new();
+                for val in av.values {
+                    if let Some(v) = self.try_convert_anyvalue(val)? {
+                        values.push(v);
+                    }
+                }
+                Ok(Some(opentelemetry_proto::tonic::common::v1::AnyValue {
+                    value: Some(
+                        opentelemetry_proto::tonic::common::v1::any_value::Value::ArrayValue(
+                            opentelemetry_proto::tonic::common::v1::ArrayValue { values },
+                        ),
+                    ),
+                }))
+            }
+            Some(Value::KvlistValue(kvl)) => {
+                let mut values = Vec::new();
+                for kv in kvl.values {
+                    values.push(self.try_convert_attribute(kv)?);
+                }
+                Ok(Some(opentelemetry_proto::tonic::common::v1::AnyValue {
+                    value: Some(
+                        opentelemetry_proto::tonic::common::v1::any_value::Value::KvlistValue(
+                            opentelemetry_proto::tonic::common::v1::KeyValueList { values },
+                        ),
+                    ),
+                }))
+            }
             _ => Ok(None),
         }
     }
@@ -225,7 +253,7 @@ impl LogsService for MockOtlpService {
         &self,
         request: Request<ExportLogsServiceRequest>,
     ) -> Result<Response<ExportLogsServiceResponse>, Status> {
-        if *self.should_fail.lock().unwrap() {
+        if *self.should_fail.lock().expect("Lock should not be poisoned") {
             return Err(Status::internal("intentional failure"));
         }
         let _ = self.logs_tx.send(request.into_inner()).await;
@@ -241,7 +269,7 @@ impl MetricsService for MockOtlpService {
         &self,
         request: Request<ExportMetricsServiceRequest>,
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
-        if *self.should_fail.lock().unwrap() {
+        if *self.should_fail.lock().expect("Lock should not be poisoned") {
             return Err(Status::internal("intentional failure"));
         }
         let _ = self.metrics_tx.send(request.into_inner()).await;
@@ -257,7 +285,7 @@ impl TraceService for MockOtlpService {
         &self,
         request: Request<ExportTraceServiceRequest>,
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
-        if *self.should_fail.lock().unwrap() {
+        if *self.should_fail.lock().expect("Lock should not be poisoned") {
             return Err(Status::internal("intentional failure"));
         }
         let _ = self.trace_tx.send(request.into_inner()).await;
