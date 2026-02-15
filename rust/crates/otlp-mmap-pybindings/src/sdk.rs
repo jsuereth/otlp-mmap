@@ -232,7 +232,7 @@ impl SdkWriter {
             otlp_mmap_protocol::metric_ref::Aggregation::Histogram(h) => {
                 HashableAggregation::Histogram {
                     temporality: h.aggregation_temporality,
-                    buckets: h.bucket_boundares.iter().map(|f| f.to_bits()).collect(),
+                    buckets: h.bucket_boundaries.iter().map(|f| f.to_bits()).collect(),
                 }
             }
             otlp_mmap_protocol::metric_ref::Aggregation::ExpHist(e) => {
@@ -404,7 +404,7 @@ fn convert_aggregation(
         Ok(otlp_mmap_protocol::metric_ref::Aggregation::Histogram(
             otlp_mmap_protocol::metric_ref::Histogram {
                 aggregation_temporality: temp,
-                bucket_boundares: bounds,
+                bucket_boundaries: bounds,
             },
         ))
     } else if let Some(exp_dict) = dict.get_item("exp_histogram")? {
@@ -489,30 +489,48 @@ mod tests {
     fn test_caching() {
         Python::initialize();
         Python::attach(|py| {
-            let temp_file = NamedTempFile::new().unwrap();
+            let temp_file = NamedTempFile::new().expect("failed to create temp file");
             let config = OtlpMmapConfig::default();
-            let writer = SdkWriter::new(temp_file.path(), &config).unwrap();
+            let writer =
+                SdkWriter::new(temp_file.path(), &config).expect("failed to create SdkWriter");
 
             // Resource caching
             let attrs1 = PyDict::new(py);
-            attrs1.set_item("service.name", "test-service").unwrap();
-            attrs1.set_item("service.version", "1.0.0").unwrap();
+            attrs1
+                .set_item("service.name", "test-service")
+                .expect("failed to set service name");
+            attrs1
+                .set_item("service.version", "1.0.0")
+                .expect("failed to set service version");
 
-            let res1 = writer.intern_resource(&attrs1, None).unwrap();
-            let res2 = writer.intern_resource(&attrs1, None).unwrap();
+            let res1 = writer
+                .intern_resource(&attrs1, None)
+                .expect("failed to intern resource 1");
+            let res2 = writer
+                .intern_resource(&attrs1, None)
+                .expect("failed to intern resource 2");
             assert_eq!(res1, res2, "Resource caching failed");
 
             // InstrumentationScope caching
-            let scope1 = writer.intern_instrumentation_scope(res1, "test-scope", Some("1.0"), Some(&attrs1)).unwrap();
-            let scope2 = writer.intern_instrumentation_scope(res1, "test-scope", Some("1.0"), Some(&attrs1)).unwrap();
+            let scope1 = writer
+                .intern_instrumentation_scope(res1, "test-scope", Some("1.0"), Some(&attrs1))
+                .expect("failed to intern scope 1");
+            let scope2 = writer
+                .intern_instrumentation_scope(res1, "test-scope", Some("1.0"), Some(&attrs1))
+                .expect("failed to intern scope 2");
             assert_eq!(scope1, scope2, "Scope caching failed");
 
             // Metric caching
             let agg = PyDict::new(py);
-            agg.set_item("gauge", PyDict::new(py)).unwrap();
-            
-            let m1 = writer.intern_metric_stream(scope1, "test-metric", "desc", "unit", &agg).unwrap();
-            let m2 = writer.intern_metric_stream(scope1, "test-metric", "desc", "unit", &agg).unwrap();
+            agg.set_item("gauge", PyDict::new(py))
+                .expect("failed to set aggregation type");
+
+            let m1 = writer
+                .intern_metric_stream(scope1, "test-metric", "desc", "unit", &agg)
+                .expect("failed to intern metric stream 1");
+            let m2 = writer
+                .intern_metric_stream(scope1, "test-metric", "desc", "unit", &agg)
+                .expect("failed to intern metric stream 2");
             assert_eq!(m1, m2, "Metric caching failed");
         });
     }

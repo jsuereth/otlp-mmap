@@ -85,24 +85,34 @@ object SdkMmapRaw:
         file: RandomAccessFile,
         opt: SdkMmapOptions): SdkMmapRaw =
         val header = FileHeader(file.getChannel())
-        header.version.set(SDK_MMAP_VERSION)
-        header.start_time.set(convertInstant(Instant.now()))
-        // TODO - we need to sort out alignment here.
+        // Check if we're "fresh" and initialize the file header.
+        if header.version.get() == 0 then
+          header.version.set(SDK_MMAP_VERSION)
+          header.start_time.set(convertInstant(Instant.now()))
+          
         var offset = 64L
+        
+        // Events
         println(s"Creating event channel @ ${offset}")
         val events = RingBuffer(file.getChannel(), offset, opt.events)
         header.events.set(offset)
         offset += events.byteSize()
-        // We need to align this on a 8-byte boundary.
+        
+        // Spans
         println(s"Creating span channel @ ${offset}")
         val spans = RingBuffer(file.getChannel(), offset, opt.spans)
         header.spans.set(offset)
         offset += spans.byteSize()
+        
+        // Measurements
         println(s"Creating measurement channel @ ${offset}")
         val measurements = RingBuffer(file.getChannel(), offset, opt.measurements)
         header.measurements.set(offset)
         offset += measurements.byteSize()
+        
+        // Dictionary
         println(s"Creating dictionary @ ${offset}")
         val dictionary = Dictionary(file.getChannel(), offset)
         header.dictionary.set(offset)
+        
         new SdkMmapRaw(events, spans, measurements, dictionary)

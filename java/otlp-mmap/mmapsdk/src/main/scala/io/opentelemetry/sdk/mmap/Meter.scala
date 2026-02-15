@@ -76,7 +76,6 @@ case class MeterSharedState(
       async_instruments.add(m)
     }
   val collectionTask = new TimerTask:
-    // TODO - set up a time thread to read async instruments.
     override def run(): Unit =
       async_instruments.synchronized {
         async_instruments.forEach(_.collect())
@@ -85,7 +84,6 @@ case class MeterSharedState(
 
 trait RegisteredMetric:
   def collect(): Unit
-// TODO - implement.
 class RegisteredAsyncLongMetric(mmap: SdkMmapRaw, metric_ref: Long, callback: Consumer[ObservableLongMeasurement])
 extends RegisteredMetric
 with ObservableLongMeasurement:

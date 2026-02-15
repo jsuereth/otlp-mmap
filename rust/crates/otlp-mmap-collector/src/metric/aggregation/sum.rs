@@ -84,7 +84,9 @@ mod tests {
         let mut agg = config.new_aggregation();
         let id = TimeSeriesIdentity::new(vec![]);
         let ctx = CollectionContext::new(100, 200);
-        let mut data = config.new_collection_data().unwrap();
+        let mut data = config
+            .new_collection_data()
+            .expect("Failed to create collection data");
 
         agg.join(Measurement {
             metric_ref: 1,
@@ -93,7 +95,7 @@ mod tests {
             span_context: None,
             value: Some(Value::AsLong(10)),
         })
-        .unwrap();
+        .expect("Failed to join measurement");
 
         agg.join(Measurement {
             metric_ref: 1,
@@ -102,7 +104,7 @@ mod tests {
             span_context: None,
             value: Some(Value::AsLong(20)),
         })
-        .unwrap();
+        .expect("Failed to join measurement");
 
         agg.collect(&id, &ctx, &mut data);
 
@@ -133,7 +135,9 @@ mod tests {
         let mut agg = config.new_aggregation();
         let id = TimeSeriesIdentity::new(vec![]);
         let ctx = CollectionContext::new(100, 200);
-        let mut data = config.new_collection_data().unwrap();
+        let mut data = config
+            .new_collection_data()
+            .expect("Failed to create collection data");
 
         agg.join(Measurement {
             metric_ref: 1,
@@ -142,7 +146,7 @@ mod tests {
             span_context: None,
             value: Some(Value::AsDouble(10.5)),
         })
-        .unwrap();
+        .expect("Failed to join measurement");
 
         agg.join(Measurement {
             metric_ref: 1,
@@ -151,7 +155,7 @@ mod tests {
             span_context: None,
             value: Some(Value::AsDouble(20.25)),
         })
-        .unwrap();
+        .expect("Failed to join measurement");
 
         agg.collect(&id, &ctx, &mut data);
 
@@ -180,7 +184,9 @@ mod tests {
         let mut agg = config.new_aggregation();
         let id = TimeSeriesIdentity::new(vec![]);
         let ctx = CollectionContext::new(100, 200);
-        let mut data = config.new_collection_data().unwrap();
+        let mut data = config
+            .new_collection_data()
+            .expect("Failed to create collection data");
 
         agg.join(Measurement {
             metric_ref: 1,
@@ -189,7 +195,7 @@ mod tests {
             span_context: None,
             value: Some(Value::AsLong(10)),
         })
-        .unwrap();
+        .expect("Failed to join measurement");
 
         agg.join(Measurement {
             metric_ref: 1,
@@ -198,7 +204,7 @@ mod tests {
             span_context: None,
             value: Some(Value::AsDouble(20.5)),
         })
-        .unwrap();
+        .expect("Failed to join measurement");
 
         agg.collect(&id, &ctx, &mut data);
 

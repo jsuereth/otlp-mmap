@@ -48,8 +48,9 @@ object Dictionary:
     def apply(channel: FileChannel, offset: Long): Dictionary =
         val arena = Arena.ofShared()
         val header = DictionaryHeader(channel.map(MapMode.READ_WRITE, offset, HEADER_SIZE, arena))
-        // TODO - reload on crash?
-        header.num_entries.set(0)
-        // Make sure we start after the dictionary header...
-        header.end.set(offset+HEADER_SIZE)
+        // Check if we're "fresh" here, and initialize the dictionary.
+        // We consider it fresh if end is 0 or less than header start.
+        if header.end.get() < (offset + HEADER_SIZE) then
+          header.num_entries.set(0)
+          header.end.set(offset+HEADER_SIZE)
         new Dictionary(header, channel)

@@ -58,7 +58,7 @@ mod tests {
             span_context: None,
             value: Some(Value::AsLong(10)),
         })
-        .unwrap();
+        .expect("Failed to join measurement");
 
         // collect is a no-op, but we can't really call it without valid Data,
         // which new_collection_data doesn't provide.

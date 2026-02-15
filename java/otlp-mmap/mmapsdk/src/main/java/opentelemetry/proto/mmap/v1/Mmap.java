@@ -638,7 +638,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
 
     /**
      * <pre>
-     * InsturmentationScope from which this was recorded.
+     * InstrumentationScope from which this was recorded.
      * </pre>
      *
      * <code>int64 scope_ref = 20;</code>
@@ -754,6 +754,14 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     opentelemetry.proto.mmap.v1.Mmap.SpanEvent.EventCase getEventCase();
   }
   /**
+   * <pre>
+   * SpanEvent represents a lifecycle event for a span.
+   *
+   * Rationale: SpanEvent contains trace_id and span_id directly (rather than
+   * using a nested SpanContext message) because the SpanEvent is the primary
+   * source of these IDs for the span it describes.
+   * </pre>
+   *
    * Protobuf type {@code opentelemetry.proto.mmap.v1.SpanEvent}
    */
   public static final class SpanEvent extends
@@ -8798,7 +8806,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     private long scopeRef_ = 0L;
     /**
      * <pre>
-     * InsturmentationScope from which this was recorded.
+     * InstrumentationScope from which this was recorded.
      * </pre>
      *
      * <code>int64 scope_ref = 20;</code>
@@ -9269,6 +9277,14 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       return builder;
     }
     /**
+     * <pre>
+     * SpanEvent represents a lifecycle event for a span.
+     *
+     * Rationale: SpanEvent contains trace_id and span_id directly (rather than
+     * using a nested SpanContext message) because the SpanEvent is the primary
+     * source of these IDs for the span it describes.
+     * </pre>
+     *
      * Protobuf type {@code opentelemetry.proto.mmap.v1.SpanEvent}
      */
     public static final class Builder extends
@@ -9549,7 +9565,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       private long scopeRef_ ;
       /**
        * <pre>
-       * InsturmentationScope from which this was recorded.
+       * InstrumentationScope from which this was recorded.
        * </pre>
        *
        * <code>int64 scope_ref = 20;</code>
@@ -9561,7 +9577,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * InsturmentationScope from which this was recorded.
+       * InstrumentationScope from which this was recorded.
        * </pre>
        *
        * <code>int64 scope_ref = 20;</code>
@@ -9577,7 +9593,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * InsturmentationScope from which this was recorded.
+       * InstrumentationScope from which this was recorded.
        * </pre>
        *
        * <code>int64 scope_ref = 20;</code>
@@ -11327,7 +11343,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
 
     /**
      * <pre>
-     * Reference to the definitiion of this metric.
+     * Reference to the definition of this metric in the dictionary.
      * </pre>
      *
      * <code>int64 metric_ref = 1;</code>
@@ -11337,20 +11353,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
 
     /**
      * <pre>
-     * TODO- use a ref for this?
-     * A collection of attribute key/value pairs on the link.
-     * Attribute keys MUST be unique (it is not allowed to have more than one
-     * attribute with the same key).
-     *
-     * The attribute values SHOULD NOT contain empty values.
-     * The attribute values SHOULD NOT contain bytes values.
-     * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-     * double values.
-     * The attribute values SHOULD NOT contain kvlist values.
-     * The behavior of software that receives attributes containing such values can be unpredictable.
-     * These restrictions can change in a minor release.
-     * The restrictions take origin from the OpenTelemetry specification:
-     * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+     * A collection of attribute key/value pairs that identify the time series.
+     * For performance, it is recommended to use a `value_ref` in `AnyValue`
+     * to point to a dictionary entry for attribute sets, especially for metrics
+     * with high cardinality.
+     * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+     * entry to better deduplicate attribute sets.
      * </pre>
      *
      * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -11359,20 +11367,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
         getAttributesList();
     /**
      * <pre>
-     * TODO- use a ref for this?
-     * A collection of attribute key/value pairs on the link.
-     * Attribute keys MUST be unique (it is not allowed to have more than one
-     * attribute with the same key).
-     *
-     * The attribute values SHOULD NOT contain empty values.
-     * The attribute values SHOULD NOT contain bytes values.
-     * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-     * double values.
-     * The attribute values SHOULD NOT contain kvlist values.
-     * The behavior of software that receives attributes containing such values can be unpredictable.
-     * These restrictions can change in a minor release.
-     * The restrictions take origin from the OpenTelemetry specification:
-     * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+     * A collection of attribute key/value pairs that identify the time series.
+     * For performance, it is recommended to use a `value_ref` in `AnyValue`
+     * to point to a dictionary entry for attribute sets, especially for metrics
+     * with high cardinality.
+     * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+     * entry to better deduplicate attribute sets.
      * </pre>
      *
      * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -11380,20 +11380,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     opentelemetry.proto.mmap.v1.Mmap.KeyValueRef getAttributes(int index);
     /**
      * <pre>
-     * TODO- use a ref for this?
-     * A collection of attribute key/value pairs on the link.
-     * Attribute keys MUST be unique (it is not allowed to have more than one
-     * attribute with the same key).
-     *
-     * The attribute values SHOULD NOT contain empty values.
-     * The attribute values SHOULD NOT contain bytes values.
-     * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-     * double values.
-     * The attribute values SHOULD NOT contain kvlist values.
-     * The behavior of software that receives attributes containing such values can be unpredictable.
-     * These restrictions can change in a minor release.
-     * The restrictions take origin from the OpenTelemetry specification:
-     * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+     * A collection of attribute key/value pairs that identify the time series.
+     * For performance, it is recommended to use a `value_ref` in `AnyValue`
+     * to point to a dictionary entry for attribute sets, especially for metrics
+     * with high cardinality.
+     * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+     * entry to better deduplicate attribute sets.
      * </pre>
      *
      * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -11401,20 +11393,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     int getAttributesCount();
     /**
      * <pre>
-     * TODO- use a ref for this?
-     * A collection of attribute key/value pairs on the link.
-     * Attribute keys MUST be unique (it is not allowed to have more than one
-     * attribute with the same key).
-     *
-     * The attribute values SHOULD NOT contain empty values.
-     * The attribute values SHOULD NOT contain bytes values.
-     * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-     * double values.
-     * The attribute values SHOULD NOT contain kvlist values.
-     * The behavior of software that receives attributes containing such values can be unpredictable.
-     * These restrictions can change in a minor release.
-     * The restrictions take origin from the OpenTelemetry specification:
-     * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+     * A collection of attribute key/value pairs that identify the time series.
+     * For performance, it is recommended to use a `value_ref` in `AnyValue`
+     * to point to a dictionary entry for attribute sets, especially for metrics
+     * with high cardinality.
+     * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+     * entry to better deduplicate attribute sets.
      * </pre>
      *
      * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -11423,20 +11407,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
         getAttributesOrBuilderList();
     /**
      * <pre>
-     * TODO- use a ref for this?
-     * A collection of attribute key/value pairs on the link.
-     * Attribute keys MUST be unique (it is not allowed to have more than one
-     * attribute with the same key).
-     *
-     * The attribute values SHOULD NOT contain empty values.
-     * The attribute values SHOULD NOT contain bytes values.
-     * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-     * double values.
-     * The attribute values SHOULD NOT contain kvlist values.
-     * The behavior of software that receives attributes containing such values can be unpredictable.
-     * These restrictions can change in a minor release.
-     * The restrictions take origin from the OpenTelemetry specification:
-     * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+     * A collection of attribute key/value pairs that identify the time series.
+     * For performance, it is recommended to use a `value_ref` in `AnyValue`
+     * to point to a dictionary entry for attribute sets, especially for metrics
+     * with high cardinality.
+     * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+     * entry to better deduplicate attribute sets.
      * </pre>
      *
      * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -11481,6 +11457,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
      * <pre>
      * (optional) Span context information if this measurement was
      * recorded within a span.
+     * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+     * it is referring to an existing span context rather than defining it.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -11491,6 +11469,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
      * <pre>
      * (optional) Span context information if this measurement was
      * recorded within a span.
+     * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+     * it is referring to an existing span context rather than defining it.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -11501,6 +11481,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
      * <pre>
      * (optional) Span context information if this measurement was
      * recorded within a span.
+     * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+     * it is referring to an existing span context rather than defining it.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -11600,7 +11582,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     private long metricRef_ = 0L;
     /**
      * <pre>
-     * Reference to the definitiion of this metric.
+     * Reference to the definition of this metric in the dictionary.
      * </pre>
      *
      * <code>int64 metric_ref = 1;</code>
@@ -11616,20 +11598,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     private java.util.List<opentelemetry.proto.mmap.v1.Mmap.KeyValueRef> attributes_;
     /**
      * <pre>
-     * TODO- use a ref for this?
-     * A collection of attribute key/value pairs on the link.
-     * Attribute keys MUST be unique (it is not allowed to have more than one
-     * attribute with the same key).
-     *
-     * The attribute values SHOULD NOT contain empty values.
-     * The attribute values SHOULD NOT contain bytes values.
-     * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-     * double values.
-     * The attribute values SHOULD NOT contain kvlist values.
-     * The behavior of software that receives attributes containing such values can be unpredictable.
-     * These restrictions can change in a minor release.
-     * The restrictions take origin from the OpenTelemetry specification:
-     * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+     * A collection of attribute key/value pairs that identify the time series.
+     * For performance, it is recommended to use a `value_ref` in `AnyValue`
+     * to point to a dictionary entry for attribute sets, especially for metrics
+     * with high cardinality.
+     * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+     * entry to better deduplicate attribute sets.
      * </pre>
      *
      * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -11640,20 +11614,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     }
     /**
      * <pre>
-     * TODO- use a ref for this?
-     * A collection of attribute key/value pairs on the link.
-     * Attribute keys MUST be unique (it is not allowed to have more than one
-     * attribute with the same key).
-     *
-     * The attribute values SHOULD NOT contain empty values.
-     * The attribute values SHOULD NOT contain bytes values.
-     * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-     * double values.
-     * The attribute values SHOULD NOT contain kvlist values.
-     * The behavior of software that receives attributes containing such values can be unpredictable.
-     * These restrictions can change in a minor release.
-     * The restrictions take origin from the OpenTelemetry specification:
-     * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+     * A collection of attribute key/value pairs that identify the time series.
+     * For performance, it is recommended to use a `value_ref` in `AnyValue`
+     * to point to a dictionary entry for attribute sets, especially for metrics
+     * with high cardinality.
+     * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+     * entry to better deduplicate attribute sets.
      * </pre>
      *
      * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -11665,20 +11631,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     }
     /**
      * <pre>
-     * TODO- use a ref for this?
-     * A collection of attribute key/value pairs on the link.
-     * Attribute keys MUST be unique (it is not allowed to have more than one
-     * attribute with the same key).
-     *
-     * The attribute values SHOULD NOT contain empty values.
-     * The attribute values SHOULD NOT contain bytes values.
-     * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-     * double values.
-     * The attribute values SHOULD NOT contain kvlist values.
-     * The behavior of software that receives attributes containing such values can be unpredictable.
-     * These restrictions can change in a minor release.
-     * The restrictions take origin from the OpenTelemetry specification:
-     * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+     * A collection of attribute key/value pairs that identify the time series.
+     * For performance, it is recommended to use a `value_ref` in `AnyValue`
+     * to point to a dictionary entry for attribute sets, especially for metrics
+     * with high cardinality.
+     * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+     * entry to better deduplicate attribute sets.
      * </pre>
      *
      * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -11689,20 +11647,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     }
     /**
      * <pre>
-     * TODO- use a ref for this?
-     * A collection of attribute key/value pairs on the link.
-     * Attribute keys MUST be unique (it is not allowed to have more than one
-     * attribute with the same key).
-     *
-     * The attribute values SHOULD NOT contain empty values.
-     * The attribute values SHOULD NOT contain bytes values.
-     * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-     * double values.
-     * The attribute values SHOULD NOT contain kvlist values.
-     * The behavior of software that receives attributes containing such values can be unpredictable.
-     * These restrictions can change in a minor release.
-     * The restrictions take origin from the OpenTelemetry specification:
-     * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+     * A collection of attribute key/value pairs that identify the time series.
+     * For performance, it is recommended to use a `value_ref` in `AnyValue`
+     * to point to a dictionary entry for attribute sets, especially for metrics
+     * with high cardinality.
+     * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+     * entry to better deduplicate attribute sets.
      * </pre>
      *
      * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -11713,20 +11663,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     }
     /**
      * <pre>
-     * TODO- use a ref for this?
-     * A collection of attribute key/value pairs on the link.
-     * Attribute keys MUST be unique (it is not allowed to have more than one
-     * attribute with the same key).
-     *
-     * The attribute values SHOULD NOT contain empty values.
-     * The attribute values SHOULD NOT contain bytes values.
-     * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-     * double values.
-     * The attribute values SHOULD NOT contain kvlist values.
-     * The behavior of software that receives attributes containing such values can be unpredictable.
-     * These restrictions can change in a minor release.
-     * The restrictions take origin from the OpenTelemetry specification:
-     * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+     * A collection of attribute key/value pairs that identify the time series.
+     * For performance, it is recommended to use a `value_ref` in `AnyValue`
+     * to point to a dictionary entry for attribute sets, especially for metrics
+     * with high cardinality.
+     * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+     * entry to better deduplicate attribute sets.
      * </pre>
      *
      * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -11801,6 +11743,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
      * <pre>
      * (optional) Span context information if this measurement was
      * recorded within a span.
+     * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+     * it is referring to an existing span context rather than defining it.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -11814,6 +11758,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
      * <pre>
      * (optional) Span context information if this measurement was
      * recorded within a span.
+     * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+     * it is referring to an existing span context rather than defining it.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -11827,6 +11773,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
      * <pre>
      * (optional) Span context information if this measurement was
      * recorded within a span.
+     * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+     * it is referring to an existing span context rather than defining it.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -12373,7 +12321,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       private long metricRef_ ;
       /**
        * <pre>
-       * Reference to the definitiion of this metric.
+       * Reference to the definition of this metric in the dictionary.
        * </pre>
        *
        * <code>int64 metric_ref = 1;</code>
@@ -12385,7 +12333,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * Reference to the definitiion of this metric.
+       * Reference to the definition of this metric in the dictionary.
        * </pre>
        *
        * <code>int64 metric_ref = 1;</code>
@@ -12401,7 +12349,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * Reference to the definitiion of this metric.
+       * Reference to the definition of this metric in the dictionary.
        * </pre>
        *
        * <code>int64 metric_ref = 1;</code>
@@ -12428,20 +12376,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
 
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12455,20 +12395,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12482,20 +12414,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12509,20 +12433,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12543,20 +12459,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12574,20 +12482,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12607,20 +12507,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12641,20 +12533,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12672,20 +12556,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12703,20 +12579,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12735,20 +12603,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12765,20 +12625,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12795,20 +12647,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12819,20 +12663,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12846,20 +12682,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12874,20 +12702,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12898,20 +12718,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -12923,20 +12735,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO- use a ref for this?
-       * A collection of attribute key/value pairs on the link.
-       * Attribute keys MUST be unique (it is not allowed to have more than one
-       * attribute with the same key).
-       *
-       * The attribute values SHOULD NOT contain empty values.
-       * The attribute values SHOULD NOT contain bytes values.
-       * The attribute values SHOULD NOT contain array values different than array of string values, bool values, int values,
-       * double values.
-       * The attribute values SHOULD NOT contain kvlist values.
-       * The behavior of software that receives attributes containing such values can be unpredictable.
-       * These restrictions can change in a minor release.
-       * The restrictions take origin from the OpenTelemetry specification:
-       * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.47.0/specification/common/README.md#attribute.
+       * A collection of attribute key/value pairs that identify the time series.
+       * For performance, it is recommended to use a `value_ref` in `AnyValue`
+       * to point to a dictionary entry for attribute sets, especially for metrics
+       * with high cardinality.
+       * TODO: Consider replacing this with a single `timeseries_ref` to a dictionary
+       * entry to better deduplicate attribute sets.
        * </pre>
        *
        * <code>repeated .opentelemetry.proto.mmap.v1.KeyValueRef attributes = 2;</code>
@@ -13098,6 +12902,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * (optional) Span context information if this measurement was
        * recorded within a span.
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -13110,6 +12916,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * (optional) Span context information if this measurement was
        * recorded within a span.
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -13126,6 +12934,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * (optional) Span context information if this measurement was
        * recorded within a span.
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -13147,6 +12957,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * (optional) Span context information if this measurement was
        * recorded within a span.
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -13166,6 +12978,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * (optional) Span context information if this measurement was
        * recorded within a span.
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -13192,6 +13006,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * (optional) Span context information if this measurement was
        * recorded within a span.
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -13210,6 +13026,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * (optional) Span context information if this measurement was
        * recorded within a span.
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -13223,6 +13041,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * (optional) Span context information if this measurement was
        * recorded within a span.
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -13239,6 +13059,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * (optional) Span context information if this measurement was
        * recorded within a span.
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 6;</code>
@@ -14474,29 +14296,29 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * Bucket boundaries to use for this histogram.
        * </pre>
        *
-       * <code>repeated double bucket_boundares = 2;</code>
-       * @return A list containing the bucketBoundares.
+       * <code>repeated double bucket_boundaries = 2;</code>
+       * @return A list containing the bucketBoundaries.
        */
-      java.util.List<java.lang.Double> getBucketBoundaresList();
+      java.util.List<java.lang.Double> getBucketBoundariesList();
       /**
        * <pre>
        * Bucket boundaries to use for this histogram.
        * </pre>
        *
-       * <code>repeated double bucket_boundares = 2;</code>
-       * @return The count of bucketBoundares.
+       * <code>repeated double bucket_boundaries = 2;</code>
+       * @return The count of bucketBoundaries.
        */
-      int getBucketBoundaresCount();
+      int getBucketBoundariesCount();
       /**
        * <pre>
        * Bucket boundaries to use for this histogram.
        * </pre>
        *
-       * <code>repeated double bucket_boundares = 2;</code>
+       * <code>repeated double bucket_boundaries = 2;</code>
        * @param index The index of the element to return.
-       * @return The bucketBoundares at the given index.
+       * @return The bucketBoundaries at the given index.
        */
-      double getBucketBoundares(int index);
+      double getBucketBoundaries(int index);
     }
     /**
      * Protobuf type {@code opentelemetry.proto.mmap.v1.MetricRef.Histogram}
@@ -14521,7 +14343,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       private Histogram() {
         aggregationTemporality_ = 0;
-        bucketBoundares_ = emptyDoubleList();
+        bucketBoundaries_ = emptyDoubleList();
       }
 
       public static final com.google.protobuf.Descriptors.Descriptor
@@ -14565,47 +14387,47 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
         return result == null ? opentelemetry.proto.mmap.v1.Mmap.AggregationTemporality.UNRECOGNIZED : result;
       }
 
-      public static final int BUCKET_BOUNDARES_FIELD_NUMBER = 2;
+      public static final int BUCKET_BOUNDARIES_FIELD_NUMBER = 2;
       @SuppressWarnings("serial")
-      private com.google.protobuf.Internal.DoubleList bucketBoundares_ =
+      private com.google.protobuf.Internal.DoubleList bucketBoundaries_ =
           emptyDoubleList();
       /**
        * <pre>
        * Bucket boundaries to use for this histogram.
        * </pre>
        *
-       * <code>repeated double bucket_boundares = 2;</code>
-       * @return A list containing the bucketBoundares.
+       * <code>repeated double bucket_boundaries = 2;</code>
+       * @return A list containing the bucketBoundaries.
        */
       @java.lang.Override
       public java.util.List<java.lang.Double>
-          getBucketBoundaresList() {
-        return bucketBoundares_;
+          getBucketBoundariesList() {
+        return bucketBoundaries_;
       }
       /**
        * <pre>
        * Bucket boundaries to use for this histogram.
        * </pre>
        *
-       * <code>repeated double bucket_boundares = 2;</code>
-       * @return The count of bucketBoundares.
+       * <code>repeated double bucket_boundaries = 2;</code>
+       * @return The count of bucketBoundaries.
        */
-      public int getBucketBoundaresCount() {
-        return bucketBoundares_.size();
+      public int getBucketBoundariesCount() {
+        return bucketBoundaries_.size();
       }
       /**
        * <pre>
        * Bucket boundaries to use for this histogram.
        * </pre>
        *
-       * <code>repeated double bucket_boundares = 2;</code>
+       * <code>repeated double bucket_boundaries = 2;</code>
        * @param index The index of the element to return.
-       * @return The bucketBoundares at the given index.
+       * @return The bucketBoundaries at the given index.
        */
-      public double getBucketBoundares(int index) {
-        return bucketBoundares_.getDouble(index);
+      public double getBucketBoundaries(int index) {
+        return bucketBoundaries_.getDouble(index);
       }
-      private int bucketBoundaresMemoizedSerializedSize = -1;
+      private int bucketBoundariesMemoizedSerializedSize = -1;
 
       private byte memoizedIsInitialized = -1;
       @java.lang.Override
@@ -14625,12 +14447,12 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
         if (aggregationTemporality_ != opentelemetry.proto.mmap.v1.Mmap.AggregationTemporality.AGGREGATION_TEMPORALITY_UNSPECIFIED.getNumber()) {
           output.writeEnum(1, aggregationTemporality_);
         }
-        if (getBucketBoundaresList().size() > 0) {
+        if (getBucketBoundariesList().size() > 0) {
           output.writeUInt32NoTag(18);
-          output.writeUInt32NoTag(bucketBoundaresMemoizedSerializedSize);
+          output.writeUInt32NoTag(bucketBoundariesMemoizedSerializedSize);
         }
-        for (int i = 0; i < bucketBoundares_.size(); i++) {
-          output.writeDoubleNoTag(bucketBoundares_.getDouble(i));
+        for (int i = 0; i < bucketBoundaries_.size(); i++) {
+          output.writeDoubleNoTag(bucketBoundaries_.getDouble(i));
         }
         getUnknownFields().writeTo(output);
       }
@@ -14647,14 +14469,14 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
         }
         {
           int dataSize = 0;
-          dataSize = 8 * getBucketBoundaresList().size();
+          dataSize = 8 * getBucketBoundariesList().size();
           size += dataSize;
-          if (!getBucketBoundaresList().isEmpty()) {
+          if (!getBucketBoundariesList().isEmpty()) {
             size += 1;
             size += com.google.protobuf.CodedOutputStream
                 .computeInt32SizeNoTag(dataSize);
           }
-          bucketBoundaresMemoizedSerializedSize = dataSize;
+          bucketBoundariesMemoizedSerializedSize = dataSize;
         }
         size += getUnknownFields().getSerializedSize();
         memoizedSize = size;
@@ -14672,8 +14494,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
         opentelemetry.proto.mmap.v1.Mmap.MetricRef.Histogram other = (opentelemetry.proto.mmap.v1.Mmap.MetricRef.Histogram) obj;
 
         if (aggregationTemporality_ != other.aggregationTemporality_) return false;
-        if (!getBucketBoundaresList()
-            .equals(other.getBucketBoundaresList())) return false;
+        if (!getBucketBoundariesList()
+            .equals(other.getBucketBoundariesList())) return false;
         if (!getUnknownFields().equals(other.getUnknownFields())) return false;
         return true;
       }
@@ -14687,9 +14509,9 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
         hash = (19 * hash) + getDescriptor().hashCode();
         hash = (37 * hash) + AGGREGATION_TEMPORALITY_FIELD_NUMBER;
         hash = (53 * hash) + aggregationTemporality_;
-        if (getBucketBoundaresCount() > 0) {
-          hash = (37 * hash) + BUCKET_BOUNDARES_FIELD_NUMBER;
-          hash = (53 * hash) + getBucketBoundaresList().hashCode();
+        if (getBucketBoundariesCount() > 0) {
+          hash = (37 * hash) + BUCKET_BOUNDARIES_FIELD_NUMBER;
+          hash = (53 * hash) + getBucketBoundariesList().hashCode();
         }
         hash = (29 * hash) + getUnknownFields().hashCode();
         memoizedHashCode = hash;
@@ -14823,7 +14645,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
           super.clear();
           bitField0_ = 0;
           aggregationTemporality_ = 0;
-          bucketBoundares_ = emptyDoubleList();
+          bucketBoundaries_ = emptyDoubleList();
           return this;
         }
 
@@ -14861,8 +14683,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
             result.aggregationTemporality_ = aggregationTemporality_;
           }
           if (((from_bitField0_ & 0x00000002) != 0)) {
-            bucketBoundares_.makeImmutable();
-            result.bucketBoundares_ = bucketBoundares_;
+            bucketBoundaries_.makeImmutable();
+            result.bucketBoundaries_ = bucketBoundaries_;
           }
         }
 
@@ -14881,14 +14703,14 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
           if (other.aggregationTemporality_ != 0) {
             setAggregationTemporalityValue(other.getAggregationTemporalityValue());
           }
-          if (!other.bucketBoundares_.isEmpty()) {
-            if (bucketBoundares_.isEmpty()) {
-              bucketBoundares_ = other.bucketBoundares_;
-              bucketBoundares_.makeImmutable();
+          if (!other.bucketBoundaries_.isEmpty()) {
+            if (bucketBoundaries_.isEmpty()) {
+              bucketBoundaries_ = other.bucketBoundaries_;
+              bucketBoundaries_.makeImmutable();
               bitField0_ |= 0x00000002;
             } else {
-              ensureBucketBoundaresIsMutable();
-              bucketBoundares_.addAll(other.bucketBoundares_);
+              ensureBucketBoundariesIsMutable();
+              bucketBoundaries_.addAll(other.bucketBoundaries_);
             }
             onChanged();
           }
@@ -14925,17 +14747,17 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
                 } // case 8
                 case 17: {
                   double v = input.readDouble();
-                  ensureBucketBoundaresIsMutable();
-                  bucketBoundares_.addDouble(v);
+                  ensureBucketBoundariesIsMutable();
+                  bucketBoundaries_.addDouble(v);
                   break;
                 } // case 17
                 case 18: {
                   int length = input.readRawVarint32();
                   int limit = input.pushLimit(length);
                   int alloc = length > 4096 ? 4096 : length;
-                  ensureBucketBoundaresIsMutable(alloc / 8);
+                  ensureBucketBoundariesIsMutable(alloc / 8);
                   while (input.getBytesUntilLimit() > 0) {
-                    bucketBoundares_.addDouble(input.readDouble());
+                    bucketBoundaries_.addDouble(input.readDouble());
                   }
                   input.popLimit(limit);
                   break;
@@ -15033,16 +14855,16 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
           return this;
         }
 
-        private com.google.protobuf.Internal.DoubleList bucketBoundares_ = emptyDoubleList();
-        private void ensureBucketBoundaresIsMutable() {
-          if (!bucketBoundares_.isModifiable()) {
-            bucketBoundares_ = makeMutableCopy(bucketBoundares_);
+        private com.google.protobuf.Internal.DoubleList bucketBoundaries_ = emptyDoubleList();
+        private void ensureBucketBoundariesIsMutable() {
+          if (!bucketBoundaries_.isModifiable()) {
+            bucketBoundaries_ = makeMutableCopy(bucketBoundaries_);
           }
           bitField0_ |= 0x00000002;
         }
-        private void ensureBucketBoundaresIsMutable(int capacity) {
-          if (!bucketBoundares_.isModifiable()) {
-            bucketBoundares_ = makeMutableCopy(bucketBoundares_, capacity);
+        private void ensureBucketBoundariesIsMutable(int capacity) {
+          if (!bucketBoundaries_.isModifiable()) {
+            bucketBoundaries_ = makeMutableCopy(bucketBoundaries_, capacity);
           }
           bitField0_ |= 0x00000002;
         }
@@ -15051,52 +14873,52 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
          * Bucket boundaries to use for this histogram.
          * </pre>
          *
-         * <code>repeated double bucket_boundares = 2;</code>
-         * @return A list containing the bucketBoundares.
+         * <code>repeated double bucket_boundaries = 2;</code>
+         * @return A list containing the bucketBoundaries.
          */
         public java.util.List<java.lang.Double>
-            getBucketBoundaresList() {
-          bucketBoundares_.makeImmutable();
-          return bucketBoundares_;
+            getBucketBoundariesList() {
+          bucketBoundaries_.makeImmutable();
+          return bucketBoundaries_;
         }
         /**
          * <pre>
          * Bucket boundaries to use for this histogram.
          * </pre>
          *
-         * <code>repeated double bucket_boundares = 2;</code>
-         * @return The count of bucketBoundares.
+         * <code>repeated double bucket_boundaries = 2;</code>
+         * @return The count of bucketBoundaries.
          */
-        public int getBucketBoundaresCount() {
-          return bucketBoundares_.size();
+        public int getBucketBoundariesCount() {
+          return bucketBoundaries_.size();
         }
         /**
          * <pre>
          * Bucket boundaries to use for this histogram.
          * </pre>
          *
-         * <code>repeated double bucket_boundares = 2;</code>
+         * <code>repeated double bucket_boundaries = 2;</code>
          * @param index The index of the element to return.
-         * @return The bucketBoundares at the given index.
+         * @return The bucketBoundaries at the given index.
          */
-        public double getBucketBoundares(int index) {
-          return bucketBoundares_.getDouble(index);
+        public double getBucketBoundaries(int index) {
+          return bucketBoundaries_.getDouble(index);
         }
         /**
          * <pre>
          * Bucket boundaries to use for this histogram.
          * </pre>
          *
-         * <code>repeated double bucket_boundares = 2;</code>
+         * <code>repeated double bucket_boundaries = 2;</code>
          * @param index The index to set the value at.
-         * @param value The bucketBoundares to set.
+         * @param value The bucketBoundaries to set.
          * @return This builder for chaining.
          */
-        public Builder setBucketBoundares(
+        public Builder setBucketBoundaries(
             int index, double value) {
 
-          ensureBucketBoundaresIsMutable();
-          bucketBoundares_.setDouble(index, value);
+          ensureBucketBoundariesIsMutable();
+          bucketBoundaries_.setDouble(index, value);
           bitField0_ |= 0x00000002;
           onChanged();
           return this;
@@ -15106,14 +14928,14 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
          * Bucket boundaries to use for this histogram.
          * </pre>
          *
-         * <code>repeated double bucket_boundares = 2;</code>
-         * @param value The bucketBoundares to add.
+         * <code>repeated double bucket_boundaries = 2;</code>
+         * @param value The bucketBoundaries to add.
          * @return This builder for chaining.
          */
-        public Builder addBucketBoundares(double value) {
+        public Builder addBucketBoundaries(double value) {
 
-          ensureBucketBoundaresIsMutable();
-          bucketBoundares_.addDouble(value);
+          ensureBucketBoundariesIsMutable();
+          bucketBoundaries_.addDouble(value);
           bitField0_ |= 0x00000002;
           onChanged();
           return this;
@@ -15123,15 +14945,15 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
          * Bucket boundaries to use for this histogram.
          * </pre>
          *
-         * <code>repeated double bucket_boundares = 2;</code>
-         * @param values The bucketBoundares to add.
+         * <code>repeated double bucket_boundaries = 2;</code>
+         * @param values The bucketBoundaries to add.
          * @return This builder for chaining.
          */
-        public Builder addAllBucketBoundares(
+        public Builder addAllBucketBoundaries(
             java.lang.Iterable<? extends java.lang.Double> values) {
-          ensureBucketBoundaresIsMutable();
+          ensureBucketBoundariesIsMutable();
           com.google.protobuf.AbstractMessageLite.Builder.addAll(
-              values, bucketBoundares_);
+              values, bucketBoundaries_);
           bitField0_ |= 0x00000002;
           onChanged();
           return this;
@@ -15141,11 +14963,11 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
          * Bucket boundaries to use for this histogram.
          * </pre>
          *
-         * <code>repeated double bucket_boundares = 2;</code>
+         * <code>repeated double bucket_boundaries = 2;</code>
          * @return This builder for chaining.
          */
-        public Builder clearBucketBoundares() {
-          bucketBoundares_ = emptyDoubleList();
+        public Builder clearBucketBoundaries() {
+          bucketBoundaries_ = emptyDoubleList();
           bitField0_ = (bitField0_ & ~0x00000002);
           onChanged();
           return this;
@@ -17711,7 +17533,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
 
     /**
      * <pre>
-     * InsturmentationScope from which this was recorded.
+     * InstrumentationScope from which this was recorded.
      * </pre>
      *
      * <code>int64 scope_ref = 1;</code>
@@ -17830,6 +17652,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
      * <pre>
      * Span information in which this event was recorded.
      * [Optional].
+     * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+     * it is referring to an existing span context rather than defining it.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -17840,6 +17664,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
      * <pre>
      * Span information in which this event was recorded.
      * [Optional].
+     * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+     * it is referring to an existing span context rather than defining it.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -17850,6 +17676,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
      * <pre>
      * Span information in which this event was recorded.
      * [Optional].
+     * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+     * it is referring to an existing span context rather than defining it.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -17945,7 +17773,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     private long scopeRef_ = 0L;
     /**
      * <pre>
-     * InsturmentationScope from which this was recorded.
+     * InstrumentationScope from which this was recorded.
      * </pre>
      *
      * <code>int64 scope_ref = 1;</code>
@@ -18124,6 +17952,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
      * <pre>
      * Span information in which this event was recorded.
      * [Optional].
+     * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+     * it is referring to an existing span context rather than defining it.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -18137,6 +17967,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
      * <pre>
      * Span information in which this event was recorded.
      * [Optional].
+     * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+     * it is referring to an existing span context rather than defining it.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -18150,6 +17982,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
      * <pre>
      * Span information in which this event was recorded.
      * [Optional].
+     * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+     * it is referring to an existing span context rather than defining it.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -18767,7 +18601,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       private long scopeRef_ ;
       /**
        * <pre>
-       * InsturmentationScope from which this was recorded.
+       * InstrumentationScope from which this was recorded.
        * </pre>
        *
        * <code>int64 scope_ref = 1;</code>
@@ -18779,7 +18613,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * InsturmentationScope from which this was recorded.
+       * InstrumentationScope from which this was recorded.
        * </pre>
        *
        * <code>int64 scope_ref = 1;</code>
@@ -18795,7 +18629,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * InsturmentationScope from which this was recorded.
+       * InstrumentationScope from which this was recorded.
        * </pre>
        *
        * <code>int64 scope_ref = 1;</code>
@@ -19284,6 +19118,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * Span information in which this event was recorded.
        * [Optional].
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -19296,6 +19132,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * Span information in which this event was recorded.
        * [Optional].
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -19312,6 +19150,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * Span information in which this event was recorded.
        * [Optional].
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -19333,6 +19173,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * Span information in which this event was recorded.
        * [Optional].
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -19352,6 +19194,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * Span information in which this event was recorded.
        * [Optional].
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -19378,6 +19222,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * Span information in which this event was recorded.
        * [Optional].
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -19396,6 +19242,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * Span information in which this event was recorded.
        * [Optional].
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -19409,6 +19257,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * Span information in which this event was recorded.
        * [Optional].
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -19425,6 +19275,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
        * <pre>
        * Span information in which this event was recorded.
        * [Optional].
+       * Note: Unlike SpanEvent, this uses a nested SpanContext message as
+       * it is referring to an existing span context rather than defining it.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.SpanContext span_context = 7;</code>
@@ -21203,8 +21055,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
   }
   /**
    * <pre>
-   * InstrumentationScope is a message representing the instrumentation scope information
-   * such as the fully qualified name and version. 
+   * InstrumentationScope defines a logical unit of code instrumentation. 
    * </pre>
    *
    * Protobuf type {@code opentelemetry.proto.mmap.v1.InstrumentationScope}
@@ -21587,8 +21438,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     }
     /**
      * <pre>
-     * InstrumentationScope is a message representing the instrumentation scope information
-     * such as the fully qualified name and version. 
+     * InstrumentationScope defines a logical unit of code instrumentation. 
      * </pre>
      *
      * Protobuf type {@code opentelemetry.proto.mmap.v1.InstrumentationScope}
@@ -22451,7 +22301,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
   }
   /**
    * <pre>
-   * KeyValue Ref represents a Key-Value pair.
+   * KeyValueRef represents a key-value pair.
    * </pre>
    *
    * Protobuf type {@code opentelemetry.proto.mmap.v1.KeyValueRef}
@@ -22720,7 +22570,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     }
     /**
      * <pre>
-     * KeyValue Ref represents a Key-Value pair.
+     * KeyValueRef represents a key-value pair.
      * </pre>
      *
      * Protobuf type {@code opentelemetry.proto.mmap.v1.KeyValueRef}
@@ -23210,7 +23060,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
 
     /**
      * <pre>
-     * TODO - should we force keys to be in dictionaries here?
+     * TODO: Consider forcing keys for KeyValueList to be dictionary references
+     * for consistency and to reduce data size.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -23219,7 +23070,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     boolean hasKvlistValue();
     /**
      * <pre>
-     * TODO - should we force keys to be in dictionaries here?
+     * TODO: Consider forcing keys for KeyValueList to be dictionary references
+     * for consistency and to reduce data size.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -23228,7 +23080,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     opentelemetry.proto.mmap.v1.Mmap.KeyValueList getKvlistValue();
     /**
      * <pre>
-     * TODO - should we force keys to be in dictionaries here?
+     * TODO: Consider forcing keys for KeyValueList to be dictionary references
+     * for consistency and to reduce data size.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -23513,7 +23366,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     public static final int KVLIST_VALUE_FIELD_NUMBER = 6;
     /**
      * <pre>
-     * TODO - should we force keys to be in dictionaries here?
+     * TODO: Consider forcing keys for KeyValueList to be dictionary references
+     * for consistency and to reduce data size.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -23525,7 +23379,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     }
     /**
      * <pre>
-     * TODO - should we force keys to be in dictionaries here?
+     * TODO: Consider forcing keys for KeyValueList to be dictionary references
+     * for consistency and to reduce data size.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -23540,7 +23395,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     }
     /**
      * <pre>
-     * TODO - should we force keys to be in dictionaries here?
+     * TODO: Consider forcing keys for KeyValueList to be dictionary references
+     * for consistency and to reduce data size.
      * </pre>
      *
      * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -24508,7 +24364,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
           opentelemetry.proto.mmap.v1.Mmap.KeyValueList, opentelemetry.proto.mmap.v1.Mmap.KeyValueList.Builder, opentelemetry.proto.mmap.v1.Mmap.KeyValueListOrBuilder> kvlistValueBuilder_;
       /**
        * <pre>
-       * TODO - should we force keys to be in dictionaries here?
+       * TODO: Consider forcing keys for KeyValueList to be dictionary references
+       * for consistency and to reduce data size.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -24520,7 +24377,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO - should we force keys to be in dictionaries here?
+       * TODO: Consider forcing keys for KeyValueList to be dictionary references
+       * for consistency and to reduce data size.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -24542,7 +24400,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO - should we force keys to be in dictionaries here?
+       * TODO: Consider forcing keys for KeyValueList to be dictionary references
+       * for consistency and to reduce data size.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -24562,7 +24421,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO - should we force keys to be in dictionaries here?
+       * TODO: Consider forcing keys for KeyValueList to be dictionary references
+       * for consistency and to reduce data size.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -24580,7 +24440,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO - should we force keys to be in dictionaries here?
+       * TODO: Consider forcing keys for KeyValueList to be dictionary references
+       * for consistency and to reduce data size.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -24607,7 +24468,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO - should we force keys to be in dictionaries here?
+       * TODO: Consider forcing keys for KeyValueList to be dictionary references
+       * for consistency and to reduce data size.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -24630,7 +24492,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO - should we force keys to be in dictionaries here?
+       * TODO: Consider forcing keys for KeyValueList to be dictionary references
+       * for consistency and to reduce data size.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -24640,7 +24503,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO - should we force keys to be in dictionaries here?
+       * TODO: Consider forcing keys for KeyValueList to be dictionary references
+       * for consistency and to reduce data size.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -24658,7 +24522,8 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * TODO - should we force keys to be in dictionaries here?
+       * TODO: Consider forcing keys for KeyValueList to be dictionary references
+       * for consistency and to reduce data size.
        * </pre>
        *
        * <code>.opentelemetry.proto.mmap.v1.KeyValueList kvlist_value = 6;</code>
@@ -25701,7 +25566,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
 
     /**
      * <pre>
-     * A collection of key/value pairs of key-value pairs. The list may be empty (may
+     * A collection of key/value pairs. The list may be empty (may
      * contain 0 elements).
      * The keys MUST be unique (it is not allowed to have more than one
      * value with the same key).
@@ -25713,7 +25578,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
         getValuesList();
     /**
      * <pre>
-     * A collection of key/value pairs of key-value pairs. The list may be empty (may
+     * A collection of key/value pairs. The list may be empty (may
      * contain 0 elements).
      * The keys MUST be unique (it is not allowed to have more than one
      * value with the same key).
@@ -25724,7 +25589,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     opentelemetry.proto.mmap.v1.Mmap.KeyValueRef getValues(int index);
     /**
      * <pre>
-     * A collection of key/value pairs of key-value pairs. The list may be empty (may
+     * A collection of key/value pairs. The list may be empty (may
      * contain 0 elements).
      * The keys MUST be unique (it is not allowed to have more than one
      * value with the same key).
@@ -25735,7 +25600,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     int getValuesCount();
     /**
      * <pre>
-     * A collection of key/value pairs of key-value pairs. The list may be empty (may
+     * A collection of key/value pairs. The list may be empty (may
      * contain 0 elements).
      * The keys MUST be unique (it is not allowed to have more than one
      * value with the same key).
@@ -25747,7 +25612,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
         getValuesOrBuilderList();
     /**
      * <pre>
-     * A collection of key/value pairs of key-value pairs. The list may be empty (may
+     * A collection of key/value pairs. The list may be empty (may
      * contain 0 elements).
      * The keys MUST be unique (it is not allowed to have more than one
      * value with the same key).
@@ -25809,7 +25674,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     private java.util.List<opentelemetry.proto.mmap.v1.Mmap.KeyValueRef> values_;
     /**
      * <pre>
-     * A collection of key/value pairs of key-value pairs. The list may be empty (may
+     * A collection of key/value pairs. The list may be empty (may
      * contain 0 elements).
      * The keys MUST be unique (it is not allowed to have more than one
      * value with the same key).
@@ -25823,7 +25688,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     }
     /**
      * <pre>
-     * A collection of key/value pairs of key-value pairs. The list may be empty (may
+     * A collection of key/value pairs. The list may be empty (may
      * contain 0 elements).
      * The keys MUST be unique (it is not allowed to have more than one
      * value with the same key).
@@ -25838,7 +25703,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     }
     /**
      * <pre>
-     * A collection of key/value pairs of key-value pairs. The list may be empty (may
+     * A collection of key/value pairs. The list may be empty (may
      * contain 0 elements).
      * The keys MUST be unique (it is not allowed to have more than one
      * value with the same key).
@@ -25852,7 +25717,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     }
     /**
      * <pre>
-     * A collection of key/value pairs of key-value pairs. The list may be empty (may
+     * A collection of key/value pairs. The list may be empty (may
      * contain 0 elements).
      * The keys MUST be unique (it is not allowed to have more than one
      * value with the same key).
@@ -25866,7 +25731,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     }
     /**
      * <pre>
-     * A collection of key/value pairs of key-value pairs. The list may be empty (may
+     * A collection of key/value pairs. The list may be empty (may
      * contain 0 elements).
      * The keys MUST be unique (it is not allowed to have more than one
      * value with the same key).
@@ -26244,7 +26109,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
 
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26261,7 +26126,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26278,7 +26143,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26295,7 +26160,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26319,7 +26184,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26340,7 +26205,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26363,7 +26228,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26387,7 +26252,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26408,7 +26273,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26429,7 +26294,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26451,7 +26316,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26471,7 +26336,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26491,7 +26356,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26505,7 +26370,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26522,7 +26387,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26540,7 +26405,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26554,7 +26419,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -26569,7 +26434,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       }
       /**
        * <pre>
-       * A collection of key/value pairs of key-value pairs. The list may be empty (may
+       * A collection of key/value pairs. The list may be empty (may
        * contain 0 elements).
        * The keys MUST be unique (it is not allowed to have more than one
        * value with the same key).
@@ -27577,7 +27442,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       "nano\030\003 \001(\006\022\021\n\007as_long\030\004 \001(\003H\000\022\023\n\tas_doub" +
       "le\030\005 \001(\001H\000\022>\n\014span_context\030\006 \001(\0132(.opent" +
       "elemetry.proto.mmap.v1.SpanContextB\007\n\005va" +
-      "lue\"\220\006\n\tMetricRef\022\014\n\004name\030\001 \001(\t\022\023\n\013descr" +
+      "lue\"\221\006\n\tMetricRef\022\014\n\004name\030\001 \001(\t\022\023\n\013descr" +
       "iption\030\002 \001(\t\022\014\n\004unit\030\003 \001(\t\022!\n\031instrument" +
       "ation_scope_ref\030\004 \001(\003\022=\n\005gauge\030\005 \001(\0132,.o" +
       "pentelemetry.proto.mmap.v1.MetricRef.Gau" +
@@ -27589,66 +27454,66 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
       "tialHistogramH\000\032\007\n\005Gauge\032q\n\003Sum\022T\n\027aggre" +
       "gation_temporality\030\002 \001(\01623.opentelemetry" +
       ".proto.mmap.v1.AggregationTemporality\022\024\n" +
-      "\014is_monotonic\030\003 \001(\010\032{\n\tHistogram\022T\n\027aggr" +
+      "\014is_monotonic\030\003 \001(\010\032|\n\tHistogram\022T\n\027aggr" +
       "egation_temporality\030\001 \001(\01623.opentelemetr" +
-      "y.proto.mmap.v1.AggregationTemporality\022\030" +
-      "\n\020bucket_boundares\030\002 \003(\001\032\224\001\n\024Exponential" +
-      "Histogram\022T\n\027aggregation_temporality\030\001 \001" +
-      "(\01623.opentelemetry.proto.mmap.v1.Aggrega" +
-      "tionTemporality\022\023\n\013max_buckets\030\002 \001(\003\022\021\n\t" +
-      "max_scale\030\003 \001(\003B\r\n\013aggregation\"\332\002\n\005Event" +
-      "\022\021\n\tscope_ref\030\001 \001(\003\022\026\n\016time_unix_nano\030\002 " +
-      "\001(\006\022D\n\017severity_number\030\003 \001(\0162+.opentelem" +
-      "etry.proto.mmap.v1.SeverityNumber\022\025\n\rsev" +
-      "erity_text\030\004 \001(\t\0223\n\004body\030\005 \001(\0132%.opentel" +
-      "emetry.proto.mmap.v1.AnyValue\022\026\n\016event_n" +
-      "ame_ref\030\006 \001(\003\022>\n\014span_context\030\007 \001(\0132(.op" +
-      "entelemetry.proto.mmap.v1.SpanContext\022<\n" +
-      "\nattributes\030\010 \003(\0132(.opentelemetry.proto." +
-      "mmap.v1.KeyValueRef\"j\n\010Resource\022<\n\nattri" +
-      "butes\030\001 \003(\0132(.opentelemetry.proto.mmap.v" +
-      "1.KeyValueRef\022 \n\030dropped_attributes_coun" +
-      "t\030\002 \001(\r\"\263\001\n\024InstrumentationScope\022\020\n\010name" +
-      "_ref\030\001 \001(\003\022\023\n\013version_ref\030\002 \001(\003\022<\n\nattri" +
-      "butes\030\003 \003(\0132(.opentelemetry.proto.mmap.v" +
-      "1.KeyValueRef\022 \n\030dropped_attributes_coun" +
-      "t\030\004 \001(\r\022\024\n\014resource_ref\030\005 \001(\003\"T\n\013KeyValu" +
-      "eRef\022\017\n\007key_ref\030\001 \001(\003\0224\n\005value\030\002 \001(\0132%.o" +
-      "pentelemetry.proto.mmap.v1.AnyValue\"\235\002\n\010" +
-      "AnyValue\022\026\n\014string_value\030\001 \001(\tH\000\022\024\n\nbool" +
-      "_value\030\002 \001(\010H\000\022\023\n\tint_value\030\003 \001(\003H\000\022\026\n\014d" +
-      "ouble_value\030\004 \001(\001H\000\022>\n\013array_value\030\005 \001(\013" +
-      "2\'.opentelemetry.proto.mmap.v1.ArrayValu" +
-      "eH\000\022A\n\014kvlist_value\030\006 \001(\0132).opentelemetr" +
-      "y.proto.mmap.v1.KeyValueListH\000\022\025\n\013bytes_" +
-      "value\030\007 \001(\014H\000\022\023\n\tvalue_ref\030\010 \001(\003H\000B\007\n\005va" +
-      "lue\"C\n\nArrayValue\0225\n\006values\030\001 \003(\0132%.open" +
-      "telemetry.proto.mmap.v1.AnyValue\"H\n\014KeyV" +
-      "alueList\0228\n\006values\030\001 \003(\0132(.opentelemetry" +
-      ".proto.mmap.v1.KeyValueRef\"?\n\013SpanContex" +
-      "t\022\017\n\007span_id\030\001 \001(\014\022\020\n\010trace_id\030\002 \001(\014\022\r\n\005" +
-      "flags\030\003 \001(\007*\214\001\n\026AggregationTemporality\022\'" +
-      "\n#AGGREGATION_TEMPORALITY_UNSPECIFIED\020\000\022" +
-      "!\n\035AGGREGATION_TEMPORALITY_DELTA\020\001\022&\n\"AG" +
-      "GREGATION_TEMPORALITY_CUMULATIVE\020\002*\303\005\n\016S" +
-      "everityNumber\022\037\n\033SEVERITY_NUMBER_UNSPECI" +
-      "FIED\020\000\022\031\n\025SEVERITY_NUMBER_TRACE\020\001\022\032\n\026SEV" +
-      "ERITY_NUMBER_TRACE2\020\002\022\032\n\026SEVERITY_NUMBER" +
-      "_TRACE3\020\003\022\032\n\026SEVERITY_NUMBER_TRACE4\020\004\022\031\n" +
-      "\025SEVERITY_NUMBER_DEBUG\020\005\022\032\n\026SEVERITY_NUM" +
-      "BER_DEBUG2\020\006\022\032\n\026SEVERITY_NUMBER_DEBUG3\020\007" +
-      "\022\032\n\026SEVERITY_NUMBER_DEBUG4\020\010\022\030\n\024SEVERITY" +
-      "_NUMBER_INFO\020\t\022\031\n\025SEVERITY_NUMBER_INFO2\020" +
-      "\n\022\031\n\025SEVERITY_NUMBER_INFO3\020\013\022\031\n\025SEVERITY" +
-      "_NUMBER_INFO4\020\014\022\030\n\024SEVERITY_NUMBER_WARN\020" +
-      "\r\022\031\n\025SEVERITY_NUMBER_WARN2\020\016\022\031\n\025SEVERITY" +
-      "_NUMBER_WARN3\020\017\022\031\n\025SEVERITY_NUMBER_WARN4" +
-      "\020\020\022\031\n\025SEVERITY_NUMBER_ERROR\020\021\022\032\n\026SEVERIT" +
-      "Y_NUMBER_ERROR2\020\022\022\032\n\026SEVERITY_NUMBER_ERR" +
-      "OR3\020\023\022\032\n\026SEVERITY_NUMBER_ERROR4\020\024\022\031\n\025SEV" +
-      "ERITY_NUMBER_FATAL\020\025\022\032\n\026SEVERITY_NUMBER_" +
-      "FATAL2\020\026\022\032\n\026SEVERITY_NUMBER_FATAL3\020\027\022\032\n\026" +
-      "SEVERITY_NUMBER_FATAL4\020\030b\006proto3"
+      "y.proto.mmap.v1.AggregationTemporality\022\031" +
+      "\n\021bucket_boundaries\030\002 \003(\001\032\224\001\n\024Exponentia" +
+      "lHistogram\022T\n\027aggregation_temporality\030\001 " +
+      "\001(\01623.opentelemetry.proto.mmap.v1.Aggreg" +
+      "ationTemporality\022\023\n\013max_buckets\030\002 \001(\003\022\021\n" +
+      "\tmax_scale\030\003 \001(\003B\r\n\013aggregation\"\332\002\n\005Even" +
+      "t\022\021\n\tscope_ref\030\001 \001(\003\022\026\n\016time_unix_nano\030\002" +
+      " \001(\006\022D\n\017severity_number\030\003 \001(\0162+.opentele" +
+      "metry.proto.mmap.v1.SeverityNumber\022\025\n\rse" +
+      "verity_text\030\004 \001(\t\0223\n\004body\030\005 \001(\0132%.opente" +
+      "lemetry.proto.mmap.v1.AnyValue\022\026\n\016event_" +
+      "name_ref\030\006 \001(\003\022>\n\014span_context\030\007 \001(\0132(.o" +
+      "pentelemetry.proto.mmap.v1.SpanContext\022<" +
+      "\n\nattributes\030\010 \003(\0132(.opentelemetry.proto" +
+      ".mmap.v1.KeyValueRef\"j\n\010Resource\022<\n\nattr" +
+      "ibutes\030\001 \003(\0132(.opentelemetry.proto.mmap." +
+      "v1.KeyValueRef\022 \n\030dropped_attributes_cou" +
+      "nt\030\002 \001(\r\"\263\001\n\024InstrumentationScope\022\020\n\010nam" +
+      "e_ref\030\001 \001(\003\022\023\n\013version_ref\030\002 \001(\003\022<\n\nattr" +
+      "ibutes\030\003 \003(\0132(.opentelemetry.proto.mmap." +
+      "v1.KeyValueRef\022 \n\030dropped_attributes_cou" +
+      "nt\030\004 \001(\r\022\024\n\014resource_ref\030\005 \001(\003\"T\n\013KeyVal" +
+      "ueRef\022\017\n\007key_ref\030\001 \001(\003\0224\n\005value\030\002 \001(\0132%." +
+      "opentelemetry.proto.mmap.v1.AnyValue\"\235\002\n" +
+      "\010AnyValue\022\026\n\014string_value\030\001 \001(\tH\000\022\024\n\nboo" +
+      "l_value\030\002 \001(\010H\000\022\023\n\tint_value\030\003 \001(\003H\000\022\026\n\014" +
+      "double_value\030\004 \001(\001H\000\022>\n\013array_value\030\005 \001(" +
+      "\0132\'.opentelemetry.proto.mmap.v1.ArrayVal" +
+      "ueH\000\022A\n\014kvlist_value\030\006 \001(\0132).opentelemet" +
+      "ry.proto.mmap.v1.KeyValueListH\000\022\025\n\013bytes" +
+      "_value\030\007 \001(\014H\000\022\023\n\tvalue_ref\030\010 \001(\003H\000B\007\n\005v" +
+      "alue\"C\n\nArrayValue\0225\n\006values\030\001 \003(\0132%.ope" +
+      "ntelemetry.proto.mmap.v1.AnyValue\"H\n\014Key" +
+      "ValueList\0228\n\006values\030\001 \003(\0132(.opentelemetr" +
+      "y.proto.mmap.v1.KeyValueRef\"?\n\013SpanConte" +
+      "xt\022\017\n\007span_id\030\001 \001(\014\022\020\n\010trace_id\030\002 \001(\014\022\r\n" +
+      "\005flags\030\003 \001(\007*\214\001\n\026AggregationTemporality\022" +
+      "\'\n#AGGREGATION_TEMPORALITY_UNSPECIFIED\020\000" +
+      "\022!\n\035AGGREGATION_TEMPORALITY_DELTA\020\001\022&\n\"A" +
+      "GGREGATION_TEMPORALITY_CUMULATIVE\020\002*\303\005\n\016" +
+      "SeverityNumber\022\037\n\033SEVERITY_NUMBER_UNSPEC" +
+      "IFIED\020\000\022\031\n\025SEVERITY_NUMBER_TRACE\020\001\022\032\n\026SE" +
+      "VERITY_NUMBER_TRACE2\020\002\022\032\n\026SEVERITY_NUMBE" +
+      "R_TRACE3\020\003\022\032\n\026SEVERITY_NUMBER_TRACE4\020\004\022\031" +
+      "\n\025SEVERITY_NUMBER_DEBUG\020\005\022\032\n\026SEVERITY_NU" +
+      "MBER_DEBUG2\020\006\022\032\n\026SEVERITY_NUMBER_DEBUG3\020" +
+      "\007\022\032\n\026SEVERITY_NUMBER_DEBUG4\020\010\022\030\n\024SEVERIT" +
+      "Y_NUMBER_INFO\020\t\022\031\n\025SEVERITY_NUMBER_INFO2" +
+      "\020\n\022\031\n\025SEVERITY_NUMBER_INFO3\020\013\022\031\n\025SEVERIT" +
+      "Y_NUMBER_INFO4\020\014\022\030\n\024SEVERITY_NUMBER_WARN" +
+      "\020\r\022\031\n\025SEVERITY_NUMBER_WARN2\020\016\022\031\n\025SEVERIT" +
+      "Y_NUMBER_WARN3\020\017\022\031\n\025SEVERITY_NUMBER_WARN" +
+      "4\020\020\022\031\n\025SEVERITY_NUMBER_ERROR\020\021\022\032\n\026SEVERI" +
+      "TY_NUMBER_ERROR2\020\022\022\032\n\026SEVERITY_NUMBER_ER" +
+      "ROR3\020\023\022\032\n\026SEVERITY_NUMBER_ERROR4\020\024\022\031\n\025SE" +
+      "VERITY_NUMBER_FATAL\020\025\022\032\n\026SEVERITY_NUMBER" +
+      "_FATAL2\020\026\022\032\n\026SEVERITY_NUMBER_FATAL3\020\027\022\032\n" +
+      "\026SEVERITY_NUMBER_FATAL4\020\030b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -27731,7 +27596,7 @@ public final class Mmap extends com.google.protobuf.GeneratedFile {
     internal_static_opentelemetry_proto_mmap_v1_MetricRef_Histogram_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_opentelemetry_proto_mmap_v1_MetricRef_Histogram_descriptor,
-        new java.lang.String[] { "AggregationTemporality", "BucketBoundares", });
+        new java.lang.String[] { "AggregationTemporality", "BucketBoundaries", });
     internal_static_opentelemetry_proto_mmap_v1_MetricRef_ExponentialHistogram_descriptor =
       internal_static_opentelemetry_proto_mmap_v1_MetricRef_descriptor.getNestedType(3);
     internal_static_opentelemetry_proto_mmap_v1_MetricRef_ExponentialHistogram_fieldAccessorTable = new

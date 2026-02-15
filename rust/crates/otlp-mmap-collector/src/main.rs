@@ -4,7 +4,9 @@ use std::{
 };
 
 use clap::Parser;
-use otlp_mmap_collector::{CollectorSdkConfig, Error, LogSdkConfig, MetricSdkConfig, TraceSdkConfig, new_collector_sdk};
+use otlp_mmap_collector::{
+    new_collector_sdk, CollectorSdkConfig, Error, LogSdkConfig, MetricSdkConfig, TraceSdkConfig,
+};
 
 /// An MMAP Collector.
 #[derive(Parser, Debug)]
