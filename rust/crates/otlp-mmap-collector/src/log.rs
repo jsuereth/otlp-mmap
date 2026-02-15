@@ -1,170 +1,132 @@
-//! Contains components that implement a logs SDK.
+//! Logic for collecting events from MMAP and converting them into OTLP log batches.
 
+use crate::{AsyncEventQueue, Error, SdkLookup};
+use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use otlp_mmap_protocol::Event;
 use std::{collections::HashMap, time::Duration};
 
-use crate::{AsyncEventQueue, Error, SdkLookup};
-
-/// A collector of events.
-pub(crate) struct EventCollector {}
+/// Helper to collect and group log events.
+pub struct EventCollector {}
 
 impl EventCollector {
-    pub fn new() -> EventCollector {
-        EventCollector {}
+    pub fn new() -> Self {
+        Self {}
     }
 
-    /// Batches log events and returns a new protocol request object if we have any by timeout.
-    pub async fn try_create_next_batch(
+    /// Attempts to read events from the queue and create a batch of OTLP logs.
+    pub async fn try_create_next_batch<Q: AsyncEventQueue<Event>, L: SdkLookup>(
         &mut self,
-        reader: &impl AsyncEventQueue<Event>,
-        lookup: &impl SdkLookup,
-        len: usize,
+        queue: &Q,
+        lookup: &L,
+        max_batch_size: usize,
         timeout: Duration,
-    ) -> Result<
-        Option<opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest>,
-        Error,
-    > {
-        let buf = self.try_buffer_events(reader, lookup, len, timeout).await?;
-        if !buf.is_empty() {
-            return Ok(Some(self.try_create_event_batch(lookup, buf)?));
+    ) -> Result<Option<ExportLogsServiceRequest>, Error> {
+        let mut events = Vec::new();
+        let deadline = tokio::time::Instant::now() + timeout;
+
+        while events.len() < max_batch_size {
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() && !events.is_empty() {
+                break;
+            }
+
+            tokio::select! {
+                res = queue.try_read_next() => {
+                    match res {
+                        Ok(e) => events.push(e),
+                        Err(e) => {
+                            // If we hit an error (like end of queue) and have events, return them.
+                            if !events.is_empty() {
+                                break;
+                            }
+                            return Err(e);
+                        }
+                    }
+                }
+                _ = tokio::time::sleep(remaining) => {
+                    break;
+                }
+            }
         }
-        Ok(None)
+
+        if events.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(Some(self.group_events(events, lookup)?))
     }
 
-    fn try_create_event_batch(
+    /// Groups events by Resource -> instrumentation scope, for OTLP export request.
+    fn group_events<L: SdkLookup>(
         &self,
-        lookup: &impl SdkLookup,
-        batch: Vec<TrackedEvent>,
-    ) -> Result<opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest, Error>
-    {
-        let mut scope_map: HashMap<i64, Vec<opentelemetry_proto::tonic::logs::v1::LogRecord>> =
-            HashMap::new();
-        for log in batch {
-            scope_map.entry(log.scope_ref).or_default().push(log.log);
-        }
+        events: Vec<Event>,
+        lookup: &L,
+    ) -> Result<ExportLogsServiceRequest, Error> {
         let mut resource_map: HashMap<
             i64,
-            Vec<(
-                i64,
-                opentelemetry_proto::tonic::common::v1::InstrumentationScope,
-            )>,
+            HashMap<i64, Vec<opentelemetry_proto::tonic::logs::v1::LogRecord>>,
         > = HashMap::new();
-        for scope_ref in scope_map.keys() {
-            let scope = lookup.try_lookup_scope(*scope_ref)?;
-            resource_map
-                .entry(scope.resource_ref)
-                .or_default()
-                .push((*scope_ref, scope.scope));
-        }
-        let mut result =
-            opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest {
-                resource_logs: Default::default(),
-            };
-        for (resource_ref, scopes) in resource_map.into_iter() {
-            let resource = lookup.try_lookup_resource(resource_ref)?;
-            let mut resource_logs = opentelemetry_proto::tonic::logs::v1::ResourceLogs {
-                resource: Some(resource),
-                scope_logs: Default::default(),
-                // TODO - pull this.
-                schema_url: "".to_owned(),
-            };
-            for (sid, scope) in scopes.into_iter() {
-                let mut scope_logs = opentelemetry_proto::tonic::logs::v1::ScopeLogs {
-                    scope: Some(scope),
-                    log_records: Vec::new(),
-                    // TODO - pull this
-                    schema_url: "".to_owned(),
-                };
-                if let Some(records) = scope_map.remove(&sid) {
-                    scope_logs.log_records.extend(records);
-                }
-                resource_logs.scope_logs.push(scope_logs);
-            }
-            result.resource_logs.push(resource_logs);
-        }
-        Ok(result)
-    }
 
-    /// Pulls in log events and buffers them for export.
-    async fn try_buffer_events(
-        &mut self,
-        reader: &impl AsyncEventQueue<Event>,
-        lookup: &impl SdkLookup,
-        len: usize,
-        timeout: tokio::time::Duration,
-    ) -> Result<Vec<TrackedEvent>, Error> {
-        // TODO - check sanity on the file before continuing.
-        // Here we create a batch of spans.
-        // println!("Buffering log events");
-        let mut buf = Vec::new();
-        let send_by_time = tokio::time::sleep_until(tokio::time::Instant::now() + timeout);
-        tokio::pin!(send_by_time);
-        loop {
-            tokio::select! {
-                event = reader.try_read_next() => {
-                    // println!("Received log event");
-                    let e = self.try_handle_log_event(event?, lookup)?;
-                    buf.push(e);
-                    // TODO - configure the size of this.
-                    if buf.len() >= len {
-                        return Ok(buf)
-                    }
-                },
-                () = &mut send_by_time => {
-                    return Ok(buf)
-                }
+        for event in events {
+            let scope = lookup.try_lookup_scope(event.scope_ref)?;
+            let mut attributes = Vec::with_capacity(event.attributes.len());
+            for attr_ref in event.attributes {
+                attributes.push(lookup.try_convert_attribute(attr_ref)?);
             }
-        }
-    }
 
-    fn try_handle_log_event(
-        &mut self,
-        e: Event,
-        lookup: &impl SdkLookup,
-    ) -> Result<TrackedEvent, Error> {
-        let event_name = if e.event_name_ref == 0 {
-            "".to_owned()
-        } else {
-            lookup.try_read_string(e.event_name_ref)?
-        };
-        let (flags, trace_id, span_id) = match e.span_context {
-            Some(ctx) => (ctx.flags, ctx.trace_id, ctx.span_id),
-            _ => (0, Vec::new(), Vec::new()),
-        };
-        let body = if let Some(v) = e.body {
-            lookup.try_convert_anyvalue(v)?
-        } else {
-            None
-        };
-        let mut attributes = Vec::new();
-        for kv in e.attributes {
-            attributes.push(lookup.try_convert_attribute(kv)?);
-        }
-        Ok(TrackedEvent {
-            scope_ref: e.scope_ref,
-            log: opentelemetry_proto::tonic::logs::v1::LogRecord {
-                time_unix_nano: e.time_unix_nano,
-                observed_time_unix_nano: e.time_unix_nano,
-                severity_number: e.severity_number,
-                severity_text: e.severity_text,
-                body,
+            let (trace_id, span_id, flags) = if let Some(ctx) = event.span_context {
+                (ctx.trace_id, ctx.span_id, ctx.flags)
+            } else {
+                (Vec::new(), Vec::new(), 0)
+            };
+
+            let log_record = opentelemetry_proto::tonic::logs::v1::LogRecord {
+                time_unix_nano: event.time_unix_nano,
+                observed_time_unix_nano: event.time_unix_nano,
+                severity_number: event.severity_number,
+                severity_text: event.severity_text,
+                body: event
+                    .body
+                    .and_then(|b| lookup.try_convert_anyvalue(b).ok().flatten()),
                 attributes,
                 dropped_attributes_count: 0,
                 flags,
                 trace_id,
                 span_id,
-                event_name,
-            },
-        })
-    }
-}
+                event_name: lookup
+                    .try_read_string(event.event_name_ref)
+                    .unwrap_or_default(),
+            };
 
-/// Tracks current status of an event from the logging ringbuffer.
-pub(crate) struct TrackedEvent {
-    /// Index into scope to use.
-    pub scope_ref: i64,
-    /// The log itself.
-    pub log: opentelemetry_proto::tonic::logs::v1::LogRecord,
+            resource_map
+                .entry(scope.resource_ref)
+                .or_default()
+                .entry(event.scope_ref)
+                .or_default()
+                .push(log_record);
+        }
+
+        let mut resource_logs = Vec::new();
+        for (res_ref, scope_map) in resource_map {
+            let mut scope_logs = Vec::new();
+            for (scope_ref, log_records) in scope_map {
+                let scope = lookup.try_lookup_scope(scope_ref)?;
+                scope_logs.push(opentelemetry_proto::tonic::logs::v1::ScopeLogs {
+                    scope: Some(scope.scope),
+                    log_records,
+                    schema_url: "".to_string(),
+                });
+            }
+
+            resource_logs.push(opentelemetry_proto::tonic::logs::v1::ResourceLogs {
+                resource: Some(lookup.try_lookup_resource(res_ref)?),
+                scope_logs,
+                schema_url: "".to_string(),
+            });
+        }
+
+        Ok(ExportLogsServiceRequest { resource_logs })
+    }
 }
 
 #[cfg(test)]
@@ -172,78 +134,96 @@ mod tests {
     use super::*;
     use crate::test_utils::{MockSdkLookup, TestEventQueue};
     use otlp_mmap_core::PartialScope;
-    use otlp_mmap_protocol::{any_value::Value, AnyValue, KeyValueRef};
+    use otlp_mmap_protocol::{any_value::Value, AnyValue, KeyValueRef, SpanContext};
 
     #[tokio::test]
     async fn test_log_conversion_and_batching() -> Result<(), Error> {
         let mut lookup = MockSdkLookup::new();
-        lookup.strings.insert(1, "body_text".to_owned());
-        lookup.strings.insert(2, "attr_key".to_owned());
+        lookup.strings.insert(1, "key1".to_owned());
+        lookup.strings.insert(2, "scope1".to_owned());
+        lookup.strings.insert(3, "1.0".to_owned());
+        lookup.strings.insert(4, "event_name".to_owned());
+
+        lookup.resources.insert(
+            1,
+            opentelemetry_proto::tonic::resource::v1::Resource {
+                attributes: vec![opentelemetry_proto::tonic::common::v1::KeyValue {
+                    key: "key1".to_owned(),
+                    value: Some(opentelemetry_proto::tonic::common::v1::AnyValue {
+                        value: Some(
+                            opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
+                                "res_val".to_owned(),
+                            ),
+                        ),
+                    }),
+                }],
+                ..Default::default()
+            },
+        );
 
         lookup.scopes.insert(
-            10,
+            1,
             PartialScope {
-                resource_ref: 100,
+                resource_ref: 1,
                 scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
-                    name: "scope_name".to_owned(),
+                    name: "scope1".to_owned(),
                     version: "1.0".to_owned(),
                     ..Default::default()
                 },
             },
         );
 
-        lookup.resources.insert(
-            100,
-            opentelemetry_proto::tonic::resource::v1::Resource {
-                ..Default::default()
-            },
-        );
-
-        let event = Event {
-            scope_ref: 10,
-            time_unix_nano: 1000,
-            severity_number: 9, // Info
+        let mut collector = EventCollector::new();
+        let queue = TestEventQueue::new([Event {
+            scope_ref: 1,
+            time_unix_nano: 12345,
             severity_text: "INFO".to_owned(),
+            severity_number: 9,
             body: Some(AnyValue {
-                value: Some(Value::ValueRef(1)),
+                value: Some(Value::StringValue("log message".to_owned())),
             }),
-            event_name_ref: 0,
-            span_context: None,
             attributes: vec![KeyValueRef {
-                key_ref: 2,
+                key_ref: 1,
                 value: Some(AnyValue {
-                    value: Some(Value::IntValue(42)),
+                    value: Some(Value::StringValue("attr_val".to_owned())),
                 }),
             }],
-        };
-
-        let queue = TestEventQueue::new(vec![event]);
-        let mut collector = EventCollector::new();
+            event_name_ref: 4,
+            span_context: Some(SpanContext {
+                trace_id: vec![1; 16],
+                span_id: vec![2; 8],
+                flags: 1,
+            }),
+        }]);
 
         let batch = collector
-            .try_create_next_batch(&queue, &lookup, 1, Duration::from_secs(1))
+            .try_create_next_batch(&queue, &lookup, 10, tokio::time::Duration::from_secs(1))
             .await?
-            .unwrap();
+            .expect("Failed to create log batch");
 
         assert_eq!(batch.resource_logs.len(), 1);
-        let resource_log = &batch.resource_logs[0];
-        assert_eq!(resource_log.scope_logs.len(), 1);
-        let scope_log = &resource_log.scope_logs[0];
-        assert_eq!(scope_log.log_records.len(), 1);
-        let record = &scope_log.log_records[0];
-
-        assert_eq!(record.time_unix_nano, 1000);
-        assert_eq!(record.severity_number, 9);
-        assert_eq!(record.severity_text, "INFO");
-        if let Some(opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(s)) =
-            record.body.as_ref().and_then(|b| b.value.as_ref())
-        {
-            assert_eq!(s, "body_text");
-        } else {
-            panic!("Expected string body");
-        }
-        assert_eq!(record.attributes.len(), 1);
-        assert_eq!(record.attributes[0].key, "attr_key");
+        let rl = &batch.resource_logs[0];
+        assert_eq!(
+            rl.resource
+                .as_ref()
+                .expect("Resource should be present")
+                .attributes[0]
+                .key,
+            "key1"
+        );
+        let sl = &rl.scope_logs[0];
+        assert_eq!(
+            sl.scope.as_ref().expect("Scope should be present").name,
+            "scope1"
+        );
+        let lr = &sl.log_records[0];
+        assert_eq!(lr.time_unix_nano, 12345);
+        assert_eq!(lr.severity_text, "INFO");
+        assert_eq!(lr.attributes[0].key, "key1");
+        assert_eq!(lr.event_name, "event_name");
+        assert_eq!(lr.trace_id, vec![1; 16]);
+        assert_eq!(lr.span_id, vec![2; 8]);
+        assert_eq!(lr.flags, 1);
 
         Ok(())
     }
@@ -251,41 +231,11 @@ mod tests {
     #[tokio::test]
     async fn test_log_grouping() -> Result<(), Error> {
         let mut lookup = MockSdkLookup::new();
+        lookup.strings.insert(1, "scope1".to_owned());
+        lookup.strings.insert(2, "scope2".to_owned());
+        lookup.strings.insert(3, "scope3".to_owned());
 
-        // Resource 1, Scope 1
-        lookup.scopes.insert(
-            1,
-            PartialScope {
-                resource_ref: 100,
-                scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
-                    name: "scope1".to_owned(),
-                    ..Default::default()
-                },
-            },
-        );
-        // Resource 1, Scope 2
-        lookup.scopes.insert(
-            2,
-            PartialScope {
-                resource_ref: 100,
-                scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
-                    name: "scope2".to_owned(),
-                    ..Default::default()
-                },
-            },
-        );
-        // Resource 2, Scope 3
-        lookup.scopes.insert(
-            3,
-            PartialScope {
-                resource_ref: 200,
-                scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
-                    name: "scope3".to_owned(),
-                    ..Default::default()
-                },
-            },
-        );
-
+        // Resource 100
         lookup.resources.insert(
             100,
             opentelemetry_proto::tonic::resource::v1::Resource {
@@ -300,6 +250,7 @@ mod tests {
                 ..Default::default()
             },
         );
+        // Resource 200
         lookup.resources.insert(
             200,
             opentelemetry_proto::tonic::resource::v1::Resource {
@@ -315,17 +266,52 @@ mod tests {
             },
         );
 
+        // Scopes
+        lookup.scopes.insert(
+            1,
+            PartialScope {
+                resource_ref: 100,
+                scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
+                    name: "scope1".to_owned(),
+                    ..Default::default()
+                },
+            },
+        );
+        lookup.scopes.insert(
+            2,
+            PartialScope {
+                resource_ref: 100,
+                scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
+                    name: "scope2".to_owned(),
+                    ..Default::default()
+                },
+            },
+        );
+        lookup.scopes.insert(
+            3,
+            PartialScope {
+                resource_ref: 200,
+                scope: opentelemetry_proto::tonic::common::v1::InstrumentationScope {
+                    name: "scope3".to_owned(),
+                    ..Default::default()
+                },
+            },
+        );
+
         let events = vec![
             Event {
                 scope_ref: 1,
-                ..Default::default()
-            },
-            Event {
-                scope_ref: 1,
+                time_unix_nano: 1,
                 ..Default::default()
             },
             Event {
                 scope_ref: 2,
+                time_unix_nano: 2,
+                ..Default::default()
+            },
+            Event {
+                scope_ref: 1,
+                time_unix_nano: 3,
                 ..Default::default()
             },
             Event {
@@ -340,7 +326,7 @@ mod tests {
         let batch = collector
             .try_create_next_batch(&queue, &lookup, 4, Duration::from_secs(1))
             .await?
-            .unwrap();
+            .expect("Failed to create log batch");
 
         // Should have 2 resource logs (Resource 100 and 200)
         assert_eq!(batch.resource_logs.len(), 2);
@@ -349,42 +335,48 @@ mod tests {
             .resource_logs
             .iter()
             .find(|rl| {
-                rl.resource.as_ref().unwrap().attributes[0]
+                rl.resource
+                    .as_ref()
+                    .expect("Resource should be present")
+                    .attributes[0]
                     .value
                     .as_ref()
-                    .unwrap()
+                    .expect("Value should be present")
                     .value
                     == Some(opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(1))
             })
-            .unwrap();
+            .expect("Resource 100 should be present in batch");
         assert_eq!(res100.scope_logs.len(), 2); // scope1 and scope2
 
         let s1 = res100
             .scope_logs
             .iter()
-            .find(|sl| sl.scope.as_ref().unwrap().name == "scope1")
-            .unwrap();
+            .find(|sl| sl.scope.as_ref().expect("Scope should be present").name == "scope1")
+            .expect("Scope 1 should be present in batch");
         assert_eq!(s1.log_records.len(), 2);
 
         let s2 = res100
             .scope_logs
             .iter()
-            .find(|sl| sl.scope.as_ref().unwrap().name == "scope2")
-            .unwrap();
+            .find(|sl| sl.scope.as_ref().expect("Scope should be present").name == "scope2")
+            .expect("Scope 2 should be present in batch");
         assert_eq!(s2.log_records.len(), 1);
 
         let res200 = batch
             .resource_logs
             .iter()
             .find(|rl| {
-                rl.resource.as_ref().unwrap().attributes[0]
+                rl.resource
+                    .as_ref()
+                    .expect("Resource should be present")
+                    .attributes[0]
                     .value
                     .as_ref()
-                    .unwrap()
+                    .expect("Value should be present")
                     .value
                     == Some(opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(2))
             })
-            .unwrap();
+            .expect("Resource 200 should be present in batch");
         assert_eq!(res200.scope_logs.len(), 1); // scope3
         assert_eq!(res200.scope_logs[0].log_records.len(), 1);
 
