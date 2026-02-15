@@ -11,10 +11,10 @@ This codebase documents itself in `README.md` and that should be used to validat
 
 ## Goals
 
-- Generate a TODO.md in the `rust` directory encompassing testing coverage gaps.
+- Generate a `TESTING_TODO.md` in the `rust` directory encompassing testing coverage gaps.
 - Do NOT touch or write any production code.  
 - Prefer non-async tests where possible.
-- Update the `TODO.md` file with tests that should be written, brief description of required inputs and ouputs, and the goal of the test.
+- Update the `TESTING_TODO.md` file with tests that should be written, brief description of required inputs and ouputs, and the goal of the test.
 - Focus on basic "does it do what it is meant to do", error conditions and scenarios, environment expectations.
 
 ## Process
@@ -22,8 +22,11 @@ This codebase documents itself in `README.md` and that should be used to validat
 - Inspect the TODO file or TODO prompt to understand current testing plan.
 - Pick a crate in `rust` to evaluate existing test coverage of code.
 - Add to the TODO file the necessary tests for the `rust` code you are evaluating.
+- Optimise the order of tests in the `TESTING_TODO.md` file.
 
 ## Example TODO File
+
+Ensure the layout and format of the TEST file matches this example:
 
 ```md
 ## 1. otlp-mmap-core: trace module testing
