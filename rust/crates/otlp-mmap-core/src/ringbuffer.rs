@@ -34,11 +34,11 @@ pub struct RingBufferReader<T> {
 
 impl<T: prost::Message + Default> RingBufferReader<T> {
     /// Constructs a new reader of ring buffers.
-    pub fn new(data: MmapMut, offset: usize) -> RingBufferReader<T> {
-        Self {
-            ring: RingBuffer::new(data, offset),
+    pub fn new(data: MmapMut, offset: usize) -> Result<RingBufferReader<T>, Error> {
+        Ok(Self {
+            ring: RingBuffer::new(data, offset)?,
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// Attempts to read a message from a ringbuffer.
@@ -65,11 +65,11 @@ impl<T: prost::Message + std::fmt::Debug> RingBufferWriter<T> {
         offset: usize,
         buffer_size: usize,
         num_buffers: usize,
-    ) -> RingBufferWriter<T> {
-        Self {
-            ring: RingBuffer::new_for_write(data, offset, buffer_size, num_buffers),
+    ) -> Result<RingBufferWriter<T>, Error> {
+        Ok(Self {
+            ring: RingBuffer::new_for_write(data, offset, buffer_size, num_buffers)?,
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// Attempts to write a message to a ringbuffer.
@@ -99,19 +99,20 @@ struct RingBuffer {
 
 impl RingBuffer {
     /// Constructs a new ring buffer on an mmap at the offset.
-    fn new(data: MmapMut, offset: usize) -> RingBuffer {
+    fn new(data: MmapMut, offset: usize) -> Result<RingBuffer, Error> {
         let hdr = unsafe { &*(data.as_ref().as_ptr().add(offset) as *const RingBufferHeader) };
-        assert!(
-            hdr.num_buffers > 0 && (hdr.num_buffers & (hdr.num_buffers - 1)) == 0,
-            "num_buffers must be a power of two, found {}",
-            hdr.num_buffers
-        );
-        RingBuffer {
+        if hdr.num_buffers <= 0 || (hdr.num_buffers & (hdr.num_buffers - 1)) != 0 {
+            return Err(Error::InvalidConfiguration(format!(
+                "num_buffers must be a power of two, found {}",
+                hdr.num_buffers
+            )));
+        }
+        Ok(RingBuffer {
             data: UnsafeCell::new(data),
             offset,
             shift: (hdr.num_buffers as u32).ilog2(),
             mask: hdr.num_buffers - 1,
-        }
+        })
     }
 
     /// Constructs a new ring buffer, but sets the header values for it as well.
@@ -120,12 +121,13 @@ impl RingBuffer {
         offset: usize,
         buffer_size: usize,
         num_buffers: usize,
-    ) -> RingBuffer {
-        assert!(
-            num_buffers > 0 && (num_buffers & (num_buffers - 1)) == 0,
-            "num_buffers must be a power of two, found {}",
-            num_buffers
-        );
+    ) -> Result<RingBuffer, Error> {
+        if num_buffers <= 0 || (num_buffers & (num_buffers - 1)) != 0 {
+            return Err(Error::InvalidConfiguration(format!(
+                "num_buffers must be a power of two, found {}",
+                num_buffers
+            )));
+        }
         // TODO - Validate memory bounds on MmapMut.
         unsafe {
             // Set header for RingBuffer
@@ -334,12 +336,10 @@ struct RingBufferHeader {
 
 #[cfg(test)]
 mod test {
-    use crate::{ringbuffer::RingBuffer, Error};
+    use crate::ringbuffer::RingBuffer;
     use memmap2::MmapOptions;
-    use otlp_mmap_protocol::any_value::Value;
-    use otlp_mmap_protocol::AnyValue;
     use std::sync::atomic::Ordering;
-    use std::{fs::OpenOptions, sync::Arc};
+    use std::fs::OpenOptions;
 
     /// A helper to create a RingBuffer for testing with a specific state.
     struct TestRingBuffer {
@@ -368,21 +368,21 @@ mod test {
 
     impl TestRingBuffer {
         fn new(opts: TestRingBufferOptions) -> TestRingBuffer {
-            let file = tempfile::NamedTempFile::new().unwrap();
+            let file = tempfile::NamedTempFile::new().expect("Failed to create temp file for testing");
             let f = OpenOptions::new()
                 .read(true)
                 .write(true)
                 .open(file.path())
-                .unwrap();
+                .expect("Failed to open temp file for testing");
             // Calculate required size. Header + availability array + buffers
             let header_size = 32;
             let availability_array_size = opts.num_buffers * 4;
             let buffers_size = opts.num_buffers * opts.buffer_size;
             let total_size = header_size + availability_array_size + buffers_size;
-            f.set_len(total_size as u64).unwrap();
-            let data = unsafe { MmapOptions::new().map_mut(&f).unwrap() };
+            f.set_len(total_size as u64).expect("Failed to set file length for testing");
+            let data = unsafe { MmapOptions::new().map_mut(&f).expect("Failed to create mmap for testing") };
 
-            let buffer = RingBuffer::new_for_write(data, 0, opts.buffer_size, opts.num_buffers);
+            let buffer = RingBuffer::new_for_write(data, 0, opts.buffer_size, opts.num_buffers).expect("Failed to create ring buffer for testing");
             buffer
                 .header()
                 .reader_index

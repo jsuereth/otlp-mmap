@@ -66,7 +66,7 @@ impl OtlpMmapWriter {
                 0,
                 config.events.buffer_size,
                 config.events.num_buffers,
-            )
+            )?
         };
         let spans = unsafe {
             let span_area = MmapOptions::new()
@@ -78,7 +78,7 @@ impl OtlpMmapWriter {
                 0,
                 config.spans.buffer_size,
                 config.spans.num_buffers,
-            )
+            )?
         };
         let metrics = unsafe {
             let measurement_area = MmapOptions::new()
@@ -90,7 +90,7 @@ impl OtlpMmapWriter {
                 0,
                 config.measurements.buffer_size,
                 config.measurements.num_buffers,
-            )
+            )?
         };
         // Dictionary may need to remap itself.
         let dictionary = Dictionary::try_new(
@@ -168,21 +168,21 @@ impl OtlpMmapReader {
                 .len((span_start - event_start) as usize)
                 .offset(event_start as u64)
                 .map_mut(&f)?;
-            RingBufferReader::<Event>::new(event_area, 0)
+            RingBufferReader::<Event>::new(event_area, 0)?
         };
         let spans = unsafe {
             let span_area = MmapOptions::new()
                 .len((measurement_start - span_start) as usize)
                 .offset(span_start as u64)
                 .map_mut(&f)?;
-            RingBufferReader::<SpanEvent>::new(span_area, 0)
+            RingBufferReader::<SpanEvent>::new(span_area, 0)?
         };
         let metrics = unsafe {
             let measurement_area = MmapOptions::new()
                 .len((dictionary_start - measurement_start) as usize)
                 .offset(measurement_start as u64)
                 .map_mut(&f)?;
-            RingBufferReader::<Measurement>::new(measurement_area, 0)
+            RingBufferReader::<Measurement>::new(measurement_area, 0)?
         };
         // Dictionary may need to remap itself.
         let dictionary =
