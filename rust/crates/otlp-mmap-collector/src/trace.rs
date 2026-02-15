@@ -160,7 +160,26 @@ impl ActiveSpans {
                     },
                 );
             }
-            Some(Event::Link(_)) => todo!(),
+            Some(Event::Link(le)) => {
+                if let Some(entry) = self.spans.get_mut(&hash) {
+                    for link in le.links {
+                        let mut attributes = Vec::new();
+                        for kvr in link.attributes {
+                            attributes.push(attr_lookup.try_convert_attribute(kvr)?);
+                        }
+                        entry.current.links.push(
+                            opentelemetry_proto::tonic::trace::v1::span::Link {
+                                trace_id: link.trace_id,
+                                span_id: link.span_id,
+                                trace_state: link.trace_state,
+                                attributes,
+                                dropped_attributes_count: link.dropped_attributes_count,
+                                flags: link.flags,
+                            },
+                        );
+                    }
+                }
+            }
             Some(Event::Name(ne)) => {
                 if let Some(entry) = self.spans.get_mut(&hash) {
                     entry.current.name = ne.name;
@@ -199,6 +218,7 @@ impl ActiveSpans {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::test_utils::{MockSdkLookup, TestEventQueue};
     use crate::{trace::ActiveSpans, Error};
     use otlp_mmap_protocol::{
@@ -276,6 +296,116 @@ mod test {
         Ok(())
     }
 
+    #[test]
+    fn test_span_event_attribute_types() -> Result<(), Error> {
+        use otlp_mmap_protocol::{ArrayValue, KeyValueList};
+        let mut lookup = MockSdkLookup::new();
+        lookup.strings.insert(1, "str_key".to_owned());
+        lookup.strings.insert(2, "bool_key".to_owned());
+        lookup.strings.insert(3, "int_key".to_owned());
+        lookup.strings.insert(4, "double_key".to_owned());
+        lookup.strings.insert(5, "array_key".to_owned());
+        lookup.strings.insert(6, "kvlist_key".to_owned());
+        lookup.strings.insert(7, "val_ref_key".to_owned());
+        lookup.strings.insert(100, "interned_value".to_owned());
+
+        let mut tracker = ActiveSpans::new();
+        let start = SpanEvent {
+            scope_ref: 1,
+            trace_id: vec![0; 16],
+            span_id: vec![0; 8],
+            event: Some(Event::Start(StartSpan {
+                name: "test".to_owned(),
+                kind: 1,
+                start_time_unix_nano: 1,
+                parent_span_id: vec![],
+                flags: 0,
+                attributes: vec![
+                    KeyValueRef {
+                        key_ref: 1,
+                        value: Some(AnyValue {
+                            value: Some(Value::StringValue("val".to_owned())),
+                        }),
+                    },
+                    KeyValueRef {
+                        key_ref: 2,
+                        value: Some(AnyValue {
+                            value: Some(Value::BoolValue(true)),
+                        }),
+                    },
+                    KeyValueRef {
+                        key_ref: 3,
+                        value: Some(AnyValue {
+                            value: Some(Value::IntValue(42)),
+                        }),
+                    },
+                    KeyValueRef {
+                        key_ref: 4,
+                        value: Some(AnyValue {
+                            value: Some(Value::DoubleValue(3.14)),
+                        }),
+                    },
+                    KeyValueRef {
+                        key_ref: 5,
+                        value: Some(AnyValue {
+                            value: Some(Value::ArrayValue(ArrayValue {
+                                values: vec![AnyValue {
+                                    value: Some(Value::StringValue("a".to_owned())),
+                                }],
+                            })),
+                        }),
+                    },
+                    KeyValueRef {
+                        key_ref: 6,
+                        value: Some(AnyValue {
+                            value: Some(Value::KvlistValue(KeyValueList {
+                                values: vec![KeyValueRef {
+                                    key_ref: 1,
+                                    value: Some(AnyValue {
+                                        value: Some(Value::StringValue("inner".to_owned())),
+                                    }),
+                                }],
+                            })),
+                        }),
+                    },
+                    KeyValueRef {
+                        key_ref: 7,
+                        value: Some(AnyValue {
+                            value: Some(Value::ValueRef(100)),
+                        }),
+                    },
+                ],
+            })),
+        };
+
+        tracker.try_handle_span_event(start, &lookup)?;
+        let span = tracker
+            .spans
+            .get(&FullSpanId {
+                trace_id: [0; 16],
+                span_id: [0; 8],
+            })
+            .expect("Span should have been inserted into active spans tracker");
+
+        assert_eq!(span.current.attributes.len(), 7);
+        // String
+        assert_eq!(span.current.attributes[0].key, "str_key");
+        // Bool
+        assert_eq!(span.current.attributes[1].key, "bool_key");
+        // Int
+        assert_eq!(span.current.attributes[2].key, "int_key");
+        // Double
+        assert_eq!(span.current.attributes[3].key, "double_key");
+        // Array
+        assert_eq!(span.current.attributes[4].key, "array_key");
+        // Kvlist
+        assert_eq!(span.current.attributes[5].key, "kvlist_key");
+        // ValueRef
+        assert_eq!(span.current.attributes[6].key, "val_ref_key");
+
+        Ok(())
+    }
+
     fn make_span_id(i: u8) -> Vec<u8> {
         vec![0, 1, 2, 3, 4, 5, 6, i]
     }
@@ -336,6 +466,82 @@ mod test {
         assert_eq!(batch.len(), 3, "Failed to batch three spans");
         // We should have a remaining active span.
         assert_eq!(tracker.num_active(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_span_event_links() -> Result<(), Error> {
+        use otlp_mmap_protocol::span_event::{add_link, AddLink};
+        let mut lookup = MockSdkLookup::new();
+        lookup.strings.insert(1, "link_attr_key".to_owned());
+
+        let mut tracker = ActiveSpans::new();
+        let trace_id = vec![1; 16];
+        let span_id = vec![2; 8];
+
+        // 1. Start span
+        let start = SpanEvent {
+            scope_ref: 1,
+            trace_id: trace_id.clone(),
+            span_id: span_id.clone(),
+            event: Some(Event::Start(StartSpan {
+                name: "test_links".to_owned(),
+                kind: 1,
+                start_time_unix_nano: 100,
+                parent_span_id: vec![],
+                flags: 0,
+                attributes: vec![],
+            })),
+        };
+        tracker.try_handle_span_event(start, &lookup)?;
+
+        // 2. Add Link
+        let link_trace_id = vec![3; 16];
+        let link_span_id = vec![4; 8];
+        let link_event = SpanEvent {
+            scope_ref: 1,
+            trace_id: trace_id.clone(),
+            span_id: span_id.clone(),
+            event: Some(Event::Link(AddLink {
+                links: vec![add_link::Link {
+                    trace_id: link_trace_id.clone(),
+                    span_id: link_span_id.clone(),
+                    trace_state: "state".to_owned(),
+                    flags: 1,
+                    dropped_attributes_count: 0,
+                    attributes: vec![KeyValueRef {
+                        key_ref: 1,
+                        value: Some(AnyValue {
+                            value: Some(Value::StringValue("link_attr_val".to_owned())),
+                        }),
+                    }],
+                }],
+            })),
+        };
+        tracker.try_handle_span_event(link_event, &lookup)?;
+
+        // 3. End span
+        let end = SpanEvent {
+            scope_ref: 1,
+            trace_id: trace_id.clone(),
+            span_id: span_id.clone(),
+            event: Some(Event::End(EndSpan {
+                end_time_unix_nano: 200,
+                status: None,
+            })),
+        };
+        let result = tracker.try_handle_span_event(end, &lookup)?;
+        let tracked_span = result.expect("Should return completed span");
+
+        assert_eq!(tracked_span.current.links.len(), 1);
+        let link = &tracked_span.current.links[0];
+        assert_eq!(link.trace_id, link_trace_id);
+        assert_eq!(link.span_id, link_span_id);
+        assert_eq!(link.trace_state, "state");
+        assert_eq!(link.flags, 1);
+        assert_eq!(link.attributes.len(), 1);
+        assert_eq!(link.attributes[0].key, "link_attr_key");
+
         Ok(())
     }
 }
