@@ -68,4 +68,3 @@ impl Default for TraceSdkConfig {
         }
     }
 }
-

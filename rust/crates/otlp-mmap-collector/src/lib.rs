@@ -639,7 +639,7 @@ mod tests {
         };
 
         // Invalid URL should cause connect failure
-        let config = MetricSdkConfig { 
+        let config = MetricSdkConfig {
             metric_endpoint: "http://domain.invalid:4317".to_owned(),
             ..Default::default()
         };
@@ -708,7 +708,7 @@ mod tests {
             reader: OtlpMmapReader::new(file.path())?,
         };
         // We run the full collector here.
-        let config = LogSdkConfig { 
+        let config = LogSdkConfig {
             log_endpoint: format!("http://{}", local_addr),
             // Speed up test.
             batch_timeout: tokio::time::Duration::from_secs(1),
