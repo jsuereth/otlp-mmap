@@ -21,7 +21,10 @@ pub struct Dictionary {
     offset: u64,
 }
 
-// We are using memory primitives on MMAP memory to allow multi-thread usage here.
+// SAFETY: Dictionary implementation is sound because all accesses to the underlying
+// `MmapMut` are performed through atomic operations for the header fields
+// (`end`, `num_entries`). Data writes to the mmap are guarded by CAS operations on
+// `end` and ensuring capacity before writing, effectively synchronizing access.
 unsafe impl Sync for Dictionary {}
 
 const DICTIONARY_HEADER_SIZE: i64 = 64;
@@ -41,6 +44,12 @@ impl Dictionary {
         }
 
         let data = unsafe {
+            // SAFETY: `MmapOptions::new().map_mut` is unsafe because it can cause UB if the file descriptor
+            // is not valid or if the mapping parameters (offset, len) are invalid.
+            // We ensure `f` is a valid `File` handle. The `offset` is a `u64` and `mmap_size`
+            // is calculated from the file's metadata, ensuring it's within the file's bounds.
+            // The `len` is cast to `usize`, which is safe on supported platforms where `mmap_size`
+            // fits into `usize`.
             MmapOptions::new()
                 .offset(offset)
                 .len(mmap_size as usize)
@@ -77,25 +86,32 @@ impl Dictionary {
         let offset = (index as u64 - self.offset) as usize;
 
         loop {
-            let data = unsafe { &*self.data.get() };
-            if let Some(mut buf) = data.get(offset..) {
-                let mut result = String::new();
-                let ctx = prost::encoding::DecodeContext::default();
-                let wire_type = prost::encoding::WireType::LengthDelimited;
-                match prost::encoding::string::merge(wire_type, &mut result, &mut buf, ctx) {
-                    Ok(_) => return Ok(result),
-                    Err(e) => {
-                        // If we failed to decode, it might be because the buffer was too short.
-                        // Try to remap and see if we can read more.
-                        if !self.try_remap()? {
-                            return Err(e.into());
+            // SAFETY: This attempts to derference the mmap and decode a proto.
+            // We will get an exception if the MMAP is not large enough and attempt to remap it.
+            // Remapping the same file, should have the same location for the entry.
+            //
+            // This MAY have UB if multiple threads are reading simultaneously, but MMAP is not designed for this.
+            unsafe {
+                let data = &*self.data.get();
+                if let Some(mut buf) = data.get(offset..) {
+                    let mut result = String::new();
+                    let ctx = prost::encoding::DecodeContext::default();
+                    let wire_type = prost::encoding::WireType::LengthDelimited;
+                    match prost::encoding::string::merge(wire_type, &mut result, &mut buf, ctx) {
+                        Ok(_) => return Ok(result),
+                        Err(e) => {
+                            // If we failed to decode, it might be because the buffer was too short.
+                            // Try to remap and see if we can read more.
+                            if !self.try_remap()? {
+                                return Err(e.into());
+                            }
+                            continue;
                         }
-                        continue;
                     }
                 }
-            }
-            if !self.try_remap()? {
-                break;
+                if !self.try_remap()? {
+                    break;
+                }
             }
         }
         Err(Error::NotFoundInDictionary("string".to_owned(), index))
@@ -114,21 +130,28 @@ impl Dictionary {
         }
         let offset = (index as u64 - self.offset) as usize;
         loop {
-            let data = unsafe { &*self.data.get() };
-            if let Some(buf) = data.get(offset..) {
-                match T::decode_length_delimited(buf) {
-                    Ok(msg) => return Ok(msg),
-                    Err(e) => {
-                        // If we failed to decode, it might be because the buffer was too short.
-                        if !self.try_remap()? {
-                            return Err(e.into());
+            // SAFETY: This attempts to derference the mmap and decode a proto.
+            // We will get an exception if the MMAP is not large enough and attempt to remap it.
+            // Remapping the same file, should have the same location for the entry.
+            //
+            // This MAY have UB if multiple threads are reading simultaneously, but MMAP is not designed for this.
+            unsafe {
+                let data = &*self.data.get();
+                if let Some(buf) = data.get(offset..) {
+                    match T::decode_length_delimited(buf) {
+                        Ok(msg) => return Ok(msg),
+                        Err(e) => {
+                            // If we failed to decode, it might be because the buffer was too short.
+                            if !self.try_remap()? {
+                                return Err(e.into());
+                            }
+                            continue;
                         }
-                        continue;
                     }
                 }
-            }
-            if !self.try_remap()? {
-                break;
+                if !self.try_remap()? {
+                    break;
+                }
             }
         }
         Err(Error::NotFoundInDictionary(
@@ -139,21 +162,21 @@ impl Dictionary {
 
     /// Attempts to remap the dictionary to the current file size.
     /// Returns true if the mmap was actually changed.
-    fn try_remap(&self) -> Result<bool, Error> {
+    ///
+    /// Note: This function will attempt to replace the current MMAP data reference
+    /// with a reload, requiring all active instances to expect previous MMAP instances to go stale,
+    /// handle the issue and retry.
+    unsafe fn try_remap(&self) -> Result<bool, Error> {
         let file_size = self.f.metadata()?.len();
-        let current_size = unsafe { (&*self.data.get()).len() as u64 };
+        let current_size = (&*self.data.get()).len() as u64;
         let new_mmap_size = file_size - self.offset;
-
         if new_mmap_size > current_size {
-            let data = unsafe {
-                MmapOptions::new()
-                    .offset(self.offset)
-                    .len(new_mmap_size as usize)
-                    .map_mut(&self.f)?
-            };
-            unsafe {
-                *self.data.get() = data;
-            }
+            let data = MmapOptions::new()
+                .offset(self.offset)
+                .len(new_mmap_size as usize)
+                .map_mut(&self.f)?;
+
+            *self.data.get() = data;
             Ok(true)
         } else {
             Ok(false)
@@ -226,12 +249,15 @@ impl Dictionary {
     /// Ensures the dictionary has enough capacity to write up to `end_offset`.
     /// If not, it resizes the file and remaps the memory.
     fn ensure_capacity(&self, end_offset: usize) -> Result<(), Error> {
-        let current_size = unsafe { (&*self.data.get()).len() };
-        if end_offset > current_size {
-            // Double the size or take what's needed, whichever is larger.
-            let new_size = std::cmp::max(current_size * 2, end_offset);
-            self.f.set_len(self.offset + new_size as u64)?;
-            self.try_remap()?;
+        // TODO - describe safety invariants.
+        unsafe {
+            let current_size = (&*self.data.get()).len();
+            if end_offset > current_size {
+                // Double the size or take what's needed, whichever is larger.
+                let new_size = std::cmp::max(current_size * 2, end_offset);
+                self.f.set_len(self.offset + new_size as u64)?;
+                self.try_remap()?;
+            }
         }
         Ok(())
     }
