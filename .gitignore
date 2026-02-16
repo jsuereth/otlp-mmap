@@ -1,6 +1,37 @@
-.metals/
-.scala-build/
-.vscode/
-target/
+# Project specific
 *.meta
 *.otlp
+
+# VS Code
+.vscode/
+
+# Scala / SBT + Ecosystem
+.bloop/
+.scala-build/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+target/
+.bloop/
+.metals/
+metals.sbt
+
+# Python
+__pycache__/
+*.pyc
+*.pyd
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.env
+.venv
+
+# Rust
+target/
+.cargo/
+*.o
+*.d
+*.rlib
