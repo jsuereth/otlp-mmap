@@ -37,14 +37,26 @@ impl MmapHeader {
         F: memmap2::MmapAsRawDesc,
     {
         Ok(MmapHeader {
+            // SAFETY: The MmapOptions::new().map_mut(file) call is unsafe because it can cause
+            // undefined behavior if the file descriptor `file` is not valid or if the mapping
+            // parameters (offset, length) are invalid. We ensure `offset` is 0 and `len` is 64,
+            // which are valid for our header. The `file` is constrained by `MmapAsRawDesc`,
+            // implying a valid file descriptor. The resulting `MmapMut` object is owned by
+            // `MmapHeader`, ensuring its lifetime.
             data: unsafe { MmapOptions::new().offset(0).len(64).map_mut(file)? },
         })
     }
 
     fn raw(&self) -> &RawMmapHeader {
+        // SAFETY: The `MmapMut` object `self.data` guarantees that the memory region
+        // is valid for the lifetime of `self`.  The `new` method ensures we have enough
+        // size of file to allocate against the size of the repr(C) struct.
         unsafe { &*(self.data.as_ref().as_ptr() as *const RawMmapHeader) }
     }
     fn raw_mut(&mut self) -> &mut RawMmapHeader {
+        // SAFETY: The `MmapMut` object `self.data` guarantees that the memory region
+        // is valid for the lifetime of `self`.  The `new` method ensures we have enough
+        // size of file to allocate against the size of the repr(C) struct.
         unsafe { &mut *(self.data.as_ref().as_ptr() as *mut RawMmapHeader) }
     }
 

@@ -237,7 +237,7 @@ impl RingBuffer {
     /// The ring buffer header (with atomic access).
     fn header(&self) -> &RingBufferHeader {
         // SAFETY: This relies on the invariant that the `MmapMut` in `self.data` is initialized and the
-        // memory region at `self.offset` contains a valid `RingBufferHeader`. 
+        // memory region at `self.offset` contains a valid `RingBufferHeader`.
         // This is guaranteed by `RingBuffer::new` or `RingBuffer::new_for_write`.
         // RingBuffferHeader is `repr(C)` to account for the layout.
         unsafe {
@@ -307,7 +307,7 @@ impl RingBuffer {
         let ring_index = self.ring_buffer_index(idx);
         let start_byte_idx = offset_to_ring + (ring_index * (self.header().buffer_size as usize));
         let end_byte_idx = start_byte_idx + (self.header().buffer_size as usize);
-        // 
+        //
         // SAFETY: We have used atomic integers to lock this PORTION of memory safely away for the lifetime of this reference.
         // The availability aray ensures that at the point this method is called for a given `idx`, that specific memory region
         // corresponding to `idx` is logically reserved for reading and is not subject to concurrent mutable access by `entry_mut`.

@@ -56,48 +56,56 @@ impl OtlpMmapWriter {
         let span_start = header.spans_offset();
         let measurement_start = header.measurements_offset();
         let dictionary_start = header.dictionary_offset();
-        let events = unsafe {
-            let event_area = MmapOptions::new()
-                .len((span_start - event_start) as usize)
-                .offset(event_start as u64)
-                .map_mut(&f)?;
-            RingBufferWriter::<Event>::new(
-                event_area,
-                0,
-                config.events.buffer_size,
-                config.events.num_buffers,
-            )?
+        // SAFETY: This MmapMut operation is unsafe because `map_mut` can cause
+        // undefined behavior if the file descriptor is invalid or if the offset
+        // and length specify an invalid memory region.
+        // We rely on the header being appropriately sized and dividing areas safely in the mmap
+        // for further calls. This is done in `header.initialize`.
+        let (events, spans, metrics, dictionary) = unsafe {
+            let events = {
+                let event_area = MmapOptions::new()
+                    .len((span_start - event_start) as usize)
+                    .offset(event_start as u64)
+                    .map_mut(&f)?;
+                RingBufferWriter::<Event>::new(
+                    event_area,
+                    0,
+                    config.events.buffer_size,
+                    config.events.num_buffers,
+                )?
+            };
+            let spans = {
+                let span_area = MmapOptions::new()
+                    .len((measurement_start - span_start) as usize)
+                    .offset(span_start as u64)
+                    .map_mut(&f)?;
+                RingBufferWriter::<SpanEvent>::new(
+                    span_area,
+                    0,
+                    config.spans.buffer_size,
+                    config.spans.num_buffers,
+                )?
+            };
+            let metrics = {
+                let measurement_area = MmapOptions::new()
+                    .len((dictionary_start - measurement_start) as usize)
+                    .offset(measurement_start as u64)
+                    .map_mut(&f)?;
+                RingBufferWriter::<Measurement>::new(
+                    measurement_area,
+                    0,
+                    config.measurements.buffer_size,
+                    config.measurements.num_buffers,
+                )?
+            };
+            // Dictionary may need to remap itself.
+            let dictionary = Dictionary::try_new(
+                f,
+                dictionary_start as u64,
+                Some(config.dictionary.initial_size),
+            )?;
+            (events, spans, metrics, dictionary)
         };
-        let spans = unsafe {
-            let span_area = MmapOptions::new()
-                .len((measurement_start - span_start) as usize)
-                .offset(span_start as u64)
-                .map_mut(&f)?;
-            RingBufferWriter::<SpanEvent>::new(
-                span_area,
-                0,
-                config.spans.buffer_size,
-                config.spans.num_buffers,
-            )?
-        };
-        let metrics = unsafe {
-            let measurement_area = MmapOptions::new()
-                .len((dictionary_start - measurement_start) as usize)
-                .offset(measurement_start as u64)
-                .map_mut(&f)?;
-            RingBufferWriter::<Measurement>::new(
-                measurement_area,
-                0,
-                config.measurements.buffer_size,
-                config.measurements.num_buffers,
-            )?
-        };
-        // Dictionary may need to remap itself.
-        let dictionary = Dictionary::try_new(
-            f,
-            dictionary_start as u64,
-            Some(config.dictionary.initial_size),
-        )?;
         let start_time = header.start_time();
         Ok(OtlpMmapWriter {
             header,
@@ -163,30 +171,39 @@ impl OtlpMmapReader {
         let span_start = header.spans_offset();
         let measurement_start = header.measurements_offset();
         let dictionary_start = header.dictionary_offset();
-        let events = unsafe {
-            let event_area = MmapOptions::new()
-                .len((span_start - event_start) as usize)
-                .offset(event_start as u64)
-                .map_mut(&f)?;
-            RingBufferReader::<Event>::new(event_area, 0)?
-        };
-        let spans = unsafe {
-            let span_area = MmapOptions::new()
-                .len((measurement_start - span_start) as usize)
-                .offset(span_start as u64)
-                .map_mut(&f)?;
-            RingBufferReader::<SpanEvent>::new(span_area, 0)?
-        };
-        let metrics = unsafe {
-            let measurement_area = MmapOptions::new()
-                .len((dictionary_start - measurement_start) as usize)
-                .offset(measurement_start as u64)
-                .map_mut(&f)?;
-            RingBufferReader::<Measurement>::new(measurement_area, 0)?
+        // SAFETY: This MmapMut operation is unsafe because `map_mut` can cause
+        // undefined behavior if the file descriptor is invalid or if the offset
+        // and length specify an invalid memory region.
+        // We rely on the header being appropriately sized and dividing areas safely in the mmap
+        // for further calls. The "check_version" call is our attempt to ensure this is true.
+        let (events, spans, metrics) = unsafe {
+            let events = {
+                let event_area = MmapOptions::new()
+                    .len((span_start - event_start) as usize)
+                    .offset(event_start as u64)
+                    .map_mut(&f)?;
+                RingBufferReader::<Event>::new(event_area, 0)?
+            };
+            let spans = {
+                let span_area = MmapOptions::new()
+                    .len((measurement_start - span_start) as usize)
+                    .offset(span_start as u64)
+                    .map_mut(&f)?;
+                RingBufferReader::<SpanEvent>::new(span_area, 0)?
+            };
+            let metrics = {
+                let measurement_area = MmapOptions::new()
+                    .len((dictionary_start - measurement_start) as usize)
+                    .offset(measurement_start as u64)
+                    .map_mut(&f)?;
+                RingBufferReader::<Measurement>::new(measurement_area, 0)?
+            };
+            (events, spans, metrics)
         };
         // Dictionary may need to remap itself.
         let dictionary =
             OtlpDictionary::new(Dictionary::try_new(f, dictionary_start as u64, None)?);
+
         Ok(OtlpMmapReader {
             header,
             events,
