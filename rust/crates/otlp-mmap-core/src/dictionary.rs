@@ -204,9 +204,11 @@ impl Dictionary {
             .fetch_add(total_len as i64, Ordering::Acquire);
         let start = (current as u64 - self.offset) as usize;
         let end = (current as u64 + total_len as u64 - self.offset) as usize;
-
+        // TODO - Verify ensure capacity is safe...
         self.ensure_capacity(end)?;
-
+        // Safety: The compare-and-swap operation, earlier, uniquely reserved the memory region
+        // for which we'll be writing this entry. As the dictionary only grows and never compacts,
+        // we are the only bit of code that COULD write this entry at this point.
         let data = unsafe { &mut *self.data.get() };
         let slice = &mut data[start..end];
         let mut buf = &mut slice[..];
@@ -232,7 +234,11 @@ impl Dictionary {
         let end = start + total_len;
 
         self.ensure_capacity(end)?;
-
+        // Safety: We confirmed that this entry is *before* the understood "end" of the dictionary.
+        // We have the following invariants making it safe to access this data.
+        // - Dictionaries are write-once, read-many, meaning once an area is written, it will not change.
+        // - We limit the region we read from the dictionary offset to the currently read "end" of the dictionary,
+        //   which is in the "readable" part, guaranteed to not be written again.
         let data = unsafe { &mut *self.data.get() };
         println!("Writing bytes to dictionary. current={current}");
         {

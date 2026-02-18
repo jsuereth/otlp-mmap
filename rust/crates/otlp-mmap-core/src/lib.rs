@@ -98,7 +98,8 @@ impl OtlpMmapWriter {
                     config.measurements.num_buffers,
                 )?
             };
-            // Dictionary may need to remap itself.
+            // Dictionary may need to remap itself as the file grows, so we need to pass
+            // in the file for this activity.
             let dictionary = Dictionary::try_new(
                 f,
                 dictionary_start as u64,
