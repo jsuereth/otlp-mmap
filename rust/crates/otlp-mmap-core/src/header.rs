@@ -11,18 +11,24 @@ use std::{
 const SUPPORTED_MMAP_VERSION: &[i64] = &[1];
 /// Current MMAP version for files we create.
 const CURRENT_MMAP_VERSION: i64 = 1;
+/// Size of the header for a ring buffer
 const RING_BUFFER_HEADER_SIZE: usize = 32;
+/// Size of OTLP MMAP file header.
+const OTLP_MMAP_HEADER_SIZE: u64 = 64;
+/// Size of dictionary section header.
+const DICTIONARY_HEADER_SIZE: u64 = 64;
 
 /// Determine the minimum file size needed for a given config
 pub(crate) fn calculate_minimum_file_size(config: &OtlpMmapConfig) -> u64 {
     // Start with header size
-    64 + ring_buffer_size(config.events.num_buffers, config.events.buffer_size) as u64
+    OTLP_MMAP_HEADER_SIZE
+        + ring_buffer_size(config.events.num_buffers, config.events.buffer_size) as u64
         + ring_buffer_size(config.spans.num_buffers, config.spans.buffer_size) as u64
         + ring_buffer_size(
             config.measurements.num_buffers,
             config.measurements.buffer_size,
         ) as u64
-        + 64
+        + DICTIONARY_HEADER_SIZE
         + config.dictionary.initial_size
 }
 
@@ -32,6 +38,7 @@ pub(crate) struct MmapHeader {
 }
 
 impl MmapHeader {
+    /// Loads the header of an OTLP-MMAP file.
     pub(crate) fn new<F>(file: F) -> Result<MmapHeader, Error>
     where
         F: memmap2::MmapAsRawDesc,
@@ -46,13 +53,14 @@ impl MmapHeader {
             data: unsafe { MmapOptions::new().offset(0).len(64).map_mut(file)? },
         })
     }
-
+    /// Access to the header.
     fn raw(&self) -> &RawMmapHeader {
         // SAFETY: The `MmapMut` object `self.data` guarantees that the memory region
         // is valid for the lifetime of `self`.  The `new` method ensures we have enough
         // size of file to allocate against the size of the repr(C) struct.
         unsafe { &*(self.data.as_ref().as_ptr() as *const RawMmapHeader) }
     }
+    /// Mutable access to the header.
     fn raw_mut(&mut self) -> &mut RawMmapHeader {
         // SAFETY: The `MmapMut` object `self.data` guarantees that the memory region
         // is valid for the lifetime of `self`.  The `new` method ensures we have enough
@@ -72,8 +80,6 @@ impl MmapHeader {
     }
 
     /// Initialize this header for writing.
-    ///
-    /// TODO - We need configuration input on sizes.
     pub fn initialize(&mut self, config: &OtlpMmapConfig) -> Result<(), Error> {
         // TODO - version should use an atomic as well.
         self.raw_mut().version = CURRENT_MMAP_VERSION;
@@ -104,28 +110,28 @@ impl MmapHeader {
         Ok(())
     }
 
-    /// Version of the MMAP file.
+    /// Version of the OTLP MMAP file.
     pub fn version(&self) -> i64 {
         self.raw().version
     }
-    /// The start time of the MMAP file in nanoseconds since epoch.
+    /// The start time of the OTLP MMAP file in nanoseconds since epoch.
     /// Note: This uses atomic Ordering::Acquire.
     pub fn start_time(&self) -> u64 {
         self.raw().start_time_unix_nano.load(Ordering::Acquire)
     }
-    /// Offset in MMAP file where event ringbuffer starts.
+    /// Offset in OTLP MMAP file where event ringbuffer starts.
     pub fn events_offset(&self) -> i64 {
         self.raw().events.load(Ordering::Relaxed)
     }
-    /// Offset in MMAP file where span ringbuffer starts.
+    /// Offset in OTLP MMAP file where span ringbuffer starts.
     pub fn spans_offset(&self) -> i64 {
         self.raw().spans.load(Ordering::Relaxed)
     }
-    /// Offset in MMAP file where measurement ringbuffer starts.
+    /// Offset in OTLP MMAP file where measurement ringbuffer starts.
     pub fn measurements_offset(&self) -> i64 {
         self.raw().measurements.load(Ordering::Relaxed)
     }
-    /// Offset in MMAP file where dictionary starts.
+    /// Offset in OTLP MMAP file where dictionary starts.
     pub fn dictionary_offset(&self) -> i64 {
         self.raw().dictionary.load(Ordering::Relaxed)
     }
@@ -159,9 +165,6 @@ mod tests {
     use std::fs::{File, OpenOptions};
     use std::io::{Seek, Write};
     use tempfile::NamedTempFile;
-
-    // The header is 64 bytes, but only 40 bytes are used today.
-    const HEADER_SIZE: u64 = 64;
 
     /// Helper to write the main MMAP header.
     fn write_main_header(

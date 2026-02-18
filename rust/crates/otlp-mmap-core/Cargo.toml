@@ -18,3 +18,8 @@ opentelemetry-proto.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "ring_benchmark"
+harness = false
