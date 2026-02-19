@@ -72,6 +72,7 @@ services:
     command: ["run", "-o", "experimental-opentelemetry", "/config/k6-load-test.js"]
     environment:
       TARGET_URL: http://java_http_server_mmap_sdk:8081/
+      VIRTUAL_USERS: 200
       K6_OTEL_SERVICE_NAME: java_http_mmap_load_test
       K6_OTEL_FLUSH_INTERVAL: 10s
       K6_OTEL_EXPORTER_TYPE: grpc
@@ -87,6 +88,7 @@ services:
     command: ["run", "-o", "experimental-opentelemetry", "/config/k6-load-test.js"]
     environment:
       TARGET_URL: http://java_http_server_sdk:8082/
+      VIRTUAL_USERS: 200
       K6_OTEL_SERVICE_NAME: java_http_sdk_load_test
       K6_OTEL_FLUSH_INTERVAL: 10s
       K6_OTEL_EXPORTER_TYPE: grpc

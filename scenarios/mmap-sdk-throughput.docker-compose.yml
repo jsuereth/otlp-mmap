@@ -54,6 +54,7 @@ services:
     command: ["run", "/config/k6-load-test.js"]
     environment:
       TARGET_URL: http://java_http_server:8081/
+      VIRTUAL_USERS: 200
     depends_on:
       - java_http_server
     volumes: 

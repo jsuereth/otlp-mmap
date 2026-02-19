@@ -4,10 +4,10 @@ import { check, sleep } from 'k6';
 // Define the load profile
 export let options = {
   stages: [
-    // Ramp up to 20 Virtual Users over 10 seconds
-    { duration: '10s', target: 200 },
-    // Stay at 20 VUs for some time
-    { duration: '600s', target: 200 },
+    // Ramp up to N Virtual Users over 10 seconds
+    { duration: '10s', target: parseInt(`${__ENV.VIRTUAL_USERS}` || '200', 10) },
+    // Stay at N VUs for some time
+    { duration: '600s', target: parseInt(`${__ENV.VIRTUAL_USERS}` || '200', 10) },
     // Ramp down to 0 VUs over 5 seconds
     { duration: '5s', target: 0 },
   ],
