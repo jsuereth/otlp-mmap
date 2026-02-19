@@ -65,6 +65,7 @@ services:
     image: grafana/k6:latest
     command: ["run", "-o", "experimental-opentelemetry", "/config/k6-load-test.js"]
     environment:
+      VIRTUAL_USERS: 10
       TARGET_URL: http://python_http_server_mmap_sdk:8081/
       K6_OTEL_SERVICE_NAME: python_http_mmap_load_test
       K6_OTEL_FLUSH_INTERVAL: 10s
@@ -82,6 +83,7 @@ services:
     command: ["run", "-o", "experimental-opentelemetry", "/config/k6-load-test.js"]
     environment:
       TARGET_URL: http://python_http_server_sdk:8082/
+      VIRTUAL_USERS: 10
       K6_OTEL_SERVICE_NAME: python_http_sdk_load_test
       K6_OTEL_FLUSH_INTERVAL: 10s
       K6_OTEL_EXPORTER_TYPE: grpc

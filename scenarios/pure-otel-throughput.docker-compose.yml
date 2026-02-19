@@ -30,6 +30,7 @@ services:
     container_name: k6_loadtester
     command: ["run", "/config/k6-load-test.js"]
     environment:
+      VIRTUAL_USERS: 200
       TARGET_URL: http://java_http_server:8081/
     depends_on:
       - java_http_server
