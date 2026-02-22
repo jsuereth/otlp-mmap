@@ -13,7 +13,7 @@ publish = false
 rust-version = "1.81.0"
 
 [workspace.dependencies]
-memmap2 = "0.9.9"
+memmap2 = "0.9.10"
 opentelemetry-proto = { version="0.31.0", features = ["full"] }
 serde={ version = "1.0.228", features = ["derive"] }
 prost = "0.14.1"
