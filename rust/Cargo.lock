@@ -1178,9 +1178,9 @@ checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
 
 [[package]]
 name = "saa"
-version = "5.4.9"
+version = "5.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da0ba8adb63e0deebd0744d8fc5bea394c08029159deaf680513fec1a3949144"
+checksum = "16c7f49c9d5caa3bf4b3106900484b447b9253fe99670ceb81cb6cb5027855e1"
 
 [[package]]
 name = "same-file"
@@ -1193,9 +1193,9 @@ dependencies = [
 
 [[package]]
 name = "scc"
-version = "3.6.1"
+version = "3.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5b74167f28ef1020bb641b58847949d5ea2945b831e26321ae81143ee6c1326"
+checksum = "33f657c5c05cdfb286cce8d368937ddda5fab6efb95a1fdcaef5d12ae79bcf8b"
 dependencies = [
  "saa",
  "sdd",
