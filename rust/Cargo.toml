@@ -26,4 +26,4 @@ itertools="0.14.0"
 clap = { version = "4.5.60", features = ["derive", "env"] }
 pyo3 = { version = "0.28", features = ["extension-module"] }
 tempfile = "3.23.0"
-criterion = { version ="0.5.1", features= ["html_reports"] }
+criterion = { version ="0.8.2", features= ["html_reports"] }
