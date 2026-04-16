@@ -13,12 +13,12 @@ that supports the MMap protocol.
 A shared native library does NOT solve the key problem we
 want to address of ensuring observability data is able to
 be collected even during a process crash. In general, the
-goal for any MMAP-SDK is to acheive the following:
+goal for any MMAP-SDK is to achieve the following:
 
 - Signals can leverage pre-allocated memory, allowing
   an SDK to report signals even during an OOM event.
 - MMAP-SDKs should avoid as much local buffering as
-  possible, prefering to directly leverage the MMAP
+  possible, preferring to directly leverage the MMAP
   buffers, ensuring data is recoverable on a crash.
 
 A shared native library *could* be used to implement an
@@ -34,14 +34,14 @@ Protocol buffers were chosen for the following:
 
 - Good support across languages
 - Easy to do length-delimited writes (i.e. length)
-  of variable sized content preceedes the content.
+  of variable sized content precedes the content.
 - Good compression of common data via variable-integers.
 
 This choice needs to be balanced against the other goals /
 priorities of OTLP-MMAP, e.g. ensuring that signals written
 *during* a process crash can still make it out. Protocol
 Buffers, if not careful, can cause memory allocations or computations that may prevent the core objective. This will
-be evalauted during benchmarking.
+be evaluated during benchmarking.
 
 ## Why not STEF?
 
@@ -66,12 +66,12 @@ reasons:
   would require a full bidirectional protocol.
 
 We believe STEF may be an ideal format for an
-`mmap-collector` to report data into an `otel-collcetor`,
+`mmap-collector` to report data into an `otel-collector`,
 but is ill-suited to the goals of OTLP-MMAP.
 
 Some of the insights in STEF into structuring binary data
 *may* be applicable and could wind up in OTLP-MMAP.
 However, as benchmarking is showing, we want to further
-limit / reduct the synchronization needed in OTLP-MMAP
+limit / reduce the synchronization needed in OTLP-MMAP
 ringbuffers, not increase the dependency on this
 capability.
