@@ -1,6 +1,6 @@
 # TODO - figure out how to build all language protobufs here.
 
-FROM rust:1-alpine3.22@sha256:3c06253e433c1b2ac2c279a98226d385d25c5f324138ab2861a5414bfa6855f9
+FROM rust:1-alpine3.22@sha256:f495b500f1d599f0ac3717c2b051d7777ea7863e351aac977c243b697d328082
 LABEL maintainer="The OpenTelemetry Authors"
 # Install protoc from Alpine package manager for better security
 # This leverages Alpine's package signing and verification mechanisms
