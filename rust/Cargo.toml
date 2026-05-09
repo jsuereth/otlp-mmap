@@ -14,7 +14,7 @@ rust-version = "1.81.0"
 
 [workspace.dependencies]
 memmap2 = "0.9.10"
-opentelemetry-proto = { version="0.31.0", features = ["full"] }
+opentelemetry-proto = { version="0.32.0", features = ["full"] }
 serde={ version = "1.0.228", features = ["derive"] }
 prost = "0.14.1"
 thiserror="2.0.17"
