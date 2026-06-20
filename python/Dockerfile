@@ -1,5 +1,5 @@
 # --- Test/Development Stage ---
-FROM python:3.14-alpine@sha256:dd4d2bd5b53d9b25a51da13addf2be586beebd5387e289e798e4083d94ca837a
+FROM python:3.14-alpine@sha256:26730869004e2b9c4b9ad09cab8625e81d256d1ce97e72df5520e806b1709f92
 
 # Install Rust toolchain and required system dependencies for compilation
 RUN apk add --no-cache rust cargo build-base python3-dev libffi-dev openssl-dev
