@@ -12,7 +12,7 @@ COPY project/plugins.sbt /build/project/plugins.sbt
 RUN sbt assembly
 
 # The runtime Image
-FROM eclipse-temurin:25@sha256:1bda4d9e668f44f399abed30636c34e0befb727408fba27b1e6aaefcf9df346b
+FROM eclipse-temurin:25@sha256:edb3aa0f621796d8f5f9d602c7611ffdf015cd89e6ddda1894d85a3a99d170a8
 LABEL maintainer="The OpenTelemetry Authors"
 
 # Create non-root user for security
