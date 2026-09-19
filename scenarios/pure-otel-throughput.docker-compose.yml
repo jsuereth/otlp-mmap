@@ -5,7 +5,7 @@
 services:
   # OpenTelemetry collector actually pull
   otel_collector:
-    image: otel/opentelemetry-collector-contrib:0.72.0
+    image: otel/opentelemetry-collector-contrib:0.161.0
     volumes:
       - ./otel-config:/otel-config
     command: ["--config=/otel-config/otel-throughput-config.yaml"]

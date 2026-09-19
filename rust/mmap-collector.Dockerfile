@@ -1,6 +1,6 @@
 
 # The build image
-FROM rust:1.88.0-alpine3.22 AS build
+FROM rust:1.98.1-alpine3.22 AS build
 RUN apk add musl-dev
 WORKDIR /build
 
@@ -13,7 +13,7 @@ COPY crates /build/crates
 RUN cargo build --release -p otlp-mmap-collector
 
 # The runtime image
-FROM alpine:3.22
+FROM alpine:3.24
 LABEL maintainer="The OpenTelemetry Authors"
 # TODO - Don't run as root...
 # RUN addgroup otel \

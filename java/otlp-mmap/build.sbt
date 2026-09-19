@@ -1,6 +1,6 @@
 
-val scala3Version = "3.7.3"
-val otelVersion = "1.56.0"
+val scala3Version = "3.9.0"
+val otelVersion = "1.66.0"
 
 lazy val mmapsdk =
   project
@@ -9,8 +9,8 @@ lazy val mmapsdk =
     name := "mmap-sdk",
     version := "0.1.0-SNAPSHOT",
     scalaVersion := scala3Version,
-    libraryDependencies += "org.scalameta" %% "munit" % "1.0.0" % Test,
-    libraryDependencies += "com.google.protobuf" % "protobuf-java" % "4.33.0",
+    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
+    libraryDependencies += "com.google.protobuf" % "protobuf-java" % "4.36.2",
     libraryDependencies += "io.opentelemetry" % "opentelemetry-api" % otelVersion,
     libraryDependencies += "io.opentelemetry" % "opentelemetry-api-incubator" % s"${otelVersion}-alpha"
   ).disablePlugins(AssemblyPlugin)
@@ -26,9 +26,9 @@ lazy val root = project
     libraryDependencies += "io.opentelemetry" % "opentelemetry-sdk" % otelVersion,
     // libraryDependencies += "io.opentelemetry" % "opentelemetry-exporter-otlp-common" % "1.42.1",
     libraryDependencies += "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % otelVersion,
-    libraryDependencies += "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.54.1",
-    libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % "2.18.0",
-    libraryDependencies += "org.scalameta" %% "munit" % "1.0.0" % Test,
+    libraryDependencies += "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.66.0",
+    libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % "2.22.2",
+    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     libraryDependencies += "io.opentelemetry.instrumentation" % "opentelemetry-java-http-server" % "2.21.0-alpha",
     libraryDependencies += "io.opentelemetry.instrumentation" % "opentelemetry-runtime-telemetry-java17" % "2.21.0-alpha",
     assembly / assemblyJarName := "demo.jar",
