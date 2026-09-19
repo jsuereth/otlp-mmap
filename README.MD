@@ -16,6 +16,7 @@ See also:
 - [mmap-collector implementation](rust/crates/otlp-mmap-collector/README.md)
 - [Try it out](#try-it-yourself)
 - [Frequently Asked Questions](FAQS.md)
+- [Contributing & Dependency Management](CONTRIBUTING.MD)
 
 ## Principles
 
