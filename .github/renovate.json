@@ -1,0 +1,38 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "description": "Renovate configuration for otlp-mmap: groups all dependency updates into a single PR across SBT, Docker, Rust, Python, and GitHub Actions",
+  "separateMajorMinor": false,
+  "packageRules": [
+    {
+      "description": "Group all dependency updates into a single PR",
+      "matchPackageNames": [
+        "*"
+      ],
+      "groupName": "all dependencies",
+      "groupSlug": "all-dependencies"
+    },
+    {
+      "description": "Ignore local monorepo Python packages from external registry lookups",
+      "matchPackageNames": [
+        "otlp-mmap-pybindings",
+        "otlp-mmap-sdk"
+      ],
+      "enabled": false
+    }
+  ],
+  "dockerfile": {
+    "managerFilePatterns": [
+      "/(^|/)(?:Dockerfile|.*\\.Dockerfile)$/",
+      "/(^|/)Dockerfile\\.[^/]+$/"
+    ]
+  },
+  "docker-compose": {
+    "managerFilePatterns": [
+      "/(^|/)(?:docker-)?compose[^/]*\\.ya?ml$/",
+      "/(^|/)[^/]*\\.docker-compose\\.ya?ml$/"
+    ]
+  }
+}
