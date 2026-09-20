@@ -727,8 +727,8 @@ pub enum AggregationTemporality {
     ///    10. The system recovers and resumes receiving at time=t_1.
     ///    11. A request is received, the system measures 1 request.
     ///    12. The 1 second collection cycle ends. A metric is exported for the
-    ///       number of requests received over the interval of time t_1 to
-    ///       t_0+1 with a value of 1.
+    ///        number of requests received over the interval of time t_1 to
+    ///        t_0+1 with a value of 1.
     ///
     /// Note: Even though, when reporting changes since last report time, using
     /// CUMULATIVE is valid, it is not recommended. This may cause problems for
