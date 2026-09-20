@@ -156,6 +156,7 @@ mod tests {
                             ),
                         ),
                     }),
+                    ..Default::default()
                 }],
                 ..Default::default()
             },
@@ -246,6 +247,7 @@ mod tests {
                             opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(1),
                         ),
                     }),
+                    ..Default::default()
                 }],
                 ..Default::default()
             },
@@ -261,6 +263,7 @@ mod tests {
                             opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(2),
                         ),
                     }),
+                    ..Default::default()
                 }],
                 ..Default::default()
             },

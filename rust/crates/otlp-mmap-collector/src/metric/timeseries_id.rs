@@ -108,6 +108,7 @@ fn compare_values(
     // 1. Try to compare directly if same type for efficiency
     match (l, r) {
         (Value::StringValue(ls), Value::StringValue(rs)) => return ls.cmp(rs),
+        (Value::StringValueStrindex(ls), Value::StringValueStrindex(rs)) => return ls.cmp(rs),
         (Value::BoolValue(lb), Value::BoolValue(rb)) => return lb.cmp(rb),
         (Value::IntValue(li), Value::IntValue(ri)) => return li.cmp(ri),
         (Value::DoubleValue(ld), Value::DoubleValue(rd)) => return ld.total_cmp(rd),
@@ -179,6 +180,7 @@ fn value_to_string(v: &opentelemetry_proto::tonic::common::v1::any_value::Value)
             s.push('}');
             s
         }
+        Value::StringValueStrindex(idx) => idx.to_string(),
     }
 }
 
@@ -204,6 +206,7 @@ mod tests {
         KeyValue {
             key: key.to_string(),
             value: Some(OTLPAnyValue { value: Some(value) }),
+            ..Default::default()
         }
     }
 
@@ -268,6 +271,7 @@ mod tests {
             Ok(opentelemetry_proto::tonic::common::v1::KeyValue {
                 key: key_string,
                 value: otlp_value,
+                ..Default::default()
             })
         }
     }
@@ -455,12 +459,14 @@ mod tests {
             value: Some(OTLPAnyValue {
                 value: Some(OTLPValue::IntValue(1)),
             }),
+            ..Default::default()
         };
         let kv2 = opentelemetry_proto::tonic::common::v1::KeyValue {
             key: "b".to_owned(),
             value: Some(OTLPAnyValue {
                 value: Some(OTLPValue::IntValue(2)),
             }),
+            ..Default::default()
         };
 
         let l1 = OTLPValue::KvlistValue(opentelemetry_proto::tonic::common::v1::KeyValueList {

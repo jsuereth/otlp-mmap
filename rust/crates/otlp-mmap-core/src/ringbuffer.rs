@@ -139,7 +139,7 @@ impl RingBuffer {
         buffer_size: usize,
         num_buffers: usize,
     ) -> Result<RingBuffer, Error> {
-        if num_buffers <= 0 || (num_buffers & (num_buffers - 1)) != 0 {
+        if num_buffers == 0 || (num_buffers & (num_buffers - 1)) != 0 {
             return Err(Error::InvalidConfiguration(format!(
                 "num_buffers must be a power of two, found {}",
                 num_buffers

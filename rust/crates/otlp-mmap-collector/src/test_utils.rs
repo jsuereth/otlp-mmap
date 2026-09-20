@@ -62,7 +62,11 @@ impl AttributeLookup for MockSdkLookup {
         } else {
             None
         };
-        Ok(opentelemetry_proto::tonic::common::v1::KeyValue { key, value })
+        Ok(opentelemetry_proto::tonic::common::v1::KeyValue {
+            key,
+            value,
+            ..Default::default()
+        })
     }
 }
 
