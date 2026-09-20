@@ -39,7 +39,7 @@ impl super::Aggregation for NoAggregation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::metric::aggregation::{Aggregation, AggregationConfig};
+    use crate::metric::aggregation::AggregationConfig;
     use otlp_mmap_protocol::measurement::Value;
     use otlp_mmap_protocol::Measurement;
 

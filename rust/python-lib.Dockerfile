@@ -1,5 +1,5 @@
 # --- Build Stage ---
-FROM python:3.11-alpine AS builder
+FROM python:3.14-alpine AS builder
 
 # Install Rust toolchain and required system dependencies for compilation
 RUN apk add --no-cache rust cargo build-base python3-dev libffi-dev openssl-dev
@@ -22,7 +22,7 @@ RUN maturin build --release --out /wheels
 # TODO - Python tests.
 
 # Create layer of python alpine with our module installed.
-FROM python:3.11-alpine
+FROM python:3.14-alpine
 WORKDIR /app
 # Copy wheels from builder
 COPY --from=builder /wheels /wheels

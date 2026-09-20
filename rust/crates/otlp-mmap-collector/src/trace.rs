@@ -74,6 +74,7 @@ impl ActiveSpans {
     }
 
     /// Returns the number of active spans.
+    #[allow(dead_code)]
     pub fn num_active(&self) -> usize {
         self.spans.len()
     }

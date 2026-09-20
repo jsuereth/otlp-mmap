@@ -9,10 +9,10 @@ COPY project/build.properties /build/project/build.properties
 COPY project/plugins.sbt /build/project/plugins.sbt
 
 # Build
-RUN sbt assembly
+RUN sbt assembly && find /build/target -name demo.jar -exec cp {} /build/demo.jar \;
 
 # The runtime Image
-FROM eclipse-temurin:25@sha256:1bda4d9e668f44f399abed30636c34e0befb727408fba27b1e6aaefcf9df346b
+FROM eclipse-temurin:25@sha256:97014c4b396021f9ddb7d592a7dbedb0c4e4215c29e03dc01c393558aefb71c2
 LABEL maintainer="The OpenTelemetry Authors"
 
 # Create non-root user for security
@@ -21,7 +21,7 @@ RUN groupadd -r -g 10001 appuser && \
 
 WORKDIR /home/otel
 # TODO - assembly jar
-COPY --from=build --chown=appuser:appuser /build/target/scala-3.7.3/demo.jar /otel/demo.jar
+COPY --from=build --chown=appuser:appuser /build/demo.jar /otel/demo.jar
 
 USER appuser
 CMD ["java", "-jar", "/otel/demo.jar"]

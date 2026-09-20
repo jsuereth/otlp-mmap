@@ -92,7 +92,11 @@ impl OtlpDictionary {
         } else {
             None
         };
-        Ok(opentelemetry_proto::tonic::common::v1::KeyValue { key, value })
+        Ok(opentelemetry_proto::tonic::common::v1::KeyValue {
+            key,
+            value,
+            ..Default::default()
+        })
     }
 
     // converts an OTLP-MMAP AnyValue to an OTLP AnyValue.

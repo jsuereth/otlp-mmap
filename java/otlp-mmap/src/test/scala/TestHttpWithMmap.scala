@@ -36,10 +36,11 @@ class TestHttpWithMmap extends FunSuite:
         val otel = MiniOpenTelemetry(mmap)
 
         // Start HTTP server
-        val server = Util.startHttpServer(otel, 9091)
+        val server = Util.startHttpServer(otel, 0)
+        val port = server.getAddress().getPort()
         try
             // Now do our test.
-            val response = httpGet("http://localhost:9091")
+            val response = httpGet(s"http://127.0.0.1:$port")
             assertEquals(response.statusCode(), 200)
 
             // Now check for spans.
