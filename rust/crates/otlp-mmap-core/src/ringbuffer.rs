@@ -266,6 +266,7 @@ impl RingBuffer {
         }
     }
     /// The number of bytes this ring buffer will take.
+    #[allow(dead_code)]
     fn byte_size(&self) -> usize {
         // Header + Availability Array + Ring Buffer
         let size = self.first_buffer_offset()

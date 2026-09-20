@@ -69,7 +69,7 @@ impl super::Aggregation for SumAggregation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::metric::aggregation::{Aggregation, AggregationConfig};
+    use crate::metric::aggregation::AggregationConfig;
     use crate::metric::timeseries_id::TimeSeriesIdentity;
     use crate::metric::CollectionContext;
     use otlp_mmap_protocol::measurement::Value;

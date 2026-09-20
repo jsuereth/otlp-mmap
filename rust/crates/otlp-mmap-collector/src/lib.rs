@@ -312,6 +312,7 @@ pub trait SdkLookup: AttributeLookup {
     ) -> Result<Option<opentelemetry_proto::tonic::common::v1::AnyValue>, Error>;
 }
 /// Abstract trait to interact with ring buffers.
+#[allow(async_fn_in_trait)]
 pub trait AsyncEventQueue<T>
 where
     T: prost::Message + std::default::Default + 'static + Sync,

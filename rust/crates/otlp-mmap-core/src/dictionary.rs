@@ -747,7 +747,7 @@ mod tests {
             .expect("Failed to create reader dictionary");
 
         // 1. Writer writes data until we are near the end of the initial 1024 bytes.
-        let mut last_idx = 0;
+        let mut last_idx;
         loop {
             let s = "short";
             last_idx = dict_writer
